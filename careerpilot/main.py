@@ -537,6 +537,21 @@ def _diagnostic_click_stages(page, job, title_selector: str, *,
     return stages
 
 
+def _cmd_validate_browser(argv: list[str]) -> int:
+    """Run minimal Chrome + Naukri validation outside the scan workflow."""
+    import subprocess
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "scripts" / "validate_chrome_browser.py"
+    if not script.exists():
+        print(f"Missing {script}", file=sys.stderr)
+        return 1
+    result = subprocess.run(
+        [sys.executable, str(script)] + argv[1:],
+        check=False,
+    )
+    return int(result.returncode)
+
+
 def _cmd_probe_open(pilot, argv: list[str]) -> int:
     """One-page, few-second diagnostic: opens ONE search page for ONE portal,
     looks at the first few real cards, and prints IN PLAIN TEXT exactly what
@@ -802,6 +817,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     elif command == "probe-open":
         return _cmd_probe_open(pilot, argv)
+    elif command == "validate-browser":
+        return _cmd_validate_browser(argv)
     elif command == "export":
         # One-shot DOM export of a URL using the (logged-in) portal profile.
         from .core.enums import Portal

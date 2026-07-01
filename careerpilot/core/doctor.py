@@ -53,6 +53,7 @@ class Doctor:
             self._check_database()
             self._check_profiles()
             self._check_browser_profiles()
+        self._check_browser_channel()
         self._check_playwright()
         self._check_browser_binary()
         self._print_report()
@@ -183,6 +184,22 @@ class Doctor:
             self._add("Browser profiles", WARN,
                       "no saved login yet; first run will need manual login",
                       mandatory=False)
+
+    def _check_browser_channel(self) -> None:
+        assert self.config
+        channel = (self.config.browser.channel or "chrome").strip().lower()
+        if channel == "msedge":
+            self._add(
+                "Browser channel", WARN,
+                "channel=msedge -- Edge process crashes have been observed before "
+                "job evaluation. Use channel: chrome in config.yaml and run "
+                "'python -m careerpilot.main validate-browser' first.",
+                mandatory=False,
+            )
+        elif channel == "chrome":
+            self._add("Browser channel", PASS, "chrome (recommended for stability)")
+        else:
+            self._add("Browser channel", PASS, f"{channel or 'bundled chromium'}")
 
     def _check_playwright(self) -> None:
         import importlib.util

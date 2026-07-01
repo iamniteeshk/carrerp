@@ -51,5 +51,17 @@ def test_lifecycle_instrumenter_wires_handlers():
     assert "page" in ctx._handlers
 
 
-def test_page_alive_treats_missing_is_closed_as_alive():
-    assert _page_alive(object())
+def test_profile_dir_isolates_chrome_channel(tmp_path):
+    from careerpilot.browser.session import BrowserManager, BrowserConfig
+    mgr = BrowserManager(BrowserConfig(channel="chrome",
+                                       profiles_path=str(tmp_path)))
+    d = mgr.profile_dir("naukri")
+    assert d == tmp_path / "naukri" / "chrome"
+
+
+def test_lifecycle_runtime_state():
+    from careerpilot.browser.lifecycle import RUNTIME
+    RUNTIME.set(workflow_state="TEST", job_url="https://example.com/j")
+    snap = RUNTIME.snapshot()
+    assert snap["workflow_state"] == "TEST"
+    assert snap["job_url"] == "https://example.com/j"

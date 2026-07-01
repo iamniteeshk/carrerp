@@ -21,6 +21,8 @@ from typing import Any
 
 from ..core.logging_setup import get_logger
 
+from .lifecycle import RUNTIME
+
 logger = get_logger(__name__)
 _lifecycle_logger = get_logger("careerpilot.browser.lifecycle")
 
@@ -52,19 +54,36 @@ class LifecycleInstrumenter:
         self.portal = portal
         self._wired_pages: set[int] = set()
 
+    def _runtime_detail(self, page: Any = None) -> str:
+        snap = RUNTIME.snapshot()
+        snap["portal"] = snap.get("portal") or self.portal
+        if page is not None:
+            snap["page_url"] = _safe_page_url(page)
+        return (
+            f"workflow={snap['workflow_state']} | job_id={snap['job_id']} | "
+            f"job_url={snap['job_url']} | job_title={snap['job_title']} | "
+            f"page_url={snap['page_url']}"
+        )
+
     def attach_context(self, context: Any) -> None:
         try:
             context.on("close", lambda: _lifecycle_logger.warning(
-                "CONTEXT_CLOSE event | portal=%s | stack=%s",
-                self.portal, _caller_stack()))
+                "CONTEXT_CLOSE event | %s | stack=%s",
+                self._runtime_detail(), _caller_stack()))
         except Exception as exc:  # noqa: BLE001
             _lifecycle_logger.debug("context.on(close) failed: %s", exc)
         try:
             browser = getattr(context, "browser", None)
             if browser is not None:
+                try:
+                    browser.on("close", lambda: _lifecycle_logger.warning(
+                        "BROWSER_CLOSE event | %s | stack=%s",
+                        self._runtime_detail(), _caller_stack()))
+                except Exception:  # noqa: BLE001
+                    pass
                 browser.on("disconnected", lambda: _lifecycle_logger.error(
-                    "BROWSER_DISCONNECTED event | portal=%s | stack=%s",
-                    self.portal, _caller_stack()))
+                    "BROWSER_DISCONNECTED event | %s | stack=%s",
+                    self._runtime_detail(), _caller_stack()))
         except Exception as exc:  # noqa: BLE001
             _lifecycle_logger.debug("browser.on(disconnected) failed: %s", exc)
         try:
@@ -81,11 +100,11 @@ class LifecycleInstrumenter:
         self._wired_pages.add(pid)
         try:
             page.on("close", lambda: _lifecycle_logger.warning(
-                "PAGE_CLOSE event | portal=%s | url=%s | stack=%s",
-                self.portal, _safe_page_url(page), _caller_stack()))
+                "PAGE_CLOSE event | %s | stack=%s",
+                self._runtime_detail(page), _caller_stack()))
             page.on("crash", lambda: _lifecycle_logger.error(
-                "PAGE_CRASH event | portal=%s | url=%s | stack=%s",
-                self.portal, _safe_page_url(page), _caller_stack()))
+                "PAGE_CRASH event | %s | stack=%s",
+                self._runtime_detail(page), _caller_stack()))
         except Exception as exc:  # noqa: BLE001
             _lifecycle_logger.debug("page lifecycle hooks failed: %s", exc)
 
@@ -95,7 +114,7 @@ class BrowserConfig:
     """Configuration-driven browser settings (no hardcoded engine)."""
 
     engine: str = "chromium"          # chromium | firefox | webkit
-    channel: str = "msedge"           # msedge | chrome | "" (bundled Chromium)
+    channel: str = "chrome"           # chrome | msedge | "" (bundled Chromium)
     headless: bool = False
     viewport_width: int = 1366
     viewport_height: int = 900
@@ -127,7 +146,12 @@ def build_launch_plan(cfg: BrowserConfig, user_data_dir: str | Path) -> tuple[st
                      "height": int(cfg.viewport_height)},
     }
     if engine == "chromium":
-        kwargs["args"] = ["--disable-blink-features=AutomationControlled"]
+        kwargs["args"] = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-dev-shm-usage",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ]
         channel = (cfg.channel or "").strip().lower()
         if channel:
             if channel not in _CHROMIUM_CHANNELS:
@@ -165,7 +189,22 @@ class BrowserManager:
         self._pw = sync_playwright().start()
 
     def profile_dir(self, portal: str) -> Path:
-        d = Path(self.cfg.profiles_path) / portal.lower()
+        """Per-portal profile; channel-specific subdir avoids Edge/Chrome corruption."""
+        base = Path(self.cfg.profiles_path) / portal.lower()
+        channel = (self.cfg.channel or "").strip().lower()
+        if channel and channel in _CHROMIUM_CHANNELS:
+            ch_dir = base / channel
+            if ch_dir.exists() or not base.exists() or not any(base.iterdir()):
+                d = ch_dir
+            else:
+                logger.warning(
+                    "Using legacy flat browser profile at %s (channel=%s). "
+                    "Edge and Chrome profiles must not share the same user-data-dir "
+                    "-- migrate login to %s to prevent browser process crashes.",
+                    base, channel, ch_dir)
+                d = base
+        else:
+            d = base
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -173,9 +212,9 @@ class BrowserManager:
         self._ensure_pw()
         engine_name, kwargs = build_launch_plan(self.cfg, self.profile_dir(portal))
         engine = getattr(self._pw, engine_name)
-        logger.info("Launching %s (%s, headless=%s) for %s",
+        logger.info("Launching %s (%s, headless=%s) for %s | profile=%s",
                     engine_name, kwargs.get("channel", "bundled"),
-                    kwargs["headless"], portal)
+                    kwargs["headless"], portal, self.profile_dir(portal))
         try:
             context = engine.launch_persistent_context(**kwargs)
         except Exception as exc:  # noqa: BLE001
@@ -285,6 +324,9 @@ class BrowserManager:
         for portal in list(self._contexts):
             self.close_portal(portal)
         if self._pw is not None:
+            _lifecycle_logger.info(
+                "INTENTIONAL_PLAYWRIGHT_STOP | %s | stack=%s",
+                RUNTIME.snapshot(), _caller_stack())
             try:
                 self._pw.stop()
             except Exception as exc:  # noqa: BLE001

@@ -22,6 +22,7 @@ from enum import Enum
 from urllib.parse import urlsplit
 
 from ..core.logging_setup import get_logger
+from .lifecycle import RUNTIME
 from ..core.models import Job, ScreeningAnswer
 
 logger = get_logger(__name__)
@@ -671,16 +672,24 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 debugger.pause(page, "after_scroll")
 
     collected = list(seen.values())
+    RUNTIME.set(workflow_state="PHASE1_COLLECTION_COMPLETE",
+                page_url=getattr(page, "url", ""))
     _nav_logger.info("PHASE1_COLLECTION_COMPLETE | %s unique job URLs collected",
                      len(collected))
 
     # PHASE 2: evaluate each collected URL via direct navigation (no card click,
     # no go_back, no dependency on the search results page staying open).
     if on_job is not None and collected:
+        RUNTIME.set(workflow_state="PHASE2_EVALUATE_STARTED")
         _nav_logger.info("PHASE2_EVALUATE_STARTED | %s URLs to open",
                          len(collected))
         for idx, j in enumerate(collected, 1):
             job_url = getattr(j, "job_url", "") or ""
+            RUNTIME.set(workflow_state="PHASE2_URL_OPEN",
+                        job_url=job_url,
+                        job_title=getattr(j, "job_title", ""),
+                        job_id=str(getattr(j, "job_id", "") or ""),
+                        page_url=getattr(page, "url", ""))
             _nav_logger.info("CARD_DETECTED | %s/%s | %s | %s",
                              idx, len(collected), getattr(j, "job_title", ""),
                              job_url)
@@ -729,6 +738,7 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 _nav_logger.warning("on_job callback failed: %s", exc)
         _nav_logger.info("PHASE2_EVALUATE_COMPLETE | %s URLs processed",
                          len(collected))
+        RUNTIME.set(workflow_state="PHASE2_EVALUATE_COMPLETE")
 
     return collected
 

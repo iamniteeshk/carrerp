@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .base_portal import (BrowserState, _log_state, navigate, wait_for_ready,
                            _card_text, _card_attr, _page_alive, _safe_wait_ms)
+from .lifecycle import RUNTIME
 from ..core.logging_setup import get_logger
 
 logger = get_logger("careerpilot.browser.detail")
@@ -150,6 +151,9 @@ class JobDetailExtractor:
         for attempt in range(max_retries + 1):
             try:
                 _log_state(BrowserState.OPENING_JOB, url)
+                RUNTIME.set(workflow_state="URL_NAVIGATION_STARTED",
+                            job_url=url, job_title=title,
+                            page_url=getattr(job_page, "url", ""))
                 logger.info("OPENING_JOB | URL_NAVIGATION_STARTED | %s | %s",
                             title, url)
                 if self.diagnostics is not None:
@@ -169,6 +173,8 @@ class JobDetailExtractor:
                 job.open_mode = "url_navigate"
                 job._job_page = job_page  # noqa: SLF001
                 logger.info("URL_NAVIGATION_COMPLETED | %s", url)
+                RUNTIME.set(workflow_state="JOB_PAGE_READY",
+                            page_url=getattr(job_page, "url", url))
                 _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
                         wait_reason="URL_NAVIGATION: direct goto job URL")
 

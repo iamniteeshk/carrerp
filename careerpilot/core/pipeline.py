@@ -200,6 +200,10 @@ class ScanPipeline:
 
             self._stage(n, "CARD_DETECTED", tag)
             job.job_id = self.jobs.insert(job)          # INSERT + commit
+            from ..browser.lifecycle import RUNTIME
+            RUNTIME.set(workflow_state="PIPELINE_PROCESSING",
+                        portal=job.portal, job_title=job.job_title,
+                        job_url=job.job_url, job_id=str(job.job_id or ""))
             counts["found"] += 1
             self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
             self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
