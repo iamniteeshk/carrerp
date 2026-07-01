@@ -11,11 +11,14 @@ resumes/
 
 # Runtime artifacts.
 careerpilot.pid
-database/
-logs/
-screenshots/
-reports/
-profiles_browser/
+/database/
+/logs/
+/screenshots/
+# Runtime artifacts (root-level only -- not careerpilot/reports Python package).
+/reports/
+/profiles_browser/
+/cache/
+/debug/
 
 # Python.
 __pycache__/

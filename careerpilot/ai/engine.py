@@ -41,6 +41,9 @@ Company: {company}
 Location: {location}
 Description:
 {description}
+Responsibilities:
+{responsibilities}
+Skills: {skills}
 
 Return JSON with this exact shape:
 {{"match_score": <int 0-100, how well the candidate fits this job>,
@@ -101,6 +104,8 @@ class AIEngine:
             company=job.company,
             location=job.location,
             description=_truncate(job.job_description, 6000),
+            responsibilities=_truncate(getattr(job, "responsibilities", ""), 2000),
+            skills=", ".join(getattr(job, "skills", []) or [])[:1000],
         )
         text, provider, model, tokens, elapsed = self._generate(prompt)
         data = _extract_json(text)
@@ -214,7 +219,9 @@ class AIEngine:
         prompt = _EVAL_PROMPT.format(
             profile=self.profile, profiles=", ".join(self.profile_names),
             title=job.job_title, company=job.company, location=job.location,
-            description=_truncate(job.job_description, 6000))
+            description=_truncate(job.job_description, 6000),
+            responsibilities=_truncate(getattr(job, "responsibilities", ""), 2000),
+            skills=", ".join(getattr(job, "skills", []) or [])[:1000])
         results = []
         for p in self.providers:
             row = {"provider": p.name, "model": getattr(p, "model", "")}

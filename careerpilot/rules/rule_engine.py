@@ -184,7 +184,8 @@ class RuleEngine:
     def _keyword_rule(self, job: Job) -> RuleResult:
         if not self.cfg.required_keywords:
             return RuleResult(True)
-        haystack = f"{job.job_title} {job.job_description}".lower()
+        haystack = (f"{job.job_title} {job.job_description} "
+                    f"{getattr(job, 'responsibilities', '')}").lower()
         if any(kw.lower() in haystack for kw in self.cfg.required_keywords):
             return RuleResult(True)
         return RuleResult(False, RejectionReason.DOMAIN_MISMATCH)

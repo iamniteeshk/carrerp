@@ -27,6 +27,26 @@ from ..rules.rule_engine import RuleEngine
 logger = get_logger(__name__)
 
 
+def _terminal_failure_reason(job: Job) -> str:
+    """Build a precise, actionable failure reason -- never generic."""
+    detail = getattr(job, "failure_detail", "") or ""
+    if detail:
+        return detail
+    rs = getattr(job, "read_status", "UNREAD")
+    missing = getattr(job, "missing_fields", None) or []
+    if rs == "UNREAD":
+        if missing:
+            return str(missing[0])
+        return ("EXTRACTION_FAILED: job never opened "
+                "(enable browser.open_jobs and ensure detail reader is wired)")
+    if rs == "PARTIAL":
+        if missing:
+            return (f"EXTRACTION_FAILED: incomplete JD after open "
+                    f"(missing {', '.join(str(m) for m in missing)})")
+        return "EXTRACTION_FAILED: job opened but JD extraction incomplete"
+    return f"PIPELINE_FAILED: unexpected read_status={rs}"
+
+
 class ScanPipeline:
     def __init__(self, config: AppConfig, collector: CollectorManager,
                  rules: RuleEngine, ai: AIEngine, apply_engine: AutoApplyEngine,
@@ -209,21 +229,21 @@ class ScanPipeline:
             # NEVER selected/rejected-for-fit from card data -- it is marked
             # Partial Data and routed to failed_jobs.csv (never stranded).
             if rs != "COMPLETE":
-                reason = ("never opened (enable browser.open_jobs)"
-                          if rs == "UNREAD" else
-                          f"incomplete JD (missing {job.missing_fields})")
+                reason = _terminal_failure_reason(job)
                 self.jobs.update_status(job.job_id, JobStatus.PARTIAL_DATA,
-                                        rejection_reason=f"partial data: {reason}")
-                self.failed_jobs.record(job.job_id, f"PARTIAL_DATA: {reason}",
-                                        retry_count=1)
+                                        rejection_reason=reason)
+                self.failed_jobs.record(job.job_id, reason, retry_count=1)
                 counts["partial"] = counts.get("partial", 0) + 1
                 counts["failed"] = counts.get("failed", 0) + 1
                 self._metric("jobs_queued")
-                self._status(rule_decision="PARTIAL_DATA", db_status="partial_data",
-                             csv_status="failed_jobs", wait_reason=reason)
-                self.stream.failed(job, f"PARTIAL_DATA: {reason}")
-                self._stage(n, "DECISION_COMPLETED", f"PARTIAL_DATA ({reason})")
-                self._stage(n, "JOB_FINISHED", "FAILED (failed_jobs.csv)")
+                self._status(rule_decision="FAILED", db_status="partial_data",
+                             csv_status="FailedJobs", wait_reason=reason,
+                             open_job=job.job_title,
+                             extracted_fields=getattr(job, "failure_detail", "")
+                             or ", ".join(getattr(job, "missing_fields", [])))
+                self.stream.failed(job, reason)
+                self._stage(n, "DECISION_COMPLETED", f"FAILED ({reason})")
+                self._stage(n, "JOB_FINISHED", "FAILED (FailedJobs.csv)")
                 logger.warning("Job #%s PARTIAL DATA (%s) | read_status=%s -> "
                                "failed_jobs.csv | NOT decided from card | %s",
                                n, reason, rs, tag)
@@ -316,4 +336,11 @@ class ScanPipeline:
                        if not dry_run else 0)
 
         except Exception as exc:  # noqa: BLE001 - isolate per-job failures
+            reason = f"BROWSER_EXCEPTION: {type(exc).__name__}: {exc}"
             logger.warning("Job #%s FAILED (%s): %s", n, job.job_title, exc)
+            if getattr(job, "job_id", None):
+                self.jobs.update_status(job.job_id, JobStatus.PARTIAL_DATA,
+                                        rejection_reason=reason)
+                self.failed_jobs.record(job.job_id, reason, retry_count=1)
+                self.stream.failed(job, reason)
+                counts["failed"] = counts.get("failed", 0) + 1

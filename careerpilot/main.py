@@ -141,7 +141,7 @@ class CareerPilot:
         ln_session = BrowserSession(Portal.LINKEDIN.value, self.browser)
         nk_session = BrowserSession(Portal.NAUKRI.value, self.browser)
         self._sessions = [ln_session, nk_session]
-        return {
+        portals = {
             Portal.LINKEDIN.value: LinkedInPortal(
                 ln_session, self.cfg.candidate, self.cfg.apply.easy_apply_only,
                 debugger=self.debugger, humanizer=self.humanizer,
@@ -152,6 +152,11 @@ class CareerPilot:
                 humanizer=self.humanizer, detail_extractor=self.detail_extractor,
                 parse_config=self.cfg.portals_parse.get("naukri")),
         }
+        for portal in portals.values():
+            portal.search_nationwide = self.cfg.rules.search_nationwide
+            portal.search_include_recommended = (
+                self.cfg.rules.search_include_recommended)
+        return portals
 
     def run(self) -> None:
         self._install_signal_handlers()

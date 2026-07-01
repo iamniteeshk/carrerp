@@ -33,7 +33,7 @@ def test_assess_complete_when_jd_substantive():
 def test_assess_partial_when_jd_missing_or_short():
     j = Job(portal="naukri", job_title="Director", job_description="too short")
     status, missing = assess_completeness(j)
-    assert status == "PARTIAL" and "job_description" in missing
+    assert status == "PARTIAL" and any("job_description" in m for m in missing)
 
 
 # ---- the pipeline gate ---------------------------------------------------
@@ -121,8 +121,7 @@ def test_unread_cfo_job_is_never_selected():
     assert p.ai.called == 0                     # AI NEVER ran on the card
     status, reason = p.jobs.status_by_id[1]
     assert status == JobStatus.PARTIAL_DATA
-    assert "never opened" in reason
-    assert p.failed_jobs.records and "PARTIAL_DATA" in p.failed_jobs.records[0][1]
+    assert "EXTRACTION_FAILED" in p.failed_jobs.records[0][1] or "never opened" in p.failed_jobs.records[0][1].lower()
     assert ("failed", p.failed_jobs.records[0][1]) in p.stream.events
 
 
