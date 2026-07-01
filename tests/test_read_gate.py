@@ -153,6 +153,41 @@ def test_partial_read_job_is_marked_partial_not_decided():
     assert p.jobs.status_by_id[1][0] == JobStatus.PARTIAL_DATA
 
 
+def test_low_ai_score_is_rejected_not_matched():
+    """v3.0.0: a complete job the Rule Engine passes but the AI scores below the
+    minimum match threshold must end as REJECTED, never in MatchedJobs."""
+    p = _pipeline()
+    p.min_match_score = 60
+    class _LowAI:
+        called = 0
+        def evaluate_job(self, job):
+            self.called += 1
+            return types.SimpleNamespace(match_score=18, career_profile="Infra",
+                                         confidence=40, reason="weak", apply=False,
+                                         provider="x", model="m", tokens_used=1,
+                                         execution_time=0.1, raw_response="{}")
+    p.ai = _LowAI()
+    counts = _counts()
+    j = Job(portal="naukri", job_title="Director - AI", company="Acme",
+            job_url="u", job_description="x" * 300, read_status="COMPLETE")
+    p._process_job(j, counts, dry_run=True)
+    assert counts["matched"] == 0
+    assert counts["rejected"] == 1
+    assert p.jobs.status_by_id[1][0] == JobStatus.REJECTED
+    assert any(e[0] == "rejected" for e in p.stream.events)
+
+
+def test_high_ai_score_still_matched_with_threshold():
+    p = _pipeline()
+    p.min_match_score = 60          # AI harness returns 90 -> above threshold
+    counts = _counts()
+    j = Job(portal="naukri", job_title="Director - IT Infrastructure",
+            company="Acme", job_url="u", job_description="x" * 300,
+            read_status="COMPLETE")
+    p._process_job(j, counts, dry_run=True)
+    assert counts["matched"] == 1 and counts["rejected"] == 0
+
+
 def test_complete_job_reaches_rule_and_ai():
     p = _pipeline()
     counts = _counts()

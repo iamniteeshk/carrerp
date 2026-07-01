@@ -27,15 +27,16 @@ class AIUnavailable(Exception):
     """Every provider failed; the request should be queued for retry."""
 
 
-_EVAL_PROMPT = """You are screening a leadership job for a single candidate.
-Return ONLY a JSON object, no markdown, no prose.
+_EVAL_PROMPT = """You are screening ONE leadership job for ONE specific candidate.
+Judge the WHOLE job against the WHOLE candidate profile -- never score on the
+job title alone. Return ONLY a JSON object, no markdown, no prose.
 
-Candidate profile:
+Candidate profile (their real background -- this is the ground truth):
 {profile}
 
 Available career profiles (choose EXACTLY one by name): {profiles}
 
-Job:
+Job under review:
 Title: {title}
 Company: {company}
 Location: {location}
@@ -45,11 +46,29 @@ Responsibilities:
 {responsibilities}
 Skills: {skills}
 
+How to decide match_score (0-100), weigh ALL of these, not just the title:
+- Domain fit: does the job's core domain match the candidate's domain? This is
+  the most important factor. A role in a DIFFERENT domain (e.g. AI/ML research,
+  data science, finance, sales, marketing, HR, legal, medical) is a poor match
+  even if the seniority word (Director/Head/VP) matches -- score it LOW (<40).
+- Experience & seniority: years and leadership level vs the role's requirement.
+- Technologies & responsibilities: overlap with what the candidate actually did.
+- Organisational/industry fit, location, and salary (if stated).
+
+Scoring guide (be consistent, not generous):
+- 85-100: strong fit in the candidate's own domain at the right level.
+- 60-84 : relevant domain, some gaps.
+- 40-59 : partly related; borderline.
+- 0-39  : wrong domain or wrong level -- do NOT apply.
+
+Set "apply" true ONLY when it is a genuine, high-confidence fit in-domain.
+
 Return JSON with this exact shape:
-{{"match_score": <int 0-100, how well the candidate fits this job>,
+{{"match_score": <int 0-100, holistic fit per the guide above>,
 "career_profile": "<one profile name from the list>",
 "confidence": <int 0-100, how confident you are in that profile choice>,
-"reason": "<<=3 sentences>", "apply": <true|false>}}
+"reason": "<<=3 sentences, cite the domain-fit reasoning>",
+"apply": <true|false>}}
 """
 
 

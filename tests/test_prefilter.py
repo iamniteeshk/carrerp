@@ -25,6 +25,16 @@ def test_prefilter_skips_clearly_offdomain_titles():
         assert r.prefilter(Job(portal="naukri", job_title=bad)).accepted is False
 
 
+def test_prefilter_skips_ai_ml_titles_despite_leadership_word():
+    """v3.0.0: 'Director - AI' / ML / data-science titles must be skipped at the
+    card stage even though they contain a leadership word."""
+    from careerpilot.rules.rule_engine import RuleEngine
+    r = RuleEngine(_RuleCfg())
+    for bad in ("Director - AI", "Director - AI/ML", "Head of Machine Learning",
+                "Head of Data Science", "AI Research Director"):
+        assert r.prefilter(Job(portal="naukri", job_title=bad)).accepted is False
+
+
 def test_prefilter_opens_target_titles():
     from careerpilot.rules.rule_engine import RuleEngine
     r = RuleEngine(_RuleCfg())

@@ -73,6 +73,10 @@ class ScanPipeline:
         # every discovered job ends in exactly one terminal outcome.
         self.failed_jobs = FailedJobService(job_service.db)
         self._run_log: list = []   # accumulated per-job stage trace -> run_log.md
+        # A job the AI scores below this becomes REJECTED instead of MATCHED, so
+        # the Rule Engine and the AI agree on the final decision. 0 disables it.
+        self.min_match_score = float(
+            getattr(getattr(config, "rules", None), "minimum_match_score", 0) or 0)
 
     def run_once(self) -> dict[str, int]:
         scan_id = self.scans.start()
@@ -310,6 +314,33 @@ class ScanPipeline:
                         f"score={evaluation.match_score} "
                         f"confidence={getattr(evaluation, 'confidence', '?')} "
                         f"profile={evaluation.career_profile}")
+
+            # Match-score gate: a low AI score is a REJECTION, not a match. This
+            # is what keeps off-domain roles the Rule Engine let through (e.g.
+            # an 'AI/ML Director' scored 15-20) out of MatchedJobs -- the AI and
+            # the Rule Engine must agree on the final decision.
+            min_match = getattr(self, "min_match_score", 0.0) or 0.0
+            if min_match and evaluation.match_score < min_match:
+                from ..core.enums import RejectionReason
+                reason = (f"{RejectionReason.LOW_MATCH_SCORE.value} "
+                          f"(score {evaluation.match_score:g} < {min_match:g})")
+                self.jobs.update_status(job.job_id, JobStatus.REJECTED,
+                                        match_score=evaluation.match_score,
+                                        rejection_reason=reason)
+                counts["rejected"] += 1
+                self._metric("jobs_rejected"); self._metric("csv_updates")
+                self._status(ai_status="scored", rule_decision="REJECT",
+                             csv_status="RejectedJobs", db_status="rejected")
+                self.stream.rejected(job, reason)
+                self._stage(n, "DECISION_COMPLETED",
+                            f"REJECTED (low score {evaluation.match_score:g} "
+                            f"< {min_match:g})")
+                self._stage(n, "JOB_FINISHED", "REJECTED")
+                logger.info("Job #%s REJECTED (AI score %s < %s) | "
+                            "RejectedJobs.csv | %s", n, evaluation.match_score,
+                            min_match, tag)
+                return
+
             self.jobs.update_status(job.job_id, JobStatus.MATCHED,
                                     match_score=evaluation.match_score,
                                     selected_resume=evaluation.career_profile)

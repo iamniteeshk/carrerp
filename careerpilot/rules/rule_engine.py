@@ -33,6 +33,23 @@ OFF_DOMAIN_TERMS = {
     "paralegal", "recruiter", "talent acquisition", "teacher", "professor",
     "faculty", "driver", "warehouse", "retail", "cashier", "beautician",
     "fashion", "interior", "real estate", "insurance agent",
+    # Banking / HR / other clearly off-domain functions.
+    "banking", "investment banking", "hr", "human resources", "human resource",
+    "payroll", "procurement",
+    # AI / ML / Data-Science research roles -- NOT this candidate's IT
+    # infrastructure / digital-workplace / EUC / service-delivery domain.
+    "ai", "ml", "artificial intelligence", "machine learning", "deep learning",
+    "generative ai", "llm", "nlp", "prompt engineer", "data scientist",
+    "data science", "data analyst", "computer vision",
+}
+
+# Generic seniority / management words that are NOT domain signals. They appear
+# in the profile keyword union but must NOT rescue an off-domain title (a title
+# is only "borderline" if it carries a real DOMAIN keyword, not just 'Director').
+GENERIC_TITLE_TERMS = {
+    "director", "associate director", "head", "avp", "vp", "svp", "evp", "coo",
+    "cio", "cto", "general manager", "gm", "manager", "senior", "lead", "chief",
+    "leadership", "management", "strategy", "transformation", "operations",
 }
 
 
@@ -57,6 +74,7 @@ class RuleEngine:
             self._employment_type_rule,
             self._shift_rule,
             self._location_rule,
+            self._excluded_domain_rule,
             self._title_rule,
             self._blacklist_rule,
             self._keyword_rule,
@@ -82,6 +100,17 @@ class RuleEngine:
         if not title:
             return RuleResult(accepted=True)            # can't judge -> open
 
+        # Clearly off-domain -> skip opening even if a generic leadership word
+        # (Director/Head) is present, UNLESS the title also carries one of the
+        # candidate's domain keywords (borderline -> open and let the AI judge).
+        # This is what stops 'Director - AI' from being opened and matched.
+        if not self._title_has_domain_keyword(title):
+            for term in self._excluded_terms():
+                if re.search(rf"\b{re.escape(term)}\b", title):
+                    logger.info("[prefilter] skip-open '%s' @ %s: off-domain "
+                                "term '%s'", job.job_title, job.company, term)
+                    return RuleResult(False, RejectionReason.DOMAIN_MISMATCH)
+
         # Clearly relevant -> always open.
         if self._has_accepted_title(title):
             return RuleResult(accepted=True)
@@ -94,11 +123,8 @@ class RuleEngine:
                         job.job_title, job.company)
             return RuleResult(False, RejectionReason.BLACKLISTED_COMPANY)
 
-        # Off-domain denylist (built-in defaults + configured rejected_titles).
-        # Word-boundary match so 'finance' doesn't trip 'financial-systems lead'
-        # ... actually we WANT to skip finance; boundaries avoid e.g. 'sales' in
-        # 'wholesales'. An accepted term anywhere overrides (handled above).
-        denylist = OFF_DOMAIN_TERMS | {t.lower() for t in self.cfg.rejected_titles}
+        # Configured rejected_titles (soft denylist) also skip opening.
+        denylist = {t.lower() for t in self.cfg.rejected_titles}
         for term in denylist:
             if re.search(rf"\b{re.escape(term)}\b", title):
                 logger.info("[prefilter] skip-open '%s' @ %s: off-domain term "
@@ -156,6 +182,47 @@ class RuleEngine:
         if "remote" in loc:
             return RuleResult(True)
         return RuleResult(False, RejectionReason.LOCATION_MISMATCH)
+
+    def _excluded_domain_rule(self, job: Job) -> RuleResult:
+        """Hard off-domain gate that runs BEFORE the AI (saves tokens).
+
+        A title containing a clearly off-domain term (finance, sales, AI/ML,
+        data science, legal, medical, ...) is rejected REGARDLESS of a generic
+        leadership word like 'Director'/'Head' -- that word alone must never
+        rescue an off-domain role (the root cause of 'Director - AI' matching).
+        The one exception is a title that also carries one of the candidate's
+        own domain keywords (e.g. 'Director - AI Infrastructure'): that is
+        genuinely borderline, so it is passed through for the AI to judge.
+        """
+        title = (job.job_title or "").lower().strip()
+        if not title:
+            return RuleResult(True)
+        if self._title_has_domain_keyword(title):
+            return RuleResult(True)
+        for term in self._excluded_terms():
+            if re.search(rf"\b{re.escape(term)}\b", title):
+                logger.info("Rejected '%s' @ %s: off-domain title term '%s'",
+                            job.job_title, job.company, term)
+                return RuleResult(False, RejectionReason.DOMAIN_MISMATCH)
+        return RuleResult(True)
+
+    def _excluded_terms(self) -> set[str]:
+        extra = getattr(self.cfg, "excluded_title_terms", None) or []
+        return OFF_DOMAIN_TERMS | {t.lower().strip() for t in extra if t}
+
+    def _title_has_domain_keyword(self, title_lower: str) -> bool:
+        """True if the title carries one of the candidate's real DOMAIN keywords
+        (e.g. 'Infrastructure', 'EUC') -- used to keep borderline roles for the
+        AI instead of hard-rejecting them. Generic seniority words like
+        'Director'/'Head' do NOT count, so they cannot rescue an off-domain role.
+        """
+        for kw in getattr(self.cfg, "required_keywords", None) or []:
+            kw = kw.lower().strip()
+            if not kw or kw in GENERIC_TITLE_TERMS:
+                continue
+            if re.search(rf"\b{re.escape(kw)}\b", title_lower):
+                return True
+        return False
 
     def _title_rule(self, job: Job) -> RuleResult:
         title = job.job_title.lower()
