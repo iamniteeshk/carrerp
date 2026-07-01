@@ -1,0 +1,215 @@
+# ============================================================================
+# CareerPilot configuration — ONE file, ONE candidate per deployment.
+# Copy to config/config.yaml and edit. Secrets (API keys, tokens, passwords)
+# live ONLY in .env, never here. Never edit Python source to configure anything.
+# ============================================================================
+
+application:
+  name: CareerPilot
+  reports_dir: reports
+
+scheduler:
+  scan_interval_hours: 4
+  daily_summary_hour: 20          # 24-hour local time
+
+# ---- Candidate: all personal/factual data (was candidate.yaml) -------------
+candidate:
+  full_name: "Your Name"
+  email: "your_email"
+  phone: "+91-XXXXXXXXXX"
+  current_location: "City, Country"
+  total_experience: "20+ years"
+  current_company: "Your Company"
+  current_designation: "Your Title"
+  current_ctc: ""                 # many forms require these; AI never guesses them
+  expected_ctc: ""
+  notice_period: ""
+  work_authorization: "Country"
+  linkedin_url: "your_profile"
+  willing_to_relocate: true
+  remote_preference: "Hybrid"     # Onsite | Hybrid | Remote | Any
+  preferred_shift: "Any"
+
+ai:
+  # Provider-driven, future-proof config. The active provider is tried first;
+  # the others act as fallbacks. Model names are NEVER hardcoded: leave
+  # preferred_model empty to auto-discover, or set it to pin a specific model.
+  # Adding any OpenAI-compatible provider (OpenRouter, Together, Fireworks,
+  # Mistral, ...) needs only a block here -- no Python changes.
+  active_provider: gemini
+  request_timeout_seconds: 30
+  max_retries: 3
+
+  providers:
+    gemini:
+      enabled: true
+      kind: gemini                 # only Gemini needs its own adapter
+      api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+      discover_models: true
+      preferred_model: ""          # empty => discover newest compatible
+    deepseek:
+      enabled: false
+      api_key_env: DEEPSEEK_API_KEY
+      base_url: https://api.deepseek.com/v1
+      discover_models: true
+      preferred_model: ""
+    glm:
+      enabled: false
+      api_key_env: GLM_API_KEY
+      base_url: https://open.bigmodel.cn/api/paas/v4
+      discover_models: true
+      preferred_model: ""
+    kimi:
+      enabled: false
+      api_key_env: KIMI_API_KEY
+      base_url: https://api.moonshot.ai/v1
+      discover_models: true
+      preferred_model: ""
+    minimax:
+      enabled: false
+      api_key_env: MINIMAX_API_KEY
+      base_url: https://api.minimax.chat/v1
+      discover_models: true
+      preferred_model: ""
+
+    # Local OpenAI-compatible servers need NO api_key. Omit api_key_env and the
+    # adapter treats the provider as keyless (no Authorization header). If the
+    # server doesn't expose /models, set discover_models:false and pin
+    # preferred_model -- discovery is optional and falls back gracefully.
+    # ollama:
+    #   enabled: false
+    #   base_url: http://localhost:11434/v1
+    #   discover_models: true        # Ollama exposes /v1/models
+    #   preferred_model: llama3.1
+    # lmstudio:
+    #   enabled: false
+    #   base_url: http://localhost:1234/v1
+    #   discover_models: true
+    #   preferred_model: ""
+    # vllm:
+    #   enabled: false
+    #   base_url: http://localhost:8000/v1
+    #   discover_models: false       # pin the served model explicitly
+    #   preferred_model: my-served-model
+
+# ---- Browser: fully configuration-driven; switch engines with no code change -
+browser:
+  open_jobs: true    # experimental: opens each job for full JD; retries + saves evidence on failure, never disabled
+  engine: chromium                # chromium | firefox | webkit
+  channel: msedge                 # msedge | chrome | "" (blank = bundled Chromium).
+                                  # Ignored for firefox/webkit. Edge is the default.
+  headless: false
+  viewport:
+    width: 1366
+    height: 900
+  profiles_path: profiles_browser # persistent per-portal login sessions
+  screenshots_path: screenshots
+  timeout_seconds: 30
+  networkidle_timeout_ms: 8000   # max wait for SPA network to settle
+  render_settle_ms: 800          # final paint margin; raise to 3000-5000 for slower pages
+  scroll_passes: 3               # natural scrolls to trigger lazy-loading
+
+dashboard:
+  host: 127.0.0.1
+  port: 5000
+  refresh_seconds: 30
+
+database:
+  path: database/careerpilot.db
+  backups_path: database/backups
+
+telegram:
+  enabled: true
+  chat_id: ""                     # optional here; TELEGRAM_BOT_TOKEN goes in .env
+
+# ---- Career Profiles: each specialization is a folder under 'dir' -----------
+profiles:
+  dir: profiles
+  default: Default        # used when AI confidence is below threshold
+  confidence_threshold: 70
+
+rules:
+  minimum_salary:
+    amount: 0                     # 0 = disabled (leadership salaries rarely listed)
+    currency: INR
+  minimum_experience: 15
+  accepted_employment_types: [Full Time, Permanent]
+  rejected_shifts: []
+  search_keywords: [Director IT Infrastructure, Associate Director, Head IT, IT Infrastructure Director, Digital Workplace, Infrastructure, EUC, Global IT, GCC, IT Operations]   # focused list to SEARCH (point 6)
+  accepted_titles: [Director, Associate Director, Head, AVP, VP, SVP, COO, General Manager, Infrastructure, IT Infrastructure, Digital Workplace, EUC, End User Computing, GCC, Global Capability, Global IT, IT Operations, Technology Operations, Service Delivery, Cloud, Data Center, Datacenter, Workplace, Information Technology, Technology, Operations]
+  rejected_titles: [Desktop Support, Technical Support, Engineer, Analyst, L1, L2]
+  blacklist_companies: []         # e.g. your current employer
+  extra_required_keywords: []     # added on top of profile keywords
+  extra_preferred_locations: []   # added on top of profile locations
+  nice_to_have_keywords: []
+
+apply:
+  mode: dry_run                   # dry_run | live  -- START IN DRY RUN
+  min_apply_score: 90             # job-fit score required to apply
+  first_run_confirmations: 5      # first N live applies need approval
+  max_applications_per_day: 5
+  delay_between_applications_seconds: 180
+  retry_limit: 3
+  easy_apply_only: true           # external ATS -> manual review
+
+logging:
+  dir: logs
+  level: INFO                     # DEBUG | INFO | WARNING | ERROR
+
+documents:
+  dir: documents
+
+# ---- Email: RESERVED. Not yet implemented (no Email Manager module exists). --
+# Present so the section is documented; password would go in .env (EMAIL_PASSWORD).
+email:
+  enabled: false
+  address: ""
+  imap_host: ""
+  password_env_var: EMAIL_PASSWORD
+
+# Visual Debug Mode -- when visual_mode is false, behaves exactly as normal.
+# When true, the Browser Engine highlights detected elements, shows a live
+# on-page status panel, logs selector/scroll diagnostics, and saves an evidence
+# bundle (screenshot + HTML + parsed JSON + state + timeline) per page.
+debug:
+  visual_mode: false
+  pause_after_navigation_seconds: 0
+  pause_before_scroll_seconds: 0
+  pause_after_scroll_seconds: 0
+  evidence_dir: debug
+  log_first_n_jobs: 5
+
+# Human-like browsing. When disabled, behaves exactly as before. When enabled,
+# scrolling is gradual (small/medium steps + pauses + occasional up-correction),
+# reading pauses scale with content size, and the mouse moves with easing.
+human:
+  enabled: true
+  words_per_minute: 350
+  scroll_step_min_px: 250
+  scroll_step_max_px: 650
+  scroll_pause_min_ms: 250
+  scroll_pause_max_ms: 900
+  upward_correction_chance: 0.15
+  mouse_moves: true
+  # seed: 42        # set for reproducible behaviour
+
+# Per-portal card selectors (config-driven extraction). The defaults in code are
+# UNVERIFIED best-known selectors -- turn on debug.visual_mode, run a search, and
+# adjust these to match the live DOM. Field selectors are scoped inside a card.
+portals:
+  naukri:
+    results_selector: "div.srp-jobtuple-wrapper, article.jobTuple"
+    fields:
+      title: "a.title"
+      company: "a.comp-name, a.subTitle"
+      location: "span.locWdth, span.loc"
+      salary: "span.sal-wrap span, span.sal"
+      experience: "span.expwdth, span.exp"
+      url: "a.title"
+  linkedin:
+    results_selector: "div.job-card-container"
+    fields:
+      title: "a.job-card-list__title, a.job-card-container__link"
+      company: ".job-card-container__primary-description"
+      location: "li.job-card-container__metadata-item"
+      url: "a.job-card-list__title, a.job-card-container__link"

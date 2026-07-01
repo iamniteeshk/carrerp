@@ -1,0 +1,10 @@
+# Domain keywords for this specialization (drive Rule Engine matching).
+required:
+  - Leadership
+  - Director
+  - Head
+  - Operations
+  - Management
+preferred:
+  - Strategy
+  - Operations

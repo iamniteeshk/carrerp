@@ -1,0 +1,9 @@
+# Career Profile: Contact_Centre
+# Place YOUR resume for this specialization here as resume.pdf (or set 'resume:'
+# to your own filename). Adding a new specialization = copy a folder like this.
+name: Contact_Centre
+description: Contact Centre and BPM leadership
+resume: resume.pdf
+resume_version: v1
+documents:
+  resume: resume.pdf

@@ -1,0 +1,11 @@
+# Domain keywords for this specialization (drive Rule Engine matching).
+required:
+  - Contact Centre
+  - Contact Center
+  - BPO
+  - Customer Experience
+  - Customer Operations
+preferred:
+  - CCaaS
+  - WFM
+  - Genesys

@@ -1,0 +1,12 @@
+# Domain keywords for this specialization (drive Rule Engine matching).
+required:
+  - Infrastructure
+  - Cloud
+  - Enterprise IT
+  - IT Operations
+  - Managed Services
+preferred:
+  - Azure
+  - VMware
+  - Cisco
+  - ITIL

@@ -1,0 +1,10 @@
+# Domain keywords for this specialization (drive Rule Engine matching).
+required:
+  - GCC
+  - Global Delivery
+  - Global Capability
+  - Shared Services
+  - Transformation
+preferred:
+  - Service Delivery
+  - Operations

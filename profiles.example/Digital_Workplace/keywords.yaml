@@ -1,0 +1,12 @@
+# Domain keywords for this specialization (drive Rule Engine matching).
+required:
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - M365
+  - Intune
+preferred:
+  - Nexthink
+  - Jamf
+  - Autopilot
+  - Copilot

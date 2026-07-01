@@ -1,0 +1,9 @@
+# Career Profile: GCC
+# Place YOUR resume for this specialization here as resume.pdf (or set 'resume:'
+# to your own filename). Adding a new specialization = copy a folder like this.
+name: GCC
+description: Global Capability Centre and global delivery leadership
+resume: resume.pdf
+resume_version: v1
+documents:
+  resume: resume.pdf

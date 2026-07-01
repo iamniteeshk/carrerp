@@ -1,0 +1,23 @@
+# Secrets and personal data -- NEVER commit these.
+.env
+candidate.yaml
+config/config.yaml
+config.yaml
+
+# Per-user career profiles (real resumes, answers, documents).
+profiles/
+documents/
+resumes/
+
+# Runtime artifacts.
+careerpilot.pid
+database/
+logs/
+screenshots/
+reports/
+profiles_browser/
+
+# Python.
+__pycache__/
+*.pyc
+.venv/
