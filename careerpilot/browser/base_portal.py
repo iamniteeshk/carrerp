@@ -84,6 +84,37 @@ def _page_alive(page) -> bool:
         return False
 
 
+def _safe_wait_ms(page, ms: int) -> None:
+    """Pause without raising TargetClosedError if the page handle is stale."""
+    if ms <= 0:
+        return
+    if not _page_alive(page):
+        time.sleep(ms / 1000.0)
+        return
+    try:
+        page.wait_for_timeout(ms)
+    except Exception:  # noqa: BLE001
+        time.sleep(ms / 1000.0)
+
+
+def _is_detach_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    name = type(exc).__name__.lower()
+    return ("target closed" in msg or "targetclosed" in name
+            or "detached" in msg or "destroyed" in msg)
+
+
+def _looks_like_job_page(page_url: str, job_url: str = "") -> bool:
+    u = (page_url or "").lower()
+    if not u or u in ("about:blank", "chrome://newtab/"):
+        return False
+    if job_url:
+        j = job_url.lower()
+        if j in u or u in j:
+            return True
+    return any(sig in u for sig in ("/job", "job-listing", "jobdetail", "jd-"))
+
+
 def _dismiss_blocking_overlays(page) -> None:
     """Close sticky banners (e.g. Naukri 'Monthly subscriptions') that intercept clicks."""
     js = """
@@ -106,7 +137,7 @@ def _dismiss_blocking_overlays(page) -> None:
         dismissed = page.evaluate(js)
         if dismissed:
             _nav_logger.info("Dismissed blocking overlay before card click")
-            page.wait_for_timeout(350)
+            _safe_wait_ms(page, 350)
     except Exception as exc:  # noqa: BLE001
         _nav_logger.debug("Overlay dismiss skipped: %s", exc)
 
@@ -117,7 +148,7 @@ def _scroll_link_to_center(page, link) -> None:
         page.evaluate(
             "(el) => el.scrollIntoView({block: 'center', inline: 'center', "
             "behavior: 'instant'})", link)
-        page.wait_for_timeout(250)
+        _safe_wait_ms(page, 250)
     except Exception as exc:  # noqa: BLE001
         _nav_logger.debug("scroll-to-center failed: %s", exc)
 
@@ -161,7 +192,8 @@ def _locate_card_link(page, job, card_selector: str, title_selector: str):
 
 
 def _wait_for_job_open(results_page, context, pre_url: str,
-                       pages_before: int, timeout_ms: int) -> JobOpenResult:
+                       pages_before: int, timeout_ms: int,
+                       job_url: str = "") -> JobOpenResult:
     """Wait for same-tab navigation OR a new tab -- never assume which."""
     _nav_logger.info("WAITING_FOR_NAVIGATION | pre_url=%s | pages=%s",
                      pre_url, pages_before)
@@ -176,36 +208,47 @@ def _wait_for_job_open(results_page, context, pre_url: str,
                         p.wait_for_load_state("domcontentloaded", timeout=2000)
                     except Exception:  # noqa: BLE001
                         pass
-                    _nav_logger.info("CLICK_SUCCESS | mode=new_tab | url=%s", p.url)
+                    p_url = getattr(p, "url", "") or ""
+                    if not _looks_like_job_page(p_url, job_url):
+                        _nav_logger.debug("Ignoring new tab (not a job page): %s",
+                                          p_url)
+                        continue
+                    _nav_logger.info("CLICK_SUCCESS | mode=new_tab | url=%s", p_url)
                     return JobOpenResult(True, "click_new_tab", p, results_page,
                                          "opened in new tab")
-            if _page_alive(results_page) and results_page.url != pre_url:
-                try:
-                    results_page.wait_for_load_state("domcontentloaded",
-                                                     timeout=2000)
-                except Exception:  # noqa: BLE001
-                    pass
-                _nav_logger.info("CLICK_SUCCESS | mode=same_tab | url=%s",
-                                 results_page.url)
-                return JobOpenResult(True, "click_same_tab", results_page,
-                                     results_page, "opened in same tab")
+            if _page_alive(results_page):
+                cur = results_page.url
+                if cur != pre_url and _looks_like_job_page(cur, job_url):
+                    try:
+                        results_page.wait_for_load_state("domcontentloaded",
+                                                         timeout=2000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    _nav_logger.info("CLICK_SUCCESS | mode=same_tab | url=%s",
+                                     cur)
+                    return JobOpenResult(True, "click_same_tab", results_page,
+                                         results_page, "opened in same tab")
         except Exception as exc:  # noqa: BLE001
-            if "TargetClosed" in type(exc).__name__:
+            if _is_detach_error(exc):
                 for p in context.pages:
-                    if _page_alive(p) and getattr(p, "url", "") != pre_url:
-                        _nav_logger.info("CLICK_SUCCESS | mode=same_tab(recovered) "
-                                         "| url=%s", p.url)
-                        return JobOpenResult(True, "click_same_tab", p, p,
+                    if not _page_alive(p):
+                        continue
+                    p_url = getattr(p, "url", "")
+                    if p_url != pre_url and _looks_like_job_page(p_url, job_url):
+                        _nav_logger.info("CLICK_SUCCESS | mode=recovered | url=%s",
+                                         p_url)
+                        same = p is results_page or p_url == getattr(
+                            results_page, "url", "")
+                        mode = "click_same_tab" if same else "click_new_tab"
+                        rp = results_page if mode == "click_new_tab" else p
+                        return JobOpenResult(True, mode, p, rp,
                                              "recovered after target closed")
             _nav_logger.debug("wait-for-open poll: %s", exc)
-        try:
-            results_page.wait_for_timeout(150)
-        except Exception:  # noqa: BLE001
-            time.sleep(0.15)
+        time.sleep(0.15)
     _nav_logger.warning("WAITING_FOR_NAVIGATION timed out | still on %s",
                         pre_url if _page_alive(results_page) else "(closed)")
     return JobOpenResult(False, "failed", None, results_page,
-                         "navigation did not start after click")
+                         "navigation timeout after click")
 
 
 def click_job_card(page, job, title_selector: str, humanizer=None,
@@ -216,6 +259,7 @@ def click_job_card(page, job, title_selector: str, humanizer=None,
     call ``navigate()``/``goto()`` for the same open.
     """
     title = (getattr(job, "job_title", "") or "").strip()
+    job_url = getattr(job, "job_url", "") or ""
     if not title_selector:
         return JobOpenResult(False, "failed", None, page, "no title selector")
     link = _locate_card_link(page, job, card_selector, title_selector)
@@ -238,19 +282,22 @@ def click_job_card(page, job, title_selector: str, humanizer=None,
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
         if humanizer is not None and humanizer.enabled:
             humanizer.move_mouse(page, cx, cy)
-            page.wait_for_timeout(humanizer.rng.randint(120, 350))
+            _safe_wait_ms(page, humanizer.rng.randint(120, 350))
         try:
             link.hover(timeout=timeout_ms)
         except Exception as exc:  # noqa: BLE001
             _nav_logger.debug("hover failed (continuing): %s", exc)
-        page.wait_for_timeout(humanizer.rng.randint(150, 450) if humanizer
-                              and humanizer.enabled else 150)
-        _nav_logger.info("CLICK card '%s' at (%.0f, %.0f)", title, cx, cy)
+        _safe_wait_ms(page, humanizer.rng.randint(150, 450) if humanizer
+                      and humanizer.enabled else 150)
+        _nav_logger.info("CLICK_STARTED | card '%s' at (%.0f, %.0f)", title, cx, cy)
         clicked = False
         for attempt in range(2):
             try:
-                link.click(timeout=timeout_ms)
+                # no_wait_after: we detect navigation ourselves -- avoids
+                # TargetClosedError when Playwright's auto-wait races SPA nav.
+                link.click(timeout=timeout_ms, no_wait_after=True)
                 clicked = True
+                _nav_logger.info("CLICK_COMPLETED | '%s'", title)
                 break
             except Exception as click_exc:  # noqa: BLE001
                 msg = str(click_exc).lower()
@@ -260,11 +307,11 @@ def click_job_card(page, job, title_selector: str, humanizer=None,
                         "re-centering card, retrying click", title)
                     _dismiss_blocking_overlays(page)
                     _scroll_link_to_center(page, link)
-                    page.wait_for_timeout(400)
+                    _safe_wait_ms(page, 400)
                     continue
-                if "target closed" in msg or "detached" in msg:
-                    _nav_logger.debug("click detached mid-navigation: %s",
-                                      click_exc)
+                if _is_detach_error(click_exc):
+                    _nav_logger.info("CLICK_COMPLETED | detach during navigation "
+                                     "| %s", click_exc)
                     clicked = True
                     break
                 _nav_logger.warning("Click failed for '%s': %s", title,
@@ -272,7 +319,8 @@ def click_job_card(page, job, title_selector: str, humanizer=None,
                 return JobOpenResult(False, "failed", None, page, str(click_exc))
         if not clicked:
             return JobOpenResult(False, "failed", None, page, "click not performed")
-        return _wait_for_job_open(page, context, pre_url, pages_before, timeout_ms)
+        return _wait_for_job_open(page, context, pre_url, pages_before,
+                                  timeout_ms, job_url=job_url)
     except Exception as exc:  # noqa: BLE001
         _nav_logger.warning("Click failed for '%s': %s", title, exc)
         return JobOpenResult(False, "failed", None, page, str(exc))
@@ -827,6 +875,8 @@ class BasePortal(abc.ABC):
         logger.info("%s search workflow start | %s page(s) planned | url=%s",
                     self.portal_name, len(plan), page.url)
         for label, url, search, location in plan:
+            logger.info("SEARCH_STARTED | %s | location=%s | url=%s",
+                        search, location or "(any)", url)
             if dbg_on:
                 dbg.reset_timeline()
                 dbg.mark("Navigate", url)
@@ -847,6 +897,8 @@ class BasePortal(abc.ABC):
             state = observe_state(page, results_selector=rsel,
                                   captcha_selector=self.CAPTCHA_SELECTOR)
             _log_state(state)
+            if state != BrowserState.EMPTY_RESULTS:
+                _nav_logger.info("RESULTS_READY | %s | %s", label, page.url)
             if dbg_on:
                 dbg.panel(page, {"Portal": self.portal_name, "State": state.value,
                                  "Search": search, "Location": location,

@@ -14,6 +14,7 @@ survive restarts even though the framework keeps a single browser engine.
 
 from __future__ import annotations
 
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from typing import Any
 from ..core.logging_setup import get_logger
 
 logger = get_logger(__name__)
+_lifecycle_logger = get_logger("careerpilot.browser.lifecycle")
 
 try:
     from playwright.sync_api import sync_playwright  # type: ignore
@@ -30,6 +32,62 @@ except Exception:  # pragma: no cover - import guard for environments w/o PW
 
 _VALID_ENGINES = ("chromium", "firefox", "webkit")
 _CHROMIUM_CHANNELS = ("msedge", "chrome", "chrome-beta", "msedge-beta", "msedge-dev")
+
+
+def _caller_stack(limit: int = 8) -> str:
+    return "".join(traceback.format_stack(limit=limit)[:-1])
+
+
+def _safe_page_url(page: Any) -> str:
+    try:
+        return page.url or "(blank)"
+    except Exception:  # noqa: BLE001
+        return "(unavailable)"
+
+
+class LifecycleInstrumenter:
+    """Trace who closes the browser -- logs every close/crash/disconnect event."""
+
+    def __init__(self, portal: str):
+        self.portal = portal
+        self._wired_pages: set[int] = set()
+
+    def attach_context(self, context: Any) -> None:
+        try:
+            context.on("close", lambda: _lifecycle_logger.warning(
+                "CONTEXT_CLOSE event | portal=%s | stack=%s",
+                self.portal, _caller_stack()))
+        except Exception as exc:  # noqa: BLE001
+            _lifecycle_logger.debug("context.on(close) failed: %s", exc)
+        try:
+            browser = getattr(context, "browser", None)
+            if browser is not None:
+                browser.on("disconnected", lambda: _lifecycle_logger.error(
+                    "BROWSER_DISCONNECTED event | portal=%s | stack=%s",
+                    self.portal, _caller_stack()))
+        except Exception as exc:  # noqa: BLE001
+            _lifecycle_logger.debug("browser.on(disconnected) failed: %s", exc)
+        try:
+            context.on("page", lambda p: self.attach_page(p))
+        except Exception as exc:  # noqa: BLE001
+            _lifecycle_logger.debug("context.on(page) failed: %s", exc)
+        for p in context.pages:
+            self.attach_page(p)
+
+    def attach_page(self, page: Any) -> None:
+        pid = id(page)
+        if pid in self._wired_pages:
+            return
+        self._wired_pages.add(pid)
+        try:
+            page.on("close", lambda: _lifecycle_logger.warning(
+                "PAGE_CLOSE event | portal=%s | url=%s | stack=%s",
+                self.portal, _safe_page_url(page), _caller_stack()))
+            page.on("crash", lambda: _lifecycle_logger.error(
+                "PAGE_CRASH event | portal=%s | url=%s | stack=%s",
+                self.portal, _safe_page_url(page), _caller_stack()))
+        except Exception as exc:  # noqa: BLE001
+            _lifecycle_logger.debug("page lifecycle hooks failed: %s", exc)
 
 
 @dataclass
@@ -93,6 +151,7 @@ class BrowserManager:
         self._pw: Any = None
         self._contexts: dict[str, Any] = {}
         self._pages: dict[str, Any] = {}
+        self._lifecycle: dict[str, LifecycleInstrumenter] = {}
 
     # ---- internal -------------------------------------------------------
 
@@ -131,6 +190,8 @@ class BrowserManager:
             else:
                 raise
         context.set_default_timeout(self.cfg.timeout_seconds * 1000)
+        instr = self._lifecycle.setdefault(portal, LifecycleInstrumenter(portal))
+        instr.attach_context(context)
         return context
 
     # ---- public API used by portals (via BrowserSession) ----------------
@@ -172,11 +233,13 @@ class BrowserManager:
 
     def is_healthy(self, portal: str) -> bool:
         ctx = self._contexts.get(portal)
-        page = self._pages.get(portal)
-        if ctx is None or page is None:
+        if ctx is None:
             return False
         try:
-            return not page.is_closed()
+            for tab in ctx.pages:
+                if self._page_alive(tab):
+                    return True
+            return False
         except Exception:  # noqa: BLE001
             return False
 
@@ -186,7 +249,10 @@ class BrowserManager:
         if portal not in self._contexts:
             return None
         if self.is_healthy(portal):
-            return self._pages[portal]
+            return self.page(portal)
+        _lifecycle_logger.warning(
+            "ENSURE_HEALTHY restarting portal=%s | reason=all tabs closed | "
+            "stack=%s", portal, _caller_stack())
         logger.warning("Browser for %s unhealthy; restarting", portal)
         self.close_portal(portal)
         return self.page(portal)
@@ -204,7 +270,11 @@ class BrowserManager:
     def close_portal(self, portal: str) -> None:
         ctx = self._contexts.pop(portal, None)
         self._pages.pop(portal, None)
+        self._lifecycle.pop(portal, None)
         if ctx is not None:
+            _lifecycle_logger.info(
+                "INTENTIONAL_CONTEXT_CLOSE | portal=%s | reason=close_portal | "
+                "stack=%s", portal, _caller_stack())
             try:
                 ctx.close()
             except Exception as exc:  # noqa: BLE001

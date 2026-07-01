@@ -28,7 +28,7 @@ class _FakeEl:
         x, y, w, h = self._box
         return {"x": x, "y": y, "width": w, "height": h}
     def hover(self, timeout=0): self.hovered = True
-    def click(self, timeout=0):
+    def click(self, timeout=0, **kwargs):  # noqa: ARG002
         self.clicked = True
         self._page._url = self._page._target_url   # simulate same-tab navigation
 

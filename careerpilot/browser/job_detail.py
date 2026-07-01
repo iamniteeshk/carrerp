@@ -59,6 +59,7 @@ DEFAULT_DETAIL_SELECTORS = {
         "company_description": ".styles_about-company__text",
         "benefits": ".styles_benefits__text, .styles_other-details__TJd1x",
         "posted_date": ".styles_jhc__stat__PgY67",
+        "recruiter_notes": ".styles_recruiter-details___, .recruiter-desc",
         "easy_apply": "#apply-button",
         "external_apply": "#company-site-button",
     },
@@ -196,6 +197,7 @@ class JobDetailExtractor:
                 logger.info("JOB_PAGE_READY | %s", getattr(job_page, "url", url))
 
                 _log_state(BrowserState.READING_JOB, title)
+                logger.info("EXTRACTION_STARTED | %s", url)
                 description = _card_text(job_page, sel.get("description"))
                 logger.info("READING_STARTED | jd_chars=%s | %s",
                             len(description or ""), url)
@@ -233,6 +235,8 @@ class JobDetailExtractor:
                           _card_text(job_page, sel.get("company_description")))
                 self._set(job, "posted_date",
                           _card_text(job_page, sel.get("posted_date")))
+                self._set(job, "recruiter_notes",
+                          _card_text(job_page, sel.get("recruiter_notes")))
                 self._set(job, "raw_html", _safe_content(job_page))
                 skills = _collect_list(job_page, sel.get("skills"))
                 if skills:
@@ -334,6 +338,8 @@ def _extracted_summary(job) -> str:
         val = getattr(job, f, "")
         if isinstance(val, str) and val.strip():
             parts.append(f)
+    if getattr(job, "recruiter_notes", ""):
+        parts.append("recruiter_notes")
     if getattr(job, "skills", None):
         parts.append("skills")
     if getattr(job, "responsibilities", ""):
@@ -362,5 +368,6 @@ def _job_to_dict(job) -> dict:
     keys = ("job_url", "job_title", "company", "location", "salary", "experience",
             "employment_type", "job_description", "responsibilities", "benefits",
             "company_description", "posted_date", "is_easy_apply", "skills",
-            "preferred_skills", "apply_url", "external_apply_url")
+            "preferred_skills", "apply_url", "external_apply_url",
+            "recruiter_notes")
     return {k: getattr(job, k, None) for k in keys}

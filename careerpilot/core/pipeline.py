@@ -204,7 +204,8 @@ class ScanPipeline:
             self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
             self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
             self.stream.found(job)                       # -> FoundJobs.csv (live)
-            self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
+            self._stage(n, "CSV_UPDATED", "FoundJobs.csv")
+            self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FOUND)")
 
             rs = getattr(job, "read_status", "UNREAD")
 
@@ -219,6 +220,8 @@ class ScanPipeline:
                 self._status(rule_decision="SKIP-OPEN", csv_status="RejectedJobs",
                              db_status="rejected")
                 self.stream.rejected(job, reason)
+                self._stage(n, "CSV_UPDATED", "RejectedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "REJECTED (prefilter)")
                 self._stage(n, "DECISION_COMPLETED", "REJECTED (not opened: "
                             "card pre-filter)")
                 self._stage(n, "JOB_FINISHED", "REJECTED")
@@ -242,6 +245,8 @@ class ScanPipeline:
                              extracted_fields=getattr(job, "failure_detail", "")
                              or ", ".join(getattr(job, "missing_fields", [])))
                 self.stream.failed(job, reason)
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "PARTIAL_DATA")
                 self._stage(n, "DECISION_COMPLETED", f"FAILED ({reason})")
                 self._stage(n, "JOB_FINISHED", "FAILED (FailedJobs.csv)")
                 logger.warning("Job #%s PARTIAL DATA (%s) | read_status=%s -> "
@@ -255,6 +260,7 @@ class ScanPipeline:
             logger.info("Job #%s fully read (jd_chars=%s) -> Rule Engine", n,
                         len(job.job_description or ""))
 
+            self._stage(n, "RULE_ENGINE_STARTED", tag)
             rule_result = self.rules.evaluate(job)
             self._stage(n, "RULE_ENGINE_COMPLETED",
                         "PASS" if rule_result.accepted else
@@ -267,13 +273,17 @@ class ScanPipeline:
                 self._metric("jobs_rejected"); self._metric("csv_updates")
                 self._status(rule_decision="REJECT", csv_status="RejectedJobs", db_status="rejected")
                 self.stream.rejected(job, reason)        # -> RejectedJobs.csv (live)
+                self._stage(n, "CSV_UPDATED", "RejectedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "REJECTED")
                 self._stage(n, "DECISION_COMPLETED", f"REJECTED ({reason})")
                 self._stage(n, "JOB_FINISHED", "REJECTED")
                 return
             self._status(rule_decision="PASS", ai_status="scoring", csv_status="SelectedJobs")
             self.stream.selected(job)                    # -> SelectedJobs.csv (live)
+            self._stage(n, "CSV_UPDATED", "SelectedJobs.csv")
             logger.info("Job #%s PASSED Rule Engine | SelectedJobs.csv", n)
 
+            self._stage(n, "AI_STARTED", tag)
             try:
                 evaluation = self.ai.evaluate_job(job)
             except AIUnavailable:
@@ -283,6 +293,8 @@ class ScanPipeline:
                 self.failed_jobs.record(job.job_id, "AI unavailable (queued for "
                                         "retry)", retry_count=1)
                 self.stream.failed(job, "AI unavailable (queued for retry)")
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "QUEUED")
                 counts["failed"] = counts.get("failed", 0) + 1
                 self._metric("jobs_queued"); self._metric("ai_failures")
                 self._stage(n, "AI_COMPLETED", "SKIPPED: provider unavailable")
@@ -318,6 +330,8 @@ class ScanPipeline:
             self._status(ai_status="scored", resume=evaluation.career_profile, csv_status="MatchedJobs", db_status="matched")
             self.stream.matched(job, evaluation.match_score,
                                 evaluation.career_profile)   # -> MatchedJobs.csv
+            self._stage(n, "CSV_UPDATED", "MatchedJobs.csv")
+            self._stage(n, "DATABASE_UPDATED", "MATCHED")
             self._stage(n, "DECISION_COMPLETED",
                         f"MATCHED (score={evaluation.match_score})")
 
@@ -326,6 +340,8 @@ class ScanPipeline:
             if result.success:
                 counts["applied"] += 1
                 self.stream.applied(job, dry_run)            # -> AppliedJobs.csv
+                self._stage(n, "CSV_UPDATED", "AppliedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "APPLIED")
                 logger.info("Job #%s %s | AppliedJobs.csv", n,
                             "DRY-RUN ready" if dry_run else "APPLIED")
             self._stage(n, "JOB_FINISHED", "MATCHED" + (" + APPLIED"
@@ -343,4 +359,6 @@ class ScanPipeline:
                                         rejection_reason=reason)
                 self.failed_jobs.record(job.job_id, reason, retry_count=1)
                 self.stream.failed(job, reason)
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "PARTIAL_DATA")
                 counts["failed"] = counts.get("failed", 0) + 1
