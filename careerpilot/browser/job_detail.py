@@ -5,13 +5,6 @@ reads it like a human (scroll + content-scaled reading time), extracts the FULL
 job description and every configured field into the Job, caches it so it is
 never reopened, and returns. The streaming pipeline runs this BEFORE the Rule
 Engine and AI so they see the complete JD, not just the card summary.
-
-Selectors are config-driven (config.yaml -> portals.<portal>.detail). The
-defaults are best-known but UNVERIFIED -- confirm with Visual Debug Mode against
-the live page. When a selector matches nothing, the corresponding field is left
-as it was (card value), never invented.
-
-Browser-only: imports no Rule/AI code. Deterministic. Never crashes the scan.
 """
 
 from __future__ import annotations
@@ -22,51 +15,77 @@ from ..core.logging_setup import get_logger
 
 logger = get_logger("careerpilot.browser.detail")
 
-# A job is COMPLETE for decision purposes when it has a substantive JD; the
-# Rule/AI engines only ever decide on a COMPLETE job. Optional fields are
-# recorded as missing but do not block a decision.
-_DESIRED_FIELDS = ("salary", "experience", "employment_type", "company")
+_DESIRED_FIELDS = (
+    "salary", "experience", "employment_type", "company", "location",
+    "responsibilities", "skills",
+)
 _MIN_JD_CHARS = 120
 
 
 def assess_completeness(job) -> tuple:
-    """Return (read_status, missing_fields) after detail extraction.
-
-    COMPLETE -> substantive JD present (engines may decide).
-    PARTIAL  -> JD missing/too short (never auto-decided; marked Partial Data).
-    """
+    """Return (read_status, missing_fields) after detail extraction."""
     missing = []
     jd = (getattr(job, "job_description", "") or "").strip()
     if len(jd) < _MIN_JD_CHARS:
-        missing.append("job_description")
+        missing.append(f"job_description ({len(jd)} chars, need {_MIN_JD_CHARS})")
     for f in _DESIRED_FIELDS:
-        if not (getattr(job, f, "") or "").strip():
+        val = getattr(job, f, "")
+        if isinstance(val, list):
+            if not val:
+                missing.append(f)
+        elif not (val or "").strip():
             missing.append(f)
     status = "COMPLETE" if len(jd) >= _MIN_JD_CHARS else "PARTIAL"
+    # Optional field gaps are reported only when the JD itself is incomplete.
+    if status == "COMPLETE":
+        return status, []
     return status, missing
 
-# UNVERIFIED best-known detail-page field selectors per portal. Override in
-# config.yaml -> portals.<portal>.detail.
+
 DEFAULT_DETAIL_SELECTORS = {
     "naukri": {
         "container": "section.styles_job-desc-container__txpYf, .job-desc",
-        "description": "section.styles_job-desc-container__txpYf, .dang-inner-html",
+        "description": ("section.styles_job-desc-container__txpYf, "
+                        ".dang-inner-html, .styles_JDC__dang-inner-html"),
+        "title": "h1.styles_jd-header-title__rZwM1, h1.jd-header-title",
+        "company": "div.styles_jd-header-comp-name__MvqAI a, a.comp-name",
+        "location": "div.styles_jd-header-loc__LuP78 span, span.loc",
         "salary": "div.styles_jhc__salary__jdfEC, .salary",
         "experience": "div.styles_jhc__exp__k_giM, .exp",
         "employment_type": ".styles_details__employment",
+        "responsibilities": ".styles_key-skill__GIPn_, .styles_job-desc-container__txpYf li",
+        "skills": ".styles_key-skill__GIPn_ a, .styles_chip__N1HCE",
         "company_description": ".styles_about-company__text",
+        "benefits": ".styles_benefits__text, .styles_other-details__TJd1x",
         "posted_date": ".styles_jhc__stat__PgY67",
         "easy_apply": "#apply-button",
         "external_apply": "#company-site-button",
     },
     "linkedin": {
         "container": "div.jobs-description__content, div.jobs-description",
-        "description": "div.jobs-description__content, article.jobs-description__container",
+        "description": ("div.jobs-description__content, "
+                        "article.jobs-description__container"),
+        "title": "h1.t-24, h2.job-details-jobs-unified-top-card__job-title",
+        "company": "a.job-details-jobs-unified-top-card__company-name",
+        "location": "span.job-details-jobs-unified-top-card__bullet",
         "employment_type": "li.jobs-unified-top-card__job-insight",
+        "responsibilities": "div.jobs-description__content ul li",
+        "skills": "div.job-details-how-you-match__skills-item",
         "company_description": "section.jobs-company__box",
+        "benefits": "div.jobs-description-benefits__text",
         "easy_apply": "button.jobs-apply-button",
+        "external_apply": "a.jobs-apply-button--top-card",
     },
 }
+
+
+def _status(status_sink, **kwargs) -> None:
+    if status_sink is None:
+        return
+    try:
+        status_sink.set(**kwargs)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 class JobDetailExtractor:
@@ -89,32 +108,28 @@ class JobDetailExtractor:
     def open_and_extract(self, page, job, *, networkidle_timeout_ms: int = 8000,
                          render_settle_ms: int = 800, max_retries: int = 1,
                          card_title_selector: str = "") -> object:
-        """Open the job page, read it, fill job in place, cache it, return job.
-
-        If the job is already cached and unchanged, skips the open entirely
-        (crash recovery / no-rework). On selector/render failure it RETRIES,
-        then captures a failure-evidence bundle, logs the exact reason, and
-        continues with the card-level data -- the scan never stops, and the
-        feature is never silently disabled.
-        """
         url = getattr(job, "job_url", "")
         portal = getattr(job, "portal", "")
+        title = getattr(job, "job_title", "") or ""
         human_on = bool(self.humanizer and self.humanizer.enabled)
+        sink = (self.diagnostics.status if self.diagnostics is not None else None)
         self._job_seq += 1
+        _status(sink, open_job=title, browser_state=BrowserState.OPENING_JOB.value,
+                url=url, extracted_fields="-", missing_fields="-",
+                rule_decision="-", ai_status="-")
 
-        # Cache: never reopen an unchanged job.
         if self.cache is not None and not self.cache.needs_open(url):
             cached = self.cache.get(url) or {}
             for k, v in cached.items():
                 if v and hasattr(job, k) and not getattr(job, k, ""):
                     setattr(job, k, v)
-            # IMPORTANT: assess completeness from the CACHED data and set
-            # read_status. Without this, a cache hit leaves read_status at its
-            # UNREAD default and the pipeline would wrongly mark an already-read
-            # job as Partial Data on every re-encounter.
             status, missing = assess_completeness(job)
             job.read_status = status
             job.missing_fields = missing
+            extracted = _extracted_summary(job)
+            _status(sink, open_job=title, browser_state=BrowserState.EXTRACTING.value,
+                    extracted_fields=extracted, missing_fields=", ".join(missing)
+                    or "none", reading_ms=getattr(job, "reading_ms", 0))
             logger.info("Detail SKIP (cache hit) | read_status=%s | %s",
                         status, url)
             return job
@@ -124,112 +139,136 @@ class JobDetailExtractor:
         for attempt in range(max_retries + 1):
             try:
                 _log_state(BrowserState.OPENING_JOB, url)
-                logger.info("STAGE OPENING_JOB | %s | %s", getattr(job,
-                            "job_title", ""), url)
+                logger.info("STAGE OPENING_JOB | %s | %s", title, url)
                 if self.diagnostics is not None:
                     self.diagnostics.attach(page)
                     self.diagnostics.recorder.navigate(url)
-                # Bring the job tab to the foreground so a human watching the
-                # browser actually SEES each job open (not a hidden background
-                # tab). Best-effort; never fatal.
                 try:
                     page.bring_to_front()
                 except Exception:  # noqa: BLE001
                     pass
-                # THE REQUESTED WORKFLOW: try a REAL click on the card's own
-                # link first (move mouse -> hover -> click) -- not a raw
-                # page.goto(). Only fall back to direct navigation if the card
-                # element can't be found on the page the user is looking at
-                # (e.g. it scrolled out of a virtualized list).
                 clicked = False
                 if card_title_selector:
+                    _status(sink, hover_target=card_title_selector,
+                            browser_state=BrowserState.OPENING_JOB.value)
                     clicked = click_job_card(
                         page, job, card_title_selector,
                         humanizer=self.humanizer if human_on else None)
                 if clicked:
                     logger.info("STAGE JOB_OPENED | %s | via REAL CLICK "
                                "(move -> hover -> click)", url)
+                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value)
                 else:
                     if human_on:
-                        self.humanizer.idle_move(page)    # natural cursor drift
+                        self.humanizer.idle_move(page)
                     logger.info("STAGE JOB_OPENED (fallback) | %s | direct "
                                "navigate -- card link not clickable on this "
                                "page", url)
-                    navigate(page, url,
-                             reason=f"open job: {getattr(job,'job_title','')}")
+                    navigate(page, url, reason=f"open job: {title}")
+                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
+                            wait_reason="NAVIGATION_FALLBACK: card not found, "
+                                        "used direct URL navigation")
                 wait_for_ready(page,
                                networkidle_timeout_ms=networkidle_timeout_ms,
                                render_settle_ms=render_settle_ms,
                                results_selector=sel.get("container", ""),
                                reason="job detail render")
 
-                _log_state(BrowserState.READING_JOB, getattr(job, "job_title", ""))
+                _log_state(BrowserState.READING_JOB, title)
                 description = _card_text(page, sel.get("description"))
                 logger.info("STAGE JD_READING_STARTED | jd_chars=%s | %s",
                             len(description or ""), url)
+                _status(sink, browser_state=BrowserState.READING_JOB.value,
+                        reading_section="top section")
                 if human_on and description:
                     _log_state(BrowserState.SCROLLING_JOB)
                     rec = (self.diagnostics.recorder
                            if self.diagnostics is not None else None)
-                    sink = (self.diagnostics.status
-                            if self.diagnostics is not None else None)
                     summary = self.humanizer.incremental_read(
                         page, description, recorder=rec, status_sink=sink)
                     job.reading_ms = summary.get("total_ms", 0)
                 logger.info("STAGE JD_READING_COMPLETED | %s", url)
 
                 _log_state(BrowserState.EXTRACTING, url)
+                self._set(job, "job_title",
+                          _card_text(page, sel.get("title"))
+                          or getattr(job, "job_title", ""))
+                self._set(job, "company",
+                          _card_text(page, sel.get("company"))
+                          or getattr(job, "company", ""))
+                self._set(job, "location",
+                          _card_text(page, sel.get("location"))
+                          or getattr(job, "location", ""))
                 self._set(job, "job_description", description)
                 self._set(job, "salary", _card_text(page, sel.get("salary")))
-                self._set(job, "experience", _card_text(page, sel.get("experience")))
+                self._set(job, "experience",
+                          _card_text(page, sel.get("experience")))
                 self._set(job, "employment_type",
                           _card_text(page, sel.get("employment_type")))
+                self._set(job, "responsibilities",
+                          _card_text(page, sel.get("responsibilities")))
+                self._set(job, "benefits", _card_text(page, sel.get("benefits")))
                 self._set(job, "company_description",
                           _card_text(page, sel.get("company_description")))
                 self._set(job, "posted_date",
                           _card_text(page, sel.get("posted_date")))
                 self._set(job, "raw_html", _safe_content(page))
-                if sel.get("external_apply"):
-                    self._set(job, "external_apply_url",
-                              _card_attr(page, sel.get("external_apply"), "href"))
+                skills = _collect_list(page, sel.get("skills"))
+                if skills:
+                    job.skills = skills
+                pref = _collect_list(page, sel.get("preferred_skills"))
+                if pref:
+                    job.preferred_skills = pref
+                apply_href = _card_attr(page, sel.get("external_apply"), "href")
+                if apply_href:
+                    job.external_apply_url = apply_href
+                    job.apply_url = apply_href
+                if sel.get("easy_apply") and page.query_selector(sel["easy_apply"]):
+                    job.is_easy_apply = True
 
                 if self.cache is not None:
                     self.cache.put(_job_to_dict(job))
 
-                # Job Detail Recorder (#2): save the opened job's evidence so the
-                # parser can be improved later without revisiting the site.
                 self._record_detail(page, job, portal, sel)
 
                 status, missing = assess_completeness(job)
                 job.read_status = status
                 job.missing_fields = missing
+                extracted = _extracted_summary(job)
+                _status(sink, browser_state=BrowserState.EXTRACTING.value,
+                        extracted_fields=extracted,
+                        missing_fields=", ".join(missing) or "none",
+                        reading_ms=getattr(job, "reading_ms", 0))
+
                 if status != "COMPLETE":
-                    # Incomplete read: retry, then mark Partial Data + evidence.
-                    logger.warning("Detail INCOMPLETE for %s (attempt %s) | "
-                                   "missing=%s", url, attempt + 1, missing)
+                    reason = (f"EXTRACTION_FAILED: selector failure -- "
+                              f"missing {', '.join(missing)}")
+                    logger.warning("Detail INCOMPLETE for %s (attempt %s) | %s",
+                                   url, attempt + 1, missing)
                     if attempt < max_retries:
                         continue
                     self._capture("job_detail_partial", page, job, portal, sel)
-                    logger.warning("Detail PARTIAL for %s after %s attempts -- "
-                                   "marking Partial Data (never auto-decided)",
-                                   url, max_retries + 1)
+                    job.failure_detail = reason
+                    logger.warning("Detail PARTIAL for %s after %s attempts -- %s",
+                                   url, max_retries + 1, reason)
                     return job
                 logger.info("Detail EXTRACTED COMPLETE | %s | jd_chars=%s | "
                             "missing_optional=%s", url, len(description or ""),
                             missing)
                 return job
-            except Exception as exc:  # noqa: BLE001 - one job never stops the scan
+            except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 logger.warning("Detail extraction failed for %s (attempt %s/%s): "
                                "%s", url, attempt + 1, max_retries + 1, exc)
-        # Exhausted retries via exception: evidence + Partial Data (never card-only).
+        reason = f"BROWSER_EXCEPTION: {type(last_exc).__name__}: {last_exc}"
         self._capture("job_detail_error", page, job, portal, sel,
                       error=str(last_exc))
         job.read_status = "PARTIAL"
-        job.missing_fields = ["job_description"]
-        logger.warning("Detail extraction giving up for %s -- marking Partial "
-                       "Data; the decision engines will NOT use card-only data",
-                       url)
+        job.missing_fields = [f"open/extract failed: {last_exc}"]
+        job.failure_detail = reason
+        _status(sink, wait_reason=reason,
+                browser_state=BrowserState.ERROR_PAGE.value)
+        logger.warning("Detail extraction giving up for %s -- %s", url, reason)
         return job
 
     def _record_detail(self, page, job, portal: str, sel: dict) -> None:
@@ -258,6 +297,30 @@ class JobDetailExtractor:
             setattr(job, attr, value)
 
 
+def _extracted_summary(job) -> str:
+    parts = []
+    for f in ("job_title", "company", "location", "salary", "experience",
+              "employment_type", "job_description"):
+        val = getattr(job, f, "")
+        if isinstance(val, str) and val.strip():
+            parts.append(f)
+    if getattr(job, "skills", None):
+        parts.append("skills")
+    if getattr(job, "responsibilities", ""):
+        parts.append("responsibilities")
+    return ", ".join(parts) if parts else "none"
+
+
+def _collect_list(page, selector: str | None) -> list[str]:
+    if not selector:
+        return []
+    try:
+        els = page.query_selector_all(selector)
+        return [e.inner_text().strip() for e in els if e.inner_text().strip()]
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def _safe_content(page) -> str:
     try:
         return page.content()
@@ -267,6 +330,7 @@ def _safe_content(page) -> str:
 
 def _job_to_dict(job) -> dict:
     keys = ("job_url", "job_title", "company", "location", "salary", "experience",
-            "employment_type", "job_description", "company_description",
-            "posted_date", "is_easy_apply")
+            "employment_type", "job_description", "responsibilities", "benefits",
+            "company_description", "posted_date", "is_easy_apply", "skills",
+            "preferred_skills", "apply_url", "external_apply_url")
     return {k: getattr(job, k, None) for k in keys}

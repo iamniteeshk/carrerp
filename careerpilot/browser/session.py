@@ -48,7 +48,7 @@ class BrowserConfig:
     networkidle_timeout_ms: int = 8000   # max wait for network to go quiet
     render_settle_ms: int = 800          # small final paint margin (tunable)
     scroll_passes: int = 3               # natural scrolls to trigger lazy-load
-    open_jobs: bool = False              # open each job's page to read full JD
+    open_jobs: bool = True              # open each job's page to read full JD
 
     def normalized_engine(self) -> str:
         engine = (self.engine or "chromium").strip().lower()

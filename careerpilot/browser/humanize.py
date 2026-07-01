@@ -65,7 +65,8 @@ class Humanizer:
         while moved < target:
             step = self.rng.randint(self.cfg.scroll_step_min_px,
                                     self.cfg.scroll_step_max_px)
-            _safe(lambda s=step: page.evaluate(f"window.scrollBy(0, {s})"))
+            # Mouse wheel scroll reads more naturally than instant scrollBy.
+            _safe(lambda s=step: page.mouse.wheel(0, s))
             moved += step
             steps += 1
             self._pause(page, self.rng.randint(self.cfg.scroll_pause_min_ms,

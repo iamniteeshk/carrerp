@@ -110,10 +110,9 @@ class LinkedInPortal(BasePortal):
         return f"{JOBS_URL}?{urlencode(parts)}"
 
     def search(self, keywords: list[str], locations: list[str],
-               on_job=None) -> list[Job]:
-        # Recommended jobs (requires login) -> preferred locations -> all.
+               on_job=None, should_open=None) -> list[Job]:
         plan = self._build_search_plan(keywords, locations)
-        return self._browse_plan(plan, on_job=on_job)
+        return self._browse_plan(plan, on_job=on_job, should_open=should_open)
 
     def apply(self, job: Job, resume_path: str, cover_letter: str,
               answer_fn, dry_run: bool) -> ApplyOutcome:
