@@ -91,6 +91,45 @@ def test_rejects_location_mismatch():
     assert not r.accepted and r.reason == RejectionReason.LOCATION_MISMATCH
 
 
+def test_rejects_ai_role_despite_director_title():
+    # v3.0.0: the exact reported bug -- an AI role must NOT be rescued by the
+    # generic 'Director' leadership word. It is rejected before the AI runs.
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Director - AI",
+                             job_description="Lead AI research and ML teams"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_rejects_ml_role_despite_director_title():
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Director - AI/ML",
+                             job_description="Machine learning platform leadership"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_rejects_data_scientist_lead():
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Head of Data Science",
+                             job_description="Build data science and analytics"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_ai_infrastructure_role_is_borderline_not_hard_rejected():
+    # A title carrying the candidate's own domain keyword ('Infrastructure') is
+    # borderline, so it is NOT hard-rejected -- the AI is allowed to judge it.
+    engine = RuleEngine(_rule_config())
+    assert engine.evaluate(_job(
+        job_title="Director - AI Infrastructure",
+        job_description="Own cloud and infrastructure platform for AI")).accepted
+
+
+def test_excluded_title_terms_are_config_extensible():
+    engine = RuleEngine(_rule_config(excluded_title_terms=["blockchain"]))
+    r = engine.evaluate(_job(job_title="Director - Blockchain",
+                             job_description="Lead blockchain platform"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
 def test_missing_salary_allowed():
     engine = RuleEngine(_rule_config())
     assert engine.evaluate(_job(salary="")).accepted

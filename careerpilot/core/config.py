@@ -56,6 +56,15 @@ class RuleConfig:
     blacklist_companies: list[str]
     required_keywords: list[str]
     nice_to_have_keywords: list[str]
+    # Minimum AI match score (0-100) for a job to be MATCHED. A scored job below
+    # this becomes REJECTED instead of appearing in MatchedJobs -- so the Rule
+    # Engine and the AI agree on the final decision. 0 disables the gate.
+    minimum_match_score: float = 0.0
+    # Extra hard off-domain title terms (merged with the built-in denylist). A
+    # title containing one of these is rejected before the AI is called, UNLESS
+    # the title also carries one of the candidate's own domain keywords (then it
+    # is borderline and the AI decides).
+    excluded_title_terms: list[str] = field(default_factory=list)
     # Focused list of phrases to SEARCH on each portal (point 6 priority titles).
     # Distinct from accepted_titles, which is the broader "is this a relevant
     # role" allowlist used for matching. If empty, search falls back to
@@ -230,6 +239,8 @@ def load_config(config_path: str | Path = "config/config.yaml",
         blacklist_companies=rules.get("blacklist_companies", []),
         required_keywords=_dedupe(union_keywords + extra_keywords),
         nice_to_have_keywords=rules.get("nice_to_have_keywords", []),
+        minimum_match_score=float(rules.get("minimum_match_score", 0) or 0),
+        excluded_title_terms=rules.get("excluded_title_terms", []) or [],
         search_keywords=rules.get("search_keywords", []) or [],
         search_nationwide=bool(rules.get("search_nationwide", False)),
         search_include_recommended=bool(rules.get("search_include_recommended",
