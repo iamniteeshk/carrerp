@@ -44,6 +44,7 @@ class RejectionReason(str, Enum):
     INVALID_JOB_TITLE = "Invalid Job Title"
     BLACKLISTED_COMPANY = "Blacklisted Company"
     DOMAIN_MISMATCH = "Domain Mismatch"
+    LOW_MATCH_SCORE = "Match Score Below Threshold"
 
 
 class AIProvider(str, Enum):
