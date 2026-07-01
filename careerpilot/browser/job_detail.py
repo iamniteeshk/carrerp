@@ -10,7 +10,8 @@ Engine and AI so they see the complete JD, not just the card summary.
 from __future__ import annotations
 
 from .base_portal import (BrowserState, _log_state, navigate, wait_for_ready,
-                           _card_text, _card_attr, click_job_card)
+                           _card_text, _card_attr, click_job_card,
+                           return_to_results, _page_alive)
 from ..core.logging_setup import get_logger
 
 logger = get_logger("careerpilot.browser.detail")
@@ -107,12 +108,15 @@ class JobDetailExtractor:
 
     def open_and_extract(self, page, job, *, networkidle_timeout_ms: int = 8000,
                          render_settle_ms: int = 800, max_retries: int = 1,
-                         card_title_selector: str = "") -> object:
+                         card_title_selector: str = "",
+                         card_selector: str = "",
+                         results_page=None) -> object:
         url = getattr(job, "job_url", "")
         portal = getattr(job, "portal", "")
         title = getattr(job, "job_title", "") or ""
         human_on = bool(self.humanizer and self.humanizer.enabled)
         sink = (self.diagnostics.status if self.diagnostics is not None else None)
+        results_page = results_page or page
         self._job_seq += 1
         _status(sink, open_job=title, browser_state=BrowserState.OPENING_JOB.value,
                 url=url, extracted_fields="-", missing_fields="-",
@@ -137,46 +141,63 @@ class JobDetailExtractor:
         sel = self._selectors(portal)
         last_exc = None
         for attempt in range(max_retries + 1):
+            job_page = results_page
             try:
                 _log_state(BrowserState.OPENING_JOB, url)
-                logger.info("STAGE OPENING_JOB | %s | %s", title, url)
+                logger.info("OPENING_JOB | %s | %s", title, url)
                 if self.diagnostics is not None:
-                    self.diagnostics.attach(page)
+                    self.diagnostics.attach(results_page)
                     self.diagnostics.recorder.navigate(url)
                 try:
-                    page.bring_to_front()
+                    results_page.bring_to_front()
                 except Exception:  # noqa: BLE001
                     pass
-                clicked = False
-                if card_title_selector:
+                open_result = None
+                if card_title_selector and _page_alive(results_page):
                     _status(sink, hover_target=card_title_selector,
                             browser_state=BrowserState.OPENING_JOB.value)
-                    clicked = click_job_card(
-                        page, job, card_title_selector,
-                        humanizer=self.humanizer if human_on else None)
-                if clicked:
-                    logger.info("STAGE JOB_OPENED | %s | via REAL CLICK "
-                               "(move -> hover -> click)", url)
-                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value)
-                else:
-                    if human_on:
-                        self.humanizer.idle_move(page)
-                    logger.info("STAGE JOB_OPENED (fallback) | %s | direct "
-                               "navigate -- card link not clickable on this "
-                               "page", url)
-                    navigate(page, url, reason=f"open job: {title}")
+                    open_result = click_job_card(
+                        results_page, job, card_title_selector,
+                        humanizer=self.humanizer if human_on else None,
+                        card_selector=card_selector)
+                if open_result and open_result.opened:
+                    job_page = open_result.job_page
+                    job.open_mode = open_result.mode
+                    job._job_page = job_page  # noqa: SLF001 -- transient browse state
+                    logger.info("CLICK_SUCCESS | mode=%s | %s",
+                                open_result.mode, getattr(job_page, "url", url))
                     _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
-                            wait_reason="NAVIGATION_FALLBACK: card not found, "
-                                        "used direct URL navigation")
-                wait_for_ready(page,
+                            wait_reason=f"CLICK_SUCCESS: {open_result.detail}")
+                elif open_result and not open_result.opened and open_result.detail:
+                    logger.info("CLICK_FAILED | %s | %s", title, open_result.detail)
+                if not (open_result and open_result.opened):
+                    if not _page_alive(results_page):
+                        raise RuntimeError("results page closed before navigation")
+                    if human_on:
+                        self.humanizer.idle_move(results_page)
+                    logger.info("NAVIGATION_FALLBACK | %s | direct navigate -- "
+                                "card click did not open job", url)
+                    navigate(results_page, url,
+                             reason=f"open job (click failed): {title}")
+                    job_page = results_page
+                    job.open_mode = "goto_fallback"
+                    job._job_page = job_page  # noqa: SLF001
+                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
+                            wait_reason="NAVIGATION_FALLBACK: card not clickable")
+                if not _page_alive(job_page):
+                    raise RuntimeError("job page closed before readiness wait")
+                logger.info("WAITING_FOR_NAVIGATION | job_page=%s",
+                            getattr(job_page, "url", ""))
+                wait_for_ready(job_page,
                                networkidle_timeout_ms=networkidle_timeout_ms,
                                render_settle_ms=render_settle_ms,
                                results_selector=sel.get("container", ""),
                                reason="job detail render")
+                logger.info("JOB_PAGE_READY | %s", getattr(job_page, "url", url))
 
                 _log_state(BrowserState.READING_JOB, title)
-                description = _card_text(page, sel.get("description"))
-                logger.info("STAGE JD_READING_STARTED | jd_chars=%s | %s",
+                description = _card_text(job_page, sel.get("description"))
+                logger.info("READING_STARTED | jd_chars=%s | %s",
                             len(description or ""), url)
                 _status(sink, browser_state=BrowserState.READING_JOB.value,
                         reading_section="top section")
@@ -185,56 +206,58 @@ class JobDetailExtractor:
                     rec = (self.diagnostics.recorder
                            if self.diagnostics is not None else None)
                     summary = self.humanizer.incremental_read(
-                        page, description, recorder=rec, status_sink=sink)
+                        job_page, description, recorder=rec, status_sink=sink)
                     job.reading_ms = summary.get("total_ms", 0)
-                logger.info("STAGE JD_READING_COMPLETED | %s", url)
+                logger.info("READING_COMPLETED | %s", url)
 
                 _log_state(BrowserState.EXTRACTING, url)
                 self._set(job, "job_title",
-                          _card_text(page, sel.get("title"))
+                          _card_text(job_page, sel.get("title"))
                           or getattr(job, "job_title", ""))
                 self._set(job, "company",
-                          _card_text(page, sel.get("company"))
+                          _card_text(job_page, sel.get("company"))
                           or getattr(job, "company", ""))
                 self._set(job, "location",
-                          _card_text(page, sel.get("location"))
+                          _card_text(job_page, sel.get("location"))
                           or getattr(job, "location", ""))
                 self._set(job, "job_description", description)
-                self._set(job, "salary", _card_text(page, sel.get("salary")))
+                self._set(job, "salary", _card_text(job_page, sel.get("salary")))
                 self._set(job, "experience",
-                          _card_text(page, sel.get("experience")))
+                          _card_text(job_page, sel.get("experience")))
                 self._set(job, "employment_type",
-                          _card_text(page, sel.get("employment_type")))
+                          _card_text(job_page, sel.get("employment_type")))
                 self._set(job, "responsibilities",
-                          _card_text(page, sel.get("responsibilities")))
-                self._set(job, "benefits", _card_text(page, sel.get("benefits")))
+                          _card_text(job_page, sel.get("responsibilities")))
+                self._set(job, "benefits", _card_text(job_page, sel.get("benefits")))
                 self._set(job, "company_description",
-                          _card_text(page, sel.get("company_description")))
+                          _card_text(job_page, sel.get("company_description")))
                 self._set(job, "posted_date",
-                          _card_text(page, sel.get("posted_date")))
-                self._set(job, "raw_html", _safe_content(page))
-                skills = _collect_list(page, sel.get("skills"))
+                          _card_text(job_page, sel.get("posted_date")))
+                self._set(job, "raw_html", _safe_content(job_page))
+                skills = _collect_list(job_page, sel.get("skills"))
                 if skills:
                     job.skills = skills
-                pref = _collect_list(page, sel.get("preferred_skills"))
+                pref = _collect_list(job_page, sel.get("preferred_skills"))
                 if pref:
                     job.preferred_skills = pref
-                apply_href = _card_attr(page, sel.get("external_apply"), "href")
+                apply_href = _card_attr(job_page, sel.get("external_apply"), "href")
                 if apply_href:
                     job.external_apply_url = apply_href
                     job.apply_url = apply_href
-                if sel.get("easy_apply") and page.query_selector(sel["easy_apply"]):
+                if sel.get("easy_apply") and job_page.query_selector(sel["easy_apply"]):
                     job.is_easy_apply = True
 
                 if self.cache is not None:
                     self.cache.put(_job_to_dict(job))
 
-                self._record_detail(page, job, portal, sel)
+                self._record_detail(job_page, job, portal, sel)
 
                 status, missing = assess_completeness(job)
                 job.read_status = status
                 job.missing_fields = missing
                 extracted = _extracted_summary(job)
+                logger.info("EXTRACTION_COMPLETED | read_status=%s | %s",
+                            status, url)
                 _status(sink, browser_state=BrowserState.EXTRACTING.value,
                         extracted_fields=extracted,
                         missing_fields=", ".join(missing) or "none",
@@ -247,7 +270,7 @@ class JobDetailExtractor:
                                    url, attempt + 1, missing)
                     if attempt < max_retries:
                         continue
-                    self._capture("job_detail_partial", page, job, portal, sel)
+                    self._capture("job_detail_partial", job_page, job, portal, sel)
                     job.failure_detail = reason
                     logger.warning("Detail PARTIAL for %s after %s attempts -- %s",
                                    url, max_retries + 1, reason)
@@ -258,10 +281,17 @@ class JobDetailExtractor:
                 return job
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
-                logger.warning("Detail extraction failed for %s (attempt %s/%s): "
-                               "%s", url, attempt + 1, max_retries + 1, exc)
+                exc_name = type(exc).__name__
+                if "TargetClosed" in exc_name or "closed" in str(exc).lower():
+                    logger.warning("Detail extraction target closed for %s "
+                                   "(attempt %s/%s): %s",
+                                   url, attempt + 1, max_retries + 1, exc)
+                else:
+                    logger.warning("Detail extraction failed for %s (attempt %s/%s): "
+                                   "%s", url, attempt + 1, max_retries + 1, exc)
         reason = f"BROWSER_EXCEPTION: {type(last_exc).__name__}: {last_exc}"
-        self._capture("job_detail_error", page, job, portal, sel,
+        capture_page = getattr(job, "_job_page", None) or results_page
+        self._capture("job_detail_error", capture_page, job, portal, sel,
                       error=str(last_exc))
         job.read_status = "PARTIAL"
         job.missing_fields = [f"open/extract failed: {last_exc}"]

@@ -12,11 +12,17 @@ from careerpilot.browser.base_portal import click_job_card
 from careerpilot.core.models import Job
 
 
+class _FakeContext:
+    def __init__(self, pages):
+        self.pages = pages
+
+
 class _FakeEl:
     def __init__(self, href="", text="", box=(10, 10, 100, 20)):
         self.href = href; self.text = text; self._box = box
         self.clicked = False; self.hovered = False
     def get_attribute(self, name): return self.href if name == "href" else None
+    def inner_text(self): return self.text
     def scroll_into_view_if_needed(self, timeout=0): pass
     def bounding_box(self):
         x, y, w, h = self._box
@@ -24,7 +30,7 @@ class _FakeEl:
     def hover(self, timeout=0): self.hovered = True
     def click(self, timeout=0):
         self.clicked = True
-        self._page._url = self._page._target_url   # simulate real navigation
+        self._page._url = self._page._target_url   # simulate same-tab navigation
 
 
 class _FakeLocator:
@@ -46,10 +52,15 @@ class _FakePage:
     def __init__(self, els, target_url=""):
         self._els = els; self._url = "https://naukri.com/results"
         self._target_url = target_url or "https://naukri.com/job/xyz"
+        self.context = _FakeContext([self])
     @property
     def url(self): return self._url
     def locator(self, sel): return _FakeLocator(self._els, self)
     def wait_for_timeout(self, ms): pass
+    def evaluate(self, *a, **k): return False
+    def query_selector_all(self, sel): return []
+    def is_closed(self): return False
+    def bring_to_front(self): pass
 
 
 def test_click_finds_element_by_href_and_clicks():
@@ -58,8 +69,7 @@ def test_click_finds_element_by_href_and_clicks():
     page = _FakePage([el], target_url=url)
     job = Job(portal="naukri", job_title="Director - IT Infra", job_url=url)
     ok = click_job_card(page, job, "a.title")
-    assert ok is True
-    assert el.clicked and el.hovered
+    assert ok and el.clicked and el.hovered
 
 
 def test_click_falls_back_to_text_when_no_href_match():
@@ -68,7 +78,7 @@ def test_click_falls_back_to_text_when_no_href_match():
     job = Job(portal="naukri", job_title="Director - IT Infra",
              job_url="https://naukri.com/job/xyz")
     ok = click_job_card(page, job, "a.title")
-    assert ok is True and el.clicked
+    assert ok and el.clicked
 
 
 def test_click_returns_false_when_no_matching_element():
@@ -76,14 +86,13 @@ def test_click_returns_false_when_no_matching_element():
     page = _FakePage([el])
     job = Job(portal="naukri", job_title="Director - IT Infra",
              job_url="https://naukri.com/job/xyz")
-    ok = click_job_card(page, job, "a.title")
-    assert ok is False and not el.clicked
+    assert not click_job_card(page, job, "a.title") and not el.clicked
 
 
 def test_click_returns_false_when_no_selector_given():
     page = _FakePage([])
     job = Job(portal="naukri", job_title="Director", job_url="u")
-    assert click_job_card(page, job, "") is False
+    assert not click_job_card(page, job, "")
 
 
 def test_open_and_extract_uses_click_before_navigate_fallback():

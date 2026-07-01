@@ -16,6 +16,7 @@ account before enabling LIVE mode.
 from __future__ import annotations
 
 import abc
+import time
 from dataclasses import dataclass
 from enum import Enum
 from urllib.parse import urlsplit
@@ -58,87 +59,264 @@ def navigate(page, url: str, *, reason: str, force: bool = False) -> bool:
     return True
 
 
-def click_job_card(page, job, title_selector: str, humanizer=None,
-                   timeout_ms: int = 5000) -> bool:
-    """Find the job's own link on the page the user is looking at right now and
-    perform a REAL, human-driven click on it: move the mouse there (curved,
-    via the humanizer), hover, then click -- exactly the 'see card -> move
-    mouse -> hover -> click -> open' workflow. This is a real Playwright click
-    on the actual element, not page.goto(url) -- it fires trusted DOM events so
-    it also works for JS-routed (SPA) card links, not only plain <a href>.
+@dataclass
+class JobOpenResult:
+    """Outcome of a real card click -- never mix with goto on success."""
+    opened: bool
+    mode: str = "failed"           # click_same_tab | click_new_tab | failed
+    job_page: object | None = None
+    results_page: object | None = None
+    detail: str = ""
 
-    Returns True only if a click was performed AND the page visibly changed as
-    a result (proof something actually opened). Returns False if the card
-    can't be found on the current page or the click led nowhere -- the caller
-    should then fall back to a direct navigate() so a job is never left
-    unopened just because its element wasn't locatable.
-    """
-    if not title_selector:
+    def __bool__(self) -> bool:
+        return self.opened
+
+
+def _page_alive(page) -> bool:
+    if page is None:
         return False
+    try:
+        checker = getattr(page, "is_closed", None)
+        if checker is None:
+            return True
+        return not checker()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _dismiss_blocking_overlays(page) -> None:
+    """Close sticky banners (e.g. Naukri 'Monthly subscriptions') that intercept clicks."""
+    js = """
+    () => {
+      const closeWords = ['close', 'not now', 'later', 'skip', 'dismiss', 'no thanks'];
+      const nodes = document.querySelectorAll(
+        'button, [role="button"], a, span, div[class*="close"], [aria-label*="lose"]');
+      for (const el of nodes) {
+        const t = (el.innerText || el.getAttribute('aria-label') || '').toLowerCase();
+        if (!t) continue;
+        if (closeWords.some(w => t.includes(w)) || t.trim() === '×' || t.trim() === 'x') {
+          const r = el.getBoundingClientRect();
+          if (r.width > 4 && r.height > 4) { el.click(); return true; }
+        }
+      }
+      return false;
+    }
+    """
+    try:
+        dismissed = page.evaluate(js)
+        if dismissed:
+            _nav_logger.info("Dismissed blocking overlay before card click")
+            page.wait_for_timeout(350)
+    except Exception as exc:  # noqa: BLE001
+        _nav_logger.debug("Overlay dismiss skipped: %s", exc)
+
+
+def _scroll_link_to_center(page, link) -> None:
+    try:
+        link.scroll_into_view_if_needed(timeout=5000)
+        page.evaluate(
+            "(el) => el.scrollIntoView({block: 'center', inline: 'center', "
+            "behavior: 'instant'})", link)
+        page.wait_for_timeout(250)
+    except Exception as exc:  # noqa: BLE001
+        _nav_logger.debug("scroll-to-center failed: %s", exc)
+
+
+def _locate_card_link(page, job, card_selector: str, title_selector: str):
+    """Find the clickable link INSIDE the matching job card (not page-global)."""
     title = (getattr(job, "job_title", "") or "").strip()
     url = getattr(job, "job_url", "") or ""
-    try:
-        locator = page.locator(title_selector)
-        count = locator.count()
-    except Exception as exc:  # noqa: BLE001
-        _nav_logger.debug("Click-locate failed for selector %s: %s",
-                          title_selector, exc)
-        return False
-    target = None
-    # Prefer an exact href match -- most reliable when several cards share a
-    # similar visible title.
-    if url:
-        for i in range(count):
-            el = locator.nth(i)
-            try:
-                href = el.get_attribute("href") or ""
-            except Exception:  # noqa: BLE001
-                href = ""
-            if href and (href == url or href in url or url.endswith(href)):
-                target = el
-                break
-    if target is None and title:
+    if not title_selector:
+        return None
+    links = []
+    if card_selector:
         try:
-            filtered = locator.filter(has_text=title)
-            if filtered.count() > 0:
-                target = filtered.first
+            for card in page.query_selector_all(card_selector):
+                try:
+                    link = card.query_selector(title_selector)
+                    if link is not None:
+                        links.append(link)
+                except Exception:  # noqa: BLE001
+                    continue
+        except Exception as exc:  # noqa: BLE001
+            _nav_logger.debug("Card-scoped query failed: %s", exc)
+    if not links:
+        try:
+            locator = page.locator(title_selector)
+            for i in range(locator.count()):
+                links.append(locator.nth(i))
         except Exception:  # noqa: BLE001
-            target = None
-    if target is None:
-        _nav_logger.info("Click target NOT found on current page for '%s' -- "
-                         "falling back to direct navigation", title)
-        return False
+            return None
+    for link in links:
+        try:
+            href = (link.get_attribute("href") or "").strip()
+            text = (link.inner_text() or "").strip()
+        except Exception:  # noqa: BLE001
+            continue
+        if url and href and (href == url or url.endswith(href) or href in url):
+            return link
+        if title and title.lower() in text.lower():
+            return link
+    return None
+
+
+def _wait_for_job_open(results_page, context, pre_url: str,
+                       pages_before: int, timeout_ms: int) -> JobOpenResult:
+    """Wait for same-tab navigation OR a new tab -- never assume which."""
+    _nav_logger.info("WAITING_FOR_NAVIGATION | pre_url=%s | pages=%s",
+                     pre_url, pages_before)
+    deadline = time.monotonic() + (timeout_ms / 1000.0)
+    while time.monotonic() < deadline:
+        try:
+            if len(context.pages) > pages_before:
+                for p in context.pages[pages_before:]:
+                    if not _page_alive(p):
+                        continue
+                    try:
+                        p.wait_for_load_state("domcontentloaded", timeout=2000)
+                    except Exception:  # noqa: BLE001
+                        pass
+                    _nav_logger.info("CLICK_SUCCESS | mode=new_tab | url=%s", p.url)
+                    return JobOpenResult(True, "click_new_tab", p, results_page,
+                                         "opened in new tab")
+            if _page_alive(results_page) and results_page.url != pre_url:
+                try:
+                    results_page.wait_for_load_state("domcontentloaded",
+                                                     timeout=2000)
+                except Exception:  # noqa: BLE001
+                    pass
+                _nav_logger.info("CLICK_SUCCESS | mode=same_tab | url=%s",
+                                 results_page.url)
+                return JobOpenResult(True, "click_same_tab", results_page,
+                                     results_page, "opened in same tab")
+        except Exception as exc:  # noqa: BLE001
+            if "TargetClosed" in type(exc).__name__:
+                for p in context.pages:
+                    if _page_alive(p) and getattr(p, "url", "") != pre_url:
+                        _nav_logger.info("CLICK_SUCCESS | mode=same_tab(recovered) "
+                                         "| url=%s", p.url)
+                        return JobOpenResult(True, "click_same_tab", p, p,
+                                             "recovered after target closed")
+            _nav_logger.debug("wait-for-open poll: %s", exc)
+        try:
+            results_page.wait_for_timeout(150)
+        except Exception:  # noqa: BLE001
+            time.sleep(0.15)
+    _nav_logger.warning("WAITING_FOR_NAVIGATION timed out | still on %s",
+                        pre_url if _page_alive(results_page) else "(closed)")
+    return JobOpenResult(False, "failed", None, results_page,
+                         "navigation did not start after click")
+
+
+def click_job_card(page, job, title_selector: str, humanizer=None,
+                   timeout_ms: int = 5000, card_selector: str = "") -> JobOpenResult:
+    """Click the job card's own link (scoped to the card). Returns JobOpenResult.
+
+    On success the caller must read/extract on ``job_page`` and must NOT also
+    call ``navigate()``/``goto()`` for the same open.
+    """
+    title = (getattr(job, "job_title", "") or "").strip()
+    if not title_selector:
+        return JobOpenResult(False, "failed", None, page, "no title selector")
+    link = _locate_card_link(page, job, card_selector, title_selector)
+    if link is None:
+        _nav_logger.info("Click target NOT found on current page for '%s'", title)
+        return JobOpenResult(False, "failed", None, page,
+                             "card link not found on results page")
+    if not _page_alive(page):
+        return JobOpenResult(False, "failed", None, page, "results page closed")
     try:
-        target.scroll_into_view_if_needed(timeout=timeout_ms)
-        box = target.bounding_box()
-        if not box:
-            return False
-        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        context = page.context
+        pages_before = len(context.pages)
         pre_url = page.url
+        _dismiss_blocking_overlays(page)
+        _scroll_link_to_center(page, link)
+        box = link.bounding_box()
+        if not box:
+            return JobOpenResult(False, "failed", None, page,
+                                 "card link not visible (no bounding box)")
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
         if humanizer is not None and humanizer.enabled:
             humanizer.move_mouse(page, cx, cy)
             page.wait_for_timeout(humanizer.rng.randint(120, 350))
-        target.hover(timeout=timeout_ms)
-        page.wait_for_timeout(humanizer.rng.randint(150, 400) if humanizer
+        try:
+            link.hover(timeout=timeout_ms)
+        except Exception as exc:  # noqa: BLE001
+            _nav_logger.debug("hover failed (continuing): %s", exc)
+        page.wait_for_timeout(humanizer.rng.randint(150, 450) if humanizer
                               and humanizer.enabled else 150)
         _nav_logger.info("CLICK card '%s' at (%.0f, %.0f)", title, cx, cy)
-        try:
-            target.click(timeout=timeout_ms)
-        except Exception as click_exc:  # noqa: BLE001 - nav can detach the frame
-            _nav_logger.debug("click() raised (often just a navigating frame): "
-                              "%s", click_exc)
-        for _ in range(max(1, timeout_ms // 200)):
+        clicked = False
+        for attempt in range(2):
             try:
-                if page.url != pre_url:
-                    return True
-            except Exception:  # noqa: BLE001 - page mid-navigation counts as ok
-                return True
-            page.wait_for_timeout(200)
-        return page.url != pre_url
+                link.click(timeout=timeout_ms)
+                clicked = True
+                break
+            except Exception as click_exc:  # noqa: BLE001
+                msg = str(click_exc).lower()
+                if attempt == 0 and ("intercept" in msg or "pointer" in msg):
+                    _nav_logger.warning(
+                        "POINTER_INTERCEPTED on '%s' -- dismissing overlay, "
+                        "re-centering card, retrying click", title)
+                    _dismiss_blocking_overlays(page)
+                    _scroll_link_to_center(page, link)
+                    page.wait_for_timeout(400)
+                    continue
+                if "target closed" in msg or "detached" in msg:
+                    _nav_logger.debug("click detached mid-navigation: %s",
+                                      click_exc)
+                    clicked = True
+                    break
+                _nav_logger.warning("Click failed for '%s': %s", title,
+                                    click_exc)
+                return JobOpenResult(False, "failed", None, page, str(click_exc))
+        if not clicked:
+            return JobOpenResult(False, "failed", None, page, "click not performed")
+        return _wait_for_job_open(page, context, pre_url, pages_before, timeout_ms)
     except Exception as exc:  # noqa: BLE001
-        _nav_logger.warning("Click failed for '%s': %s -- falling back to "
-                            "direct navigation", title, exc)
-        return False
+        _nav_logger.warning("Click failed for '%s': %s", title, exc)
+        return JobOpenResult(False, "failed", None, page, str(exc))
+
+
+def return_to_results(results_page, job_page, results_url: str, *,
+                      open_mode: str, humanizer=None) -> None:
+    """Return to the results listing without destroying the browser context."""
+    _nav_logger.info("RETURNING_TO_RESULTS | mode=%s", open_mode)
+    if open_mode == "click_new_tab":
+        if _page_alive(job_page) and job_page is not results_page:
+            try:
+                job_page.close()
+                _nav_logger.info("Closed job tab (results page unchanged)")
+            except Exception as exc:  # noqa: BLE001
+                _nav_logger.debug("job tab close: %s", exc)
+        if _page_alive(results_page):
+            try:
+                results_page.bring_to_front()
+            except Exception:  # noqa: BLE001
+                pass
+        _nav_logger.info("RESULTS_READY | url=%s", getattr(results_page, "url", ""))
+        return
+    if not _page_alive(results_page):
+        _nav_logger.warning("RETURNING_TO_RESULTS aborted -- results page closed")
+        return
+    if same_url(results_page.url, results_url):
+        _nav_logger.info("RESULTS_READY | already on results")
+        return
+    try:
+        results_page.go_back(wait_until="domcontentloaded")
+    except Exception as exc:  # noqa: BLE001
+        _nav_logger.debug("go_back failed: %s", exc)
+    if not same_url(results_page.url, results_url):
+        navigate(results_page, results_url,
+                 reason="return to results (fallback)", force=True)
+    if humanizer is not None and humanizer.enabled:
+        humanizer.idle_move(results_page)
+    _nav_logger.info("RESULTS_READY | url=%s", results_page.url)
+
+
+def click_job_card_legacy(page, job, title_selector: str, humanizer=None,
+                          timeout_ms: int = 5000) -> bool:
+    return bool(click_job_card(page, job, title_selector, humanizer, timeout_ms))
 
 
 def wait_for_ready(page, *, networkidle_timeout_ms: int = 8000,
@@ -480,31 +658,24 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 if human_on:
                     humanizer.idle_move(page)     # move mouse toward the card
                 try:
-                    detail_fn(j)                  # opens in SAME tab, reads, extracts
+                    detail_fn(j)                  # opens, reads, extracts
                 except Exception as exc:  # noqa: BLE001 - never stop the scan
                     j.read_status = "PARTIAL"
                     j.missing_fields = [
                         f"NAVIGATION_FAILED: open failed: {type(exc).__name__}: {exc}"]
                     _nav_logger.warning("Job %s/%s open failed: %s",
                                         idx, len(collected), exc)
-                # GO BACK to the results listing so the NEXT job's card can
-                # actually be located and clicked (not just goto'd). Prefer real
-                # browser back-navigation (preserves scroll position, most
-                # human-like); if that doesn't land us back, force it.
+                # Return to results so the NEXT card can be located and clicked.
+                # New-tab opens close the job tab; same-tab opens use go_back.
                 try:
-                    if not same_url(page.url, results_url):
-                        try:
-                            page.go_back(wait_until="domcontentloaded")
-                        except Exception as exc:  # noqa: BLE001
-                            _nav_logger.debug("go_back failed: %s", exc)
-                        if not same_url(page.url, results_url):
-                            navigate(page, results_url,
-                                    reason="return to results (fallback)",
-                                    force=True)
-                        if human_on:
-                            humanizer.idle_move(page)
-                        _nav_logger.info("Job %s/%s | returned to results page",
-                                        idx, len(collected))
+                    job_page = getattr(j, "_job_page", None) or page
+                    return_to_results(
+                        page, job_page, results_url,
+                        open_mode=getattr(j, "open_mode", ""),
+                        humanizer=humanizer if human_on else None)
+                    _nav_logger.info("NEXT_JOB | finished %s/%s '%s'",
+                                     idx, len(collected),
+                                     getattr(j, "job_title", ""))
                 except Exception as exc:  # noqa: BLE001 - never stop the scan
                     _nav_logger.warning("Return-to-results failed after job "
                                         "%s/%s: %s", idx, len(collected), exc)
@@ -635,19 +806,16 @@ class BasePortal(abc.ABC):
         detail_fn = None
         if getattr(cfg, "open_jobs", False) and self.detail_extractor is not None:
             def _open_job_detail(job):
-                # Open the job in the SAME (visible) tab the user is watching,
-                # read the full JD, extract + cache. Phase-2 processing means all
-                # cards for this search are already collected, so navigating the
-                # page away is safe; the outer loop navigates to the next search
-                # afterwards. No new_tab() -> no hidden tab, no new_tab failure.
                 self.detail_extractor.open_and_extract(
                     page, job,
                     networkidle_timeout_ms=cfg.networkidle_timeout_ms,
                     render_settle_ms=cfg.render_settle_ms,
-                    card_title_selector=self.field_selectors.get("title", ""))
+                    card_title_selector=self.field_selectors.get("title", ""),
+                    card_selector=rsel,
+                    results_page=page)
             detail_fn = _open_job_detail
-            logger.info("%s: job-centric mode ON (opening each job in the SAME "
-                        "tab to read full JD)", self.portal_name)
+            logger.info("%s: job-centric mode ON (click -> read JD -> return)",
+                        self.portal_name)
         else:
             reason = ("browser.open_jobs is OFF" if not getattr(cfg, "open_jobs",
                       False) else "no detail extractor wired")

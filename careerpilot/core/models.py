@@ -65,6 +65,8 @@ class Job:
     missing_fields: list[str] = field(default_factory=list)
     reading_ms: int = 0
     failure_detail: str = ""
+    # How the job page was opened (click_same_tab | click_new_tab | goto_fallback).
+    open_mode: str = ""
     discovered_at: datetime = field(default_factory=_utcnow)
 
     def dedupe_key(self) -> str:

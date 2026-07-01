@@ -135,11 +135,33 @@ class BrowserManager:
 
     # ---- public API used by portals (via BrowserSession) ----------------
 
+    @staticmethod
+    def _page_alive(page: Any) -> bool:
+        if page is None:
+            return False
+        try:
+            return not page.is_closed()
+        except Exception:  # noqa: BLE001
+            return False
+
     def page(self, portal: str) -> Any:
         if portal not in self._contexts:
             ctx = self._launch_context(portal)
             self._contexts[portal] = ctx
             self._pages[portal] = ctx.pages[0] if ctx.pages else ctx.new_page()
+            return self._pages[portal]
+        stored = self._pages.get(portal)
+        if self._page_alive(stored):
+            return stored
+        ctx = self._contexts[portal]
+        for tab in ctx.pages:
+            if self._page_alive(tab):
+                self._pages[portal] = tab
+                if stored is not None:
+                    logger.info("Recovered %s page from open context tab", portal)
+                return tab
+        self._pages[portal] = ctx.new_page()
+        logger.warning("All tabs closed for %s; opened a fresh page", portal)
         return self._pages[portal]
 
     def new_page(self, portal: str) -> Any:
