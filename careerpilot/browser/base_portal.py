@@ -671,23 +671,19 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 debugger.pause(page, "after_scroll")
 
     collected = list(seen.values())
-    _nav_logger.info("Collection complete | %s unique cards | now opening each "
-                     "in the same tab", len(collected))
+    _nav_logger.info("PHASE1_COLLECTION_COMPLETE | %s unique job URLs collected",
+                     len(collected))
 
-    # PHASE 2: PROCESS each collected job like a human -- pre-filter, then open
-    # it in the SAME visible tab, read the full JD, extract, and hand it to the
-    # pipeline. Opening in the main tab means a human watching the browser SEES
-    # each job open (no hidden background tabs) and there is no new_tab() to fail.
-    if on_job is not None:
-        # Remember the results listing so we can return to it after each job --
-        # the requested 'open -> read -> extract -> go back -> continue'
-        # workflow. Without this, only the FIRST job could ever be found and
-        # clicked; every job after it would land on whatever page the previous
-        # job left us on.
-        results_url = page.url
+    # PHASE 2: evaluate each collected URL via direct navigation (no card click,
+    # no go_back, no dependency on the search results page staying open).
+    if on_job is not None and collected:
+        _nav_logger.info("PHASE2_EVALUATE_STARTED | %s URLs to open",
+                         len(collected))
         for idx, j in enumerate(collected, 1):
-            # Card-stage gate (fail-open): skip opening only clearly off-domain
-            # roles. Everything else is opened and judged on the full JD.
+            job_url = getattr(j, "job_url", "") or ""
+            _nav_logger.info("CARD_DETECTED | %s/%s | %s | %s",
+                             idx, len(collected), getattr(j, "job_title", ""),
+                             job_url)
             open_it = True
             if should_open is not None:
                 try:
@@ -701,32 +697,24 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                     _nav_logger.info("Job %s/%s PRE_FILTER skip-open '%s'",
                                      idx, len(collected), getattr(j, "job_title", ""))
             if open_it and detail_fn is not None:
-                _nav_logger.info("Job %s/%s PRE_FILTER open '%s' -> opening in tab",
-                                 idx, len(collected), getattr(j, "job_title", ""))
+                _nav_logger.info("URL_OPEN | %s/%s | %s",
+                                 idx, len(collected), job_url)
                 if human_on:
-                    humanizer.idle_move(page)     # move mouse toward the card
+                    humanizer.idle_move(page)
                 try:
-                    detail_fn(j)                  # opens, reads, extracts
+                    detail_fn(j)
                 except Exception as exc:  # noqa: BLE001 - never stop the scan
                     j.read_status = "PARTIAL"
                     j.missing_fields = [
-                        f"NAVIGATION_FAILED: open failed: {type(exc).__name__}: {exc}"]
-                    _nav_logger.warning("Job %s/%s open failed: %s",
+                        f"NAVIGATION_FAILED: {type(exc).__name__}: {exc}"]
+                    j.failure_detail = (
+                        f"NAVIGATION_FAILED: URL open failed at evaluate phase: "
+                        f"{type(exc).__name__}: {exc}")
+                    _nav_logger.warning("Job %s/%s URL open failed: %s",
                                         idx, len(collected), exc)
-                # Return to results so the NEXT card can be located and clicked.
-                # New-tab opens close the job tab; same-tab opens use go_back.
-                try:
-                    job_page = getattr(j, "_job_page", None) or page
-                    return_to_results(
-                        page, job_page, results_url,
-                        open_mode=getattr(j, "open_mode", ""),
-                        humanizer=humanizer if human_on else None)
-                    _nav_logger.info("NEXT_JOB | finished %s/%s '%s'",
-                                     idx, len(collected),
-                                     getattr(j, "job_title", ""))
-                except Exception as exc:  # noqa: BLE001 - never stop the scan
-                    _nav_logger.warning("Return-to-results failed after job "
-                                        "%s/%s: %s", idx, len(collected), exc)
+                _nav_logger.info("NEXT_JOB | finished %s/%s | %s",
+                                 idx, len(collected),
+                                 getattr(j, "job_title", ""))
             elif open_it and detail_fn is None:
                 j.read_status = "UNREAD"
                 j.missing_fields = [
@@ -739,6 +727,8 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 on_job(j)
             except Exception as exc:  # noqa: BLE001 - one job never stops browse
                 _nav_logger.warning("on_job callback failed: %s", exc)
+        _nav_logger.info("PHASE2_EVALUATE_COMPLETE | %s URLs processed",
+                         len(collected))
 
     return collected
 
@@ -848,22 +838,17 @@ class BasePortal(abc.ABC):
         dbg = self.debugger
         dbg_on = bool(dbg and dbg.enabled)
         rsel = self._results_selector()
-        # Job-centric mode: open each job in its OWN tab, read the full JD,
-        # extract + cache, close -- the results page is never disturbed. Gated
-        # by browser.open_jobs and only when a detail extractor is wired.
+        # URL-based evaluation: goto each collected job URL directly (v2.9.7).
         detail_fn = None
         if getattr(cfg, "open_jobs", False) and self.detail_extractor is not None:
             def _open_job_detail(job):
                 self.detail_extractor.open_and_extract(
                     page, job,
                     networkidle_timeout_ms=cfg.networkidle_timeout_ms,
-                    render_settle_ms=cfg.render_settle_ms,
-                    card_title_selector=self.field_selectors.get("title", ""),
-                    card_selector=rsel,
-                    results_page=page)
+                    render_settle_ms=cfg.render_settle_ms)
             detail_fn = _open_job_detail
-            logger.info("%s: job-centric mode ON (click -> read JD -> return)",
-                        self.portal_name)
+            logger.info("%s: URL-based job evaluation ON (goto each job URL, "
+                        "no card clicks)", self.portal_name)
         else:
             reason = ("browser.open_jobs is OFF" if not getattr(cfg, "open_jobs",
                       False) else "no detail extractor wired")

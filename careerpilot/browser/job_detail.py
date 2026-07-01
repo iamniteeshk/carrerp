@@ -10,8 +10,7 @@ Engine and AI so they see the complete JD, not just the card summary.
 from __future__ import annotations
 
 from .base_portal import (BrowserState, _log_state, navigate, wait_for_ready,
-                           _card_text, _card_attr, click_job_card,
-                           return_to_results, _page_alive)
+                           _card_text, _card_attr, _page_alive, _safe_wait_ms)
 from ..core.logging_setup import get_logger
 
 logger = get_logger("careerpilot.browser.detail")
@@ -109,15 +108,16 @@ class JobDetailExtractor:
 
     def open_and_extract(self, page, job, *, networkidle_timeout_ms: int = 8000,
                          render_settle_ms: int = 800, max_retries: int = 1,
-                         card_title_selector: str = "",
-                         card_selector: str = "",
+                         card_title_selector: str = "",  # deprecated (v2.9.7+)
+                         card_selector: str = "",        # deprecated (v2.9.7+)
                          results_page=None) -> object:
+        """Open the job by URL (never by card click) and extract the full JD."""
         url = getattr(job, "job_url", "")
         portal = getattr(job, "portal", "")
         title = getattr(job, "job_title", "") or ""
         human_on = bool(self.humanizer and self.humanizer.enabled)
         sink = (self.diagnostics.status if self.diagnostics is not None else None)
-        results_page = results_page or page
+        job_page = page
         self._job_seq += 1
         _status(sink, open_job=title, browser_state=BrowserState.OPENING_JOB.value,
                 url=url, extracted_fields="-", missing_fields="-",
@@ -139,56 +139,41 @@ class JobDetailExtractor:
                         status, url)
             return job
 
+        if not (url or "").strip():
+            job.read_status = "PARTIAL"
+            job.missing_fields = ["NAVIGATION_FAILED: job URL missing on card"]
+            job.failure_detail = "NAVIGATION_FAILED: no job URL to open"
+            return job
+
         sel = self._selectors(portal)
         last_exc = None
         for attempt in range(max_retries + 1):
-            job_page = results_page
             try:
                 _log_state(BrowserState.OPENING_JOB, url)
-                logger.info("OPENING_JOB | %s | %s", title, url)
+                logger.info("OPENING_JOB | URL_NAVIGATION_STARTED | %s | %s",
+                            title, url)
                 if self.diagnostics is not None:
-                    self.diagnostics.attach(results_page)
+                    self.diagnostics.attach(job_page)
                     self.diagnostics.recorder.navigate(url)
                 try:
-                    results_page.bring_to_front()
+                    job_page.bring_to_front()
                 except Exception:  # noqa: BLE001
                     pass
-                open_result = None
-                if card_title_selector and _page_alive(results_page):
-                    _status(sink, hover_target=card_title_selector,
-                            browser_state=BrowserState.OPENING_JOB.value)
-                    open_result = click_job_card(
-                        results_page, job, card_title_selector,
-                        humanizer=self.humanizer if human_on else None,
-                        card_selector=card_selector)
-                if open_result and open_result.opened:
-                    job_page = open_result.job_page
-                    job.open_mode = open_result.mode
-                    job._job_page = job_page  # noqa: SLF001 -- transient browse state
-                    logger.info("CLICK_SUCCESS | mode=%s | %s",
-                                open_result.mode, getattr(job_page, "url", url))
-                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
-                            wait_reason=f"CLICK_SUCCESS: {open_result.detail}")
-                elif open_result and not open_result.opened and open_result.detail:
-                    logger.info("CLICK_FAILED | %s | %s", title, open_result.detail)
-                if not (open_result and open_result.opened):
-                    if not _page_alive(results_page):
-                        raise RuntimeError("results page closed before navigation")
-                    if human_on:
-                        self.humanizer.idle_move(results_page)
-                    logger.info("NAVIGATION_FALLBACK | %s | direct navigate -- "
-                                "card click did not open job", url)
-                    navigate(results_page, url,
-                             reason=f"open job (click failed): {title}")
-                    job_page = results_page
-                    job.open_mode = "goto_fallback"
-                    job._job_page = job_page  # noqa: SLF001
-                    _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
-                            wait_reason="NAVIGATION_FALLBACK: card not clickable")
                 if not _page_alive(job_page):
-                    raise RuntimeError("job page closed before readiness wait")
-                logger.info("WAITING_FOR_NAVIGATION | job_page=%s",
-                            getattr(job_page, "url", ""))
+                    raise RuntimeError("browser page closed before navigation")
+                if human_on:
+                    self.humanizer.idle_move(job_page)
+                    _safe_wait_ms(job_page,
+                                  self.humanizer.rng.randint(250, 700))
+                navigate(job_page, url, reason=f"open job by URL: {title}")
+                job.open_mode = "url_navigate"
+                job._job_page = job_page  # noqa: SLF001
+                logger.info("URL_NAVIGATION_COMPLETED | %s", url)
+                _status(sink, browser_state=BrowserState.JOB_DETAILS.value,
+                        wait_reason="URL_NAVIGATION: direct goto job URL")
+
+                if not _page_alive(job_page):
+                    raise RuntimeError("browser page closed after navigation")
                 wait_for_ready(job_page,
                                networkidle_timeout_ms=networkidle_timeout_ms,
                                render_settle_ms=render_settle_ms,
@@ -203,13 +188,18 @@ class JobDetailExtractor:
                             len(description or ""), url)
                 _status(sink, browser_state=BrowserState.READING_JOB.value,
                         reading_section="top section")
-                if human_on and description:
-                    _log_state(BrowserState.SCROLLING_JOB)
-                    rec = (self.diagnostics.recorder
-                           if self.diagnostics is not None else None)
-                    summary = self.humanizer.incremental_read(
-                        job_page, description, recorder=rec, status_sink=sink)
-                    job.reading_ms = summary.get("total_ms", 0)
+                if human_on:
+                    if not description:
+                        self.humanizer.idle_move(job_page)
+                        _safe_wait_ms(job_page,
+                                      self.humanizer.rng.randint(400, 900))
+                    else:
+                        _log_state(BrowserState.SCROLLING_JOB)
+                        rec = (self.diagnostics.recorder
+                               if self.diagnostics is not None else None)
+                        summary = self.humanizer.incremental_read(
+                            job_page, description, recorder=rec, status_sink=sink)
+                        job.reading_ms = summary.get("total_ms", 0)
                 logger.info("READING_COMPLETED | %s", url)
 
                 _log_state(BrowserState.EXTRACTING, url)
@@ -293,8 +283,9 @@ class JobDetailExtractor:
                 else:
                     logger.warning("Detail extraction failed for %s (attempt %s/%s): "
                                    "%s", url, attempt + 1, max_retries + 1, exc)
-        reason = f"BROWSER_EXCEPTION: {type(last_exc).__name__}: {last_exc}"
-        capture_page = getattr(job, "_job_page", None) or results_page
+        reason = (f"BROWSER_EXCEPTION: {type(last_exc).__name__}: {last_exc}"
+                  if last_exc else "NAVIGATION_FAILED: unknown open error")
+        capture_page = getattr(job, "_job_page", None) or job_page
         self._capture("job_detail_error", capture_page, job, portal, sel,
                       error=str(last_exc))
         job.read_status = "PARTIAL"

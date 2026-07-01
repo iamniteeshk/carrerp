@@ -95,17 +95,18 @@ def test_click_returns_false_when_no_selector_given():
     assert not click_job_card(page, job, "")
 
 
-def test_open_and_extract_uses_click_before_navigate_fallback():
-    """open_and_extract must attempt the real click path first; only fall back
-    to navigate() when the card truly isn't on the page."""
+def test_open_and_extract_uses_url_navigation_directly():
+    """open_and_extract navigates directly to the job URL (no card click)."""
     from careerpilot.browser.job_detail import JobDetailExtractor
     import careerpilot.browser.job_detail as jd
 
-    calls = {"navigate": 0}
+    calls = {"navigate": 0, "urls": []}
     orig_navigate = jd.navigate
     orig_wait = jd.wait_for_ready
-    jd.navigate = lambda page, url, **kw: calls.__setitem__(
-        "navigate", calls["navigate"] + 1)
+    def _nav(page, url, **kw):
+        calls["navigate"] += 1
+        calls["urls"].append(url)
+    jd.navigate = _nav
     jd.wait_for_ready = lambda *a, **k: None
     try:
         ex = JobDetailExtractor(humanizer=None, job_cache=None)
@@ -113,11 +114,12 @@ def test_open_and_extract_uses_click_before_navigate_fallback():
         page.bring_to_front = lambda: None
         page.query_selector = lambda *a, **k: None
         page.content = lambda: ""
-        job = Job(portal="naukri", job_title="Director",
-                 job_url="https://naukri.com/job/xyz")
-        ex.open_and_extract(page, job, card_title_selector="a.title",
-                            max_retries=0)
-        assert calls["navigate"] == 1   # no matching card -> fell back to navigate
+        job_url = "https://naukri.com/job/xyz"
+        job = Job(portal="naukri", job_title="Director", job_url=job_url)
+        ex.open_and_extract(page, job, max_retries=0)
+        assert calls["navigate"] == 1
+        assert calls["urls"] == [job_url]
+        assert job.open_mode == "url_navigate"
     finally:
         jd.navigate = orig_navigate
         jd.wait_for_ready = orig_wait
