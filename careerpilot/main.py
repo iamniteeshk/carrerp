@@ -141,7 +141,7 @@ class CareerPilot:
         ln_session = BrowserSession(Portal.LINKEDIN.value, self.browser)
         nk_session = BrowserSession(Portal.NAUKRI.value, self.browser)
         self._sessions = [ln_session, nk_session]
-        return {
+        portals = {
             Portal.LINKEDIN.value: LinkedInPortal(
                 ln_session, self.cfg.candidate, self.cfg.apply.easy_apply_only,
                 debugger=self.debugger, humanizer=self.humanizer,
@@ -152,6 +152,11 @@ class CareerPilot:
                 humanizer=self.humanizer, detail_extractor=self.detail_extractor,
                 parse_config=self.cfg.portals_parse.get("naukri")),
         }
+        for portal in portals.values():
+            portal.search_nationwide = self.cfg.rules.search_nationwide
+            portal.search_include_recommended = (
+                self.cfg.rules.search_include_recommended)
+        return portals
 
     def run(self) -> None:
         self._install_signal_handlers()
@@ -532,6 +537,21 @@ def _diagnostic_click_stages(page, job, title_selector: str, *,
     return stages
 
 
+def _cmd_validate_browser(argv: list[str]) -> int:
+    """Run minimal Chrome + Naukri validation outside the scan workflow."""
+    import subprocess
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / "scripts" / "validate_chrome_browser.py"
+    if not script.exists():
+        print(f"Missing {script}", file=sys.stderr)
+        return 1
+    result = subprocess.run(
+        [sys.executable, str(script)] + argv[1:],
+        check=False,
+    )
+    return int(result.returncode)
+
+
 def _cmd_probe_open(pilot, argv: list[str]) -> int:
     """One-page, few-second diagnostic: opens ONE search page for ONE portal,
     looks at the first few real cards, and prints IN PLAIN TEXT exactly what
@@ -797,6 +817,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     elif command == "probe-open":
         return _cmd_probe_open(pilot, argv)
+    elif command == "validate-browser":
+        return _cmd_validate_browser(argv)
     elif command == "export":
         # One-shot DOM export of a URL using the (logged-in) portal profile.
         from .core.enums import Portal

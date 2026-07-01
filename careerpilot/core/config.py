@@ -61,6 +61,12 @@ class RuleConfig:
     # role" allowlist used for matching. If empty, search falls back to
     # accepted_titles (backward compatible).
     search_keywords: list[str] = field(default_factory=list)
+    # Quality-first search: when false, skip the nationwide keyword sweep.
+    search_nationwide: bool = False
+    # When false, skip the logged-in recommended-jobs feed (fewer duplicates).
+    search_include_recommended: bool = False
+    # When set, ONLY these cities are searched (overrides profile location union).
+    search_locations: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -207,19 +213,28 @@ def load_config(config_path: str | Path = "config/config.yaml",
     union_locations = engine.all_preferred_locations()
     extra_keywords = rules.get("extra_required_keywords", []) or []
     extra_locations = rules.get("extra_preferred_locations", []) or []
+    search_locs = rules.get("search_locations", []) or []
+    if search_locs:
+        search_locations = _dedupe(search_locs)
+    else:
+        search_locations = _dedupe(union_locations + extra_locations)
     rule_cfg = RuleConfig(
         minimum_salary=int((rules.get("minimum_salary", {}) or {}).get("amount", 0)),
         salary_currency=(rules.get("minimum_salary", {}) or {}).get("currency", "INR"),
         minimum_experience=int(rules.get("minimum_experience", 15)),
         accepted_employment_types=rules.get("accepted_employment_types", ["Full Time"]),
         rejected_shifts=rules.get("rejected_shifts", []) or [],
-        preferred_locations=_dedupe(union_locations + extra_locations),
+        preferred_locations=search_locations,
         accepted_titles=rules.get("accepted_titles", []),
         rejected_titles=rules.get("rejected_titles", []),
         blacklist_companies=rules.get("blacklist_companies", []),
         required_keywords=_dedupe(union_keywords + extra_keywords),
         nice_to_have_keywords=rules.get("nice_to_have_keywords", []),
         search_keywords=rules.get("search_keywords", []) or [],
+        search_nationwide=bool(rules.get("search_nationwide", False)),
+        search_include_recommended=bool(rules.get("search_include_recommended",
+                                                   False)),
+        search_locations=search_locs,
     )
 
     apply_obj = ApplyConfig(
@@ -238,7 +253,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
     viewport = browser.get("viewport", {}) or {}
     browser_cfg = BrowserConfig(
         engine=browser.get("engine", "chromium"),
-        channel=browser.get("channel", "msedge"),
+        channel=browser.get("channel", "chrome"),
         headless=bool(browser.get("headless", False)),
         viewport_width=int(viewport.get("width", 1366)),
         viewport_height=int(viewport.get("height", 900)),
@@ -247,7 +262,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
         networkidle_timeout_ms=int(browser.get("networkidle_timeout_ms", 8000)),
         render_settle_ms=int(browser.get("render_settle_ms", 800)),
         scroll_passes=int(browser.get("scroll_passes", 3)),
-        open_jobs=bool(browser.get("open_jobs", False)),
+        open_jobs=bool(browser.get("open_jobs", True)),
     )
 
     # ---- paths (modern sections only) ----

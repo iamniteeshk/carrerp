@@ -36,13 +36,18 @@ class Job:
     shift: str = ""
     job_url: str = ""
     job_description: str = ""
+    responsibilities: str = ""
     posted_date: str = ""
     recruiter_name: str = ""
     recruiter_email: str = ""
+    recruiter_notes: str = ""
     company_website: str = ""
     company_description: str = ""
+    benefits: str = ""
     raw_html: str = ""
     external_apply_url: str = ""
+    apply_url: str = ""
+    preferred_skills: list[str] = field(default_factory=list)
     skills: list[str] = field(default_factory=list)
     source_id: str = ""
     # Easy Apply (LinkedIn) vs external redirect is decided at parse time.
@@ -59,6 +64,9 @@ class Job:
     read_status: str = "UNREAD"          # UNREAD | COMPLETE | PARTIAL | SKIPPED_PREFILTER
     missing_fields: list[str] = field(default_factory=list)
     reading_ms: int = 0
+    failure_detail: str = ""
+    # How the job page was opened (url_navigate is the production path since v2.9.7).
+    open_mode: str = ""
     discovered_at: datetime = field(default_factory=_utcnow)
 
     def dedupe_key(self) -> str:

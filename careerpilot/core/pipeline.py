@@ -27,6 +27,26 @@ from ..rules.rule_engine import RuleEngine
 logger = get_logger(__name__)
 
 
+def _terminal_failure_reason(job: Job) -> str:
+    """Build a precise, actionable failure reason -- never generic."""
+    detail = getattr(job, "failure_detail", "") or ""
+    if detail:
+        return detail
+    rs = getattr(job, "read_status", "UNREAD")
+    missing = getattr(job, "missing_fields", None) or []
+    if rs == "UNREAD":
+        if missing:
+            return str(missing[0])
+        return ("EXTRACTION_FAILED: job never opened "
+                "(enable browser.open_jobs and ensure detail reader is wired)")
+    if rs == "PARTIAL":
+        if missing:
+            return (f"EXTRACTION_FAILED: incomplete JD after open "
+                    f"(missing {', '.join(str(m) for m in missing)})")
+        return "EXTRACTION_FAILED: job opened but JD extraction incomplete"
+    return f"PIPELINE_FAILED: unexpected read_status={rs}"
+
+
 class ScanPipeline:
     def __init__(self, config: AppConfig, collector: CollectorManager,
                  rules: RuleEngine, ai: AIEngine, apply_engine: AutoApplyEngine,
@@ -180,11 +200,16 @@ class ScanPipeline:
 
             self._stage(n, "CARD_DETECTED", tag)
             job.job_id = self.jobs.insert(job)          # INSERT + commit
+            from ..browser.lifecycle import RUNTIME
+            RUNTIME.set(workflow_state="PIPELINE_PROCESSING",
+                        portal=job.portal, job_title=job.job_title,
+                        job_url=job.job_url, job_id=str(job.job_id or ""))
             counts["found"] += 1
             self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
             self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
             self.stream.found(job)                       # -> FoundJobs.csv (live)
-            self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
+            self._stage(n, "CSV_UPDATED", "FoundJobs.csv")
+            self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FOUND)")
 
             rs = getattr(job, "read_status", "UNREAD")
 
@@ -199,6 +224,8 @@ class ScanPipeline:
                 self._status(rule_decision="SKIP-OPEN", csv_status="RejectedJobs",
                              db_status="rejected")
                 self.stream.rejected(job, reason)
+                self._stage(n, "CSV_UPDATED", "RejectedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "REJECTED (prefilter)")
                 self._stage(n, "DECISION_COMPLETED", "REJECTED (not opened: "
                             "card pre-filter)")
                 self._stage(n, "JOB_FINISHED", "REJECTED")
@@ -209,21 +236,23 @@ class ScanPipeline:
             # NEVER selected/rejected-for-fit from card data -- it is marked
             # Partial Data and routed to failed_jobs.csv (never stranded).
             if rs != "COMPLETE":
-                reason = ("never opened (enable browser.open_jobs)"
-                          if rs == "UNREAD" else
-                          f"incomplete JD (missing {job.missing_fields})")
+                reason = _terminal_failure_reason(job)
                 self.jobs.update_status(job.job_id, JobStatus.PARTIAL_DATA,
-                                        rejection_reason=f"partial data: {reason}")
-                self.failed_jobs.record(job.job_id, f"PARTIAL_DATA: {reason}",
-                                        retry_count=1)
+                                        rejection_reason=reason)
+                self.failed_jobs.record(job.job_id, reason, retry_count=1)
                 counts["partial"] = counts.get("partial", 0) + 1
                 counts["failed"] = counts.get("failed", 0) + 1
                 self._metric("jobs_queued")
-                self._status(rule_decision="PARTIAL_DATA", db_status="partial_data",
-                             csv_status="failed_jobs", wait_reason=reason)
-                self.stream.failed(job, f"PARTIAL_DATA: {reason}")
-                self._stage(n, "DECISION_COMPLETED", f"PARTIAL_DATA ({reason})")
-                self._stage(n, "JOB_FINISHED", "FAILED (failed_jobs.csv)")
+                self._status(rule_decision="FAILED", db_status="partial_data",
+                             csv_status="FailedJobs", wait_reason=reason,
+                             open_job=job.job_title,
+                             extracted_fields=getattr(job, "failure_detail", "")
+                             or ", ".join(getattr(job, "missing_fields", [])))
+                self.stream.failed(job, reason)
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "PARTIAL_DATA")
+                self._stage(n, "DECISION_COMPLETED", f"FAILED ({reason})")
+                self._stage(n, "JOB_FINISHED", "FAILED (FailedJobs.csv)")
                 logger.warning("Job #%s PARTIAL DATA (%s) | read_status=%s -> "
                                "failed_jobs.csv | NOT decided from card | %s",
                                n, reason, rs, tag)
@@ -235,6 +264,7 @@ class ScanPipeline:
             logger.info("Job #%s fully read (jd_chars=%s) -> Rule Engine", n,
                         len(job.job_description or ""))
 
+            self._stage(n, "RULE_ENGINE_STARTED", tag)
             rule_result = self.rules.evaluate(job)
             self._stage(n, "RULE_ENGINE_COMPLETED",
                         "PASS" if rule_result.accepted else
@@ -247,13 +277,17 @@ class ScanPipeline:
                 self._metric("jobs_rejected"); self._metric("csv_updates")
                 self._status(rule_decision="REJECT", csv_status="RejectedJobs", db_status="rejected")
                 self.stream.rejected(job, reason)        # -> RejectedJobs.csv (live)
+                self._stage(n, "CSV_UPDATED", "RejectedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "REJECTED")
                 self._stage(n, "DECISION_COMPLETED", f"REJECTED ({reason})")
                 self._stage(n, "JOB_FINISHED", "REJECTED")
                 return
             self._status(rule_decision="PASS", ai_status="scoring", csv_status="SelectedJobs")
             self.stream.selected(job)                    # -> SelectedJobs.csv (live)
+            self._stage(n, "CSV_UPDATED", "SelectedJobs.csv")
             logger.info("Job #%s PASSED Rule Engine | SelectedJobs.csv", n)
 
+            self._stage(n, "AI_STARTED", tag)
             try:
                 evaluation = self.ai.evaluate_job(job)
             except AIUnavailable:
@@ -263,6 +297,8 @@ class ScanPipeline:
                 self.failed_jobs.record(job.job_id, "AI unavailable (queued for "
                                         "retry)", retry_count=1)
                 self.stream.failed(job, "AI unavailable (queued for retry)")
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "QUEUED")
                 counts["failed"] = counts.get("failed", 0) + 1
                 self._metric("jobs_queued"); self._metric("ai_failures")
                 self._stage(n, "AI_COMPLETED", "SKIPPED: provider unavailable")
@@ -298,6 +334,8 @@ class ScanPipeline:
             self._status(ai_status="scored", resume=evaluation.career_profile, csv_status="MatchedJobs", db_status="matched")
             self.stream.matched(job, evaluation.match_score,
                                 evaluation.career_profile)   # -> MatchedJobs.csv
+            self._stage(n, "CSV_UPDATED", "MatchedJobs.csv")
+            self._stage(n, "DATABASE_UPDATED", "MATCHED")
             self._stage(n, "DECISION_COMPLETED",
                         f"MATCHED (score={evaluation.match_score})")
 
@@ -306,6 +344,8 @@ class ScanPipeline:
             if result.success:
                 counts["applied"] += 1
                 self.stream.applied(job, dry_run)            # -> AppliedJobs.csv
+                self._stage(n, "CSV_UPDATED", "AppliedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "APPLIED")
                 logger.info("Job #%s %s | AppliedJobs.csv", n,
                             "DRY-RUN ready" if dry_run else "APPLIED")
             self._stage(n, "JOB_FINISHED", "MATCHED" + (" + APPLIED"
@@ -316,4 +356,13 @@ class ScanPipeline:
                        if not dry_run else 0)
 
         except Exception as exc:  # noqa: BLE001 - isolate per-job failures
+            reason = f"BROWSER_EXCEPTION: {type(exc).__name__}: {exc}"
             logger.warning("Job #%s FAILED (%s): %s", n, job.job_title, exc)
+            if getattr(job, "job_id", None):
+                self.jobs.update_status(job.job_id, JobStatus.PARTIAL_DATA,
+                                        rejection_reason=reason)
+                self.failed_jobs.record(job.job_id, reason, retry_count=1)
+                self.stream.failed(job, reason)
+                self._stage(n, "CSV_UPDATED", "FailedJobs.csv")
+                self._stage(n, "DATABASE_UPDATED", "PARTIAL_DATA")
+                counts["failed"] = counts.get("failed", 0) + 1

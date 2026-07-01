@@ -22,12 +22,13 @@ from careerpilot.core.config import load_config, ConfigError
 
 # ---- configuration-driven browser launch plan ---------------------------
 
-def test_launch_plan_edge_default():
+def test_launch_plan_chrome_default():
     engine, kw = build_launch_plan(BrowserConfig(), "/tmp/x")
     assert engine == "chromium"
-    assert kw["channel"] == "msedge"          # Edge is the default
+    assert kw["channel"] == "chrome"          # Chrome is the default (v2.9.7+)
     assert kw["viewport"] == {"width": 1366, "height": 900}
     assert "--disable-blink-features=AutomationControlled" in kw["args"]
+    assert "--disable-dev-shm-usage" in kw["args"]
 
 
 def test_launch_plan_chrome_channel():

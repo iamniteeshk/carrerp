@@ -78,6 +78,8 @@ class DetailPage:
     def wait_for_selector(self, *a, **k): pass
     def wait_for_timeout(self, ms): pass
     def content(self): return f"<html>{self._desc}</html>"
+    def is_closed(self): return False
+    def bring_to_front(self): pass
 
 
 class Job:

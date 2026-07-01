@@ -96,8 +96,9 @@ ai:
 browser:
   open_jobs: true    # experimental: opens each job for full JD; retries + saves evidence on failure, never disabled
   engine: chromium                # chromium | firefox | webkit
-  channel: msedge                 # msedge | chrome | "" (blank = bundled Chromium).
-                                  # Ignored for firefox/webkit. Edge is the default.
+  channel: chrome                # chrome | msedge | "" (bundled Chromium).
+                                  # Use chrome for stability; Edge profiles must
+                                  # not share the same user-data-dir as Chrome.
   headless: false
   viewport:
     width: 1366
