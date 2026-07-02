@@ -130,6 +130,19 @@ def test_excluded_title_terms_are_config_extensible():
     assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
 
 
+def test_rejects_software_and_hardware_ic_roles():
+    # v3.1.0: hands-on software/hardware IC roles are the wrong domain even with
+    # a leadership word, and must be rejected before the AI is called.
+    engine = RuleEngine(_rule_config())
+    for title in ("Director - Software Engineer", "Head - Full Stack Developer",
+                  "Director - RTL Design", "VP - VLSI / Semiconductor",
+                  "Head of QA Engineer", "Director - Embedded Systems",
+                  "Head - Data Scientist"):
+        r = engine.evaluate(_job(job_title=title,
+                                 job_description="individual contributor role"))
+        assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH, title
+
+
 def test_missing_salary_allowed():
     engine = RuleEngine(_rule_config())
     assert engine.evaluate(_job(salary="")).accepted
