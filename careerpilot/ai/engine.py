@@ -46,20 +46,37 @@ Responsibilities:
 {responsibilities}
 Skills: {skills}
 
+This candidate is an IT INFRASTRUCTURE / IT LEADERSHIP executive. Score by fit
+to THAT background, not by the seniority word in the title.
+
+STRONGLY PREFER (score high when the role is genuinely one of these):
+- IT Infrastructure, Infrastructure Head/Director/Manager, Global/Enterprise IT
+- End User Computing (EUC), Digital Workplace, Workplace Technology, Desktop
+- Service Delivery, IT Service Delivery, IT Operations, ITSM, IT Transformation
+- Internal/Regional/Global IT, Infrastructure Program Manager, Head IT
+
+SECONDARY (acceptable, score moderate): technology leadership, operations
+leadership, shared services, GCC, infrastructure consulting.
+
+STRONG PENALTY (score LOW, <30, and do not apply) -- these are the WRONG domain
+even with a Director/Head title: AI Engineering, Machine Learning, LLMs, Data
+Science, Python/Java/Cloud Developer, Software Engineer/Architect, Full Stack,
+RTL, VLSI, Semiconductor, Embedded, QA/Testing.
+
 How to decide match_score (0-100), weigh ALL of these, not just the title:
-- Domain fit: does the job's core domain match the candidate's domain? This is
-  the most important factor. A role in a DIFFERENT domain (e.g. AI/ML research,
-  data science, finance, sales, marketing, HR, legal, medical) is a poor match
-  even if the seniority word (Director/Head/VP) matches -- score it LOW (<40).
+- Domain fit vs the lists above -- this is the most important factor.
 - Experience & seniority: years and leadership level vs the role's requirement.
 - Technologies & responsibilities: overlap with what the candidate actually did.
 - Organisational/industry fit, location, and salary (if stated).
 
 Scoring guide (be consistent, not generous):
-- 85-100: strong fit in the candidate's own domain at the right level.
+- 85-100: strong fit in the candidate's own infrastructure/IT-leadership domain.
 - 60-84 : relevant domain, some gaps.
 - 40-59 : partly related; borderline.
 - 0-39  : wrong domain or wrong level -- do NOT apply.
+
+Learned from this candidate's past strong matches (use as extra signal):
+{learned}
 
 Set "apply" true ONLY when it is a genuine, high-confidence fit in-domain.
 
@@ -89,6 +106,9 @@ class AIEngine:
         else:
             self.providers = []
         self.diag_recorder = None   # optional: set by main to log AI events
+        # Optional digest of past strong matches (from GoodJobsStore.summary()),
+        # injected into the evaluation prompt so scoring improves over time.
+        self.learned_summary = ""
 
     def startup_validate(self) -> dict:
         """Validate/repair provider config at startup. For Gemini, resolves the
@@ -125,6 +145,7 @@ class AIEngine:
             description=_truncate(job.job_description, 6000),
             responsibilities=_truncate(getattr(job, "responsibilities", ""), 2000),
             skills=", ".join(getattr(job, "skills", []) or [])[:1000],
+            learned=(getattr(self, "learned_summary", "") or "(no history yet)"),
         )
         text, provider, model, tokens, elapsed = self._generate(prompt)
         data = _extract_json(text)
@@ -240,7 +261,8 @@ class AIEngine:
             title=job.job_title, company=job.company, location=job.location,
             description=_truncate(job.job_description, 6000),
             responsibilities=_truncate(getattr(job, "responsibilities", ""), 2000),
-            skills=", ".join(getattr(job, "skills", []) or [])[:1000])
+            skills=", ".join(getattr(job, "skills", []) or [])[:1000],
+            learned=(getattr(self, "learned_summary", "") or "(no history yet)"))
         results = []
         for p in self.providers:
             row = {"provider": p.name, "model": getattr(p, "model", "")}
