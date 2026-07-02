@@ -63,8 +63,11 @@ class ScanPipeline:
         # Live per-state CSVs (FoundJobs/RejectedJobs/SelectedJobs/Matched/Applied)
         # written as each job changes state, so progress is visible mid-scan and
         # nothing is lost on a crash.
-        self.stream = StreamingCSVReporter(reporter.report_dir)
+        # Per-portal live CSVs: reports/naukri/*.csv, reports/linkedin/*.csv so
+        # the two portals never mix (much easier debugging).
+        self.stream = StreamingCSVReporter(reporter.report_dir, per_portal=True)
         self._job_seq = 0
+        self._found = 0            # inserted (FOUND) jobs this run -> session cap
         self.status_sink = None  # diagnostics.LiveStatus (optional)
         self.diagnostics = None   # DiagnosticsToolkit (optional)
         self.notifier = notifier
@@ -77,6 +80,43 @@ class ScanPipeline:
         # the Rule Engine and the AI agree on the final decision. 0 disables it.
         self.min_match_score = float(
             getattr(getattr(config, "rules", None), "minimum_match_score", 0) or 0)
+        # Human-like session limits (set by main from a SessionPlan). 0/None off.
+        self.session_max_jobs = 0
+        self.session_deadline = None      # epoch seconds, or None
+        # Optional learning stores (set by main). Persistence must never crash.
+        self.good_jobs = None             # learning.GoodJobsStore
+        self.session_history = None       # learning.SessionHistoryStore
+        self.session_plan = None          # learning.SessionPlan (for history)
+
+    def _apply_session_plan(self) -> None:
+        """Give this run a human-like shape: randomized job cap, time budget and
+        keyword order, so no two runs behave identically. Never raises."""
+        try:
+            import random
+            from datetime import datetime
+            from .learning import plan_session
+            kws = list(getattr(self.collector, "keywords", []) or [])
+            plan = plan_session(random.Random(), datetime.now().weekday(), kws)
+            self.session_plan = plan
+            self.session_max_jobs = plan.max_jobs
+            self.session_deadline = time.time() + plan.duration_minutes * 60
+            if plan.keywords:
+                self.collector.keywords = plan.keywords   # randomized this run
+            logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
+                        "keyword_order=%s", plan.window, plan.duration_minutes,
+                        plan.max_jobs, plan.keywords[:5])
+        except Exception as exc:  # noqa: BLE001 - planning must never crash a scan
+            logger.warning("Session planning failed (using defaults): %s", exc)
+
+    def _session_limit_reached(self) -> bool:
+        """True once this run has hit its human-like job cap or time budget."""
+        cap = getattr(self, "session_max_jobs", 0) or 0
+        if cap and self._found >= cap:
+            return True
+        deadline = getattr(self, "session_deadline", None)
+        if deadline and time.time() >= deadline:
+            return True
+        return False
 
     def run_once(self) -> dict[str, int]:
         scan_id = self.scans.start()
@@ -92,6 +132,14 @@ class ScanPipeline:
         state = StateMachine(WorkflowState.STARTING)
         self.state = state  # exposed for dashboard/diagnostics
         self._job_seq = 0
+        self._found = 0
+        self._apply_session_plan()
+
+        def _should_open(job) -> bool:
+            # Stop opening new jobs once the human-like session budget is spent.
+            if self._session_limit_reached():
+                return False
+            return self.rules.prefilter(job).accepted
 
         try:
             state.to(WorkflowState.COLLECTING, "begin scan")
@@ -102,7 +150,7 @@ class ScanPipeline:
             # whose title isn't a target role (e.g. CFO/finance) is not opened.
             self.collector.collect_streaming(
                 lambda job: self._process_job(job, counts, dry_run),
-                should_open=lambda job: self.rules.prefilter(job).accepted)
+                should_open=_should_open)
             state.to(WorkflowState.COMPLETED, "scan finished")
         except Exception as exc:  # noqa: BLE001 - scan must never crash the app
             state.to(WorkflowState.FAILED, str(exc))
@@ -115,10 +163,16 @@ class ScanPipeline:
 
         # Generate the end-of-scan summary CSVs too (the live ones already exist).
         self.reporter.generate_all()
+        duration = time.time() - start
+        try:
+            self.reporter.generate_summary(runtime_seconds=duration)
+        except Exception as exc:  # noqa: BLE001 - reporting must never crash a scan
+            logger.warning("Portal summary generation failed: %s", exc)
         self.scans.finish(scan_id, found=counts["found"], rejected=counts["rejected"],
                           matched=counts["matched"], applied=counts["applied"],
                           portals=len(self.collector.portals),
-                          duration=time.time() - start)
+                          duration=duration)
+        self._record_session_history(counts, duration)
         # Automatic Session Summary (#7) -- the first doc to read after a run.
         if self.diagnostics is not None and self.diagnostics.enabled:
             try:
@@ -129,6 +183,65 @@ class ScanPipeline:
         self._write_run_log_md(counts, time.time() - start)
         logger.info("Scan complete: %s", counts)
         return counts
+
+    def _record_session_history(self, counts: dict, duration: float) -> None:
+        """Append a per-run record to database/session_history.json so future
+        runs can vary their behaviour. Never raises."""
+        store = getattr(self, "session_history", None)
+        if store is None:
+            return
+        try:
+            avg_score = None
+            try:
+                conn = self.jobs.db.connect()
+                row = conn.execute("SELECT AVG(match_score) FROM jobs WHERE "
+                                   "match_score IS NOT NULL").fetchone()
+                avg_score = round(row[0], 1) if row and row[0] is not None else None
+            except Exception:  # noqa: BLE001
+                pass
+            plan = getattr(self, "session_plan", None)
+            entry = {
+                "runtime_seconds": round(duration, 1),
+                "jobs_found": counts.get("found", 0),
+                "jobs_opened": counts.get("found", 0) - counts.get("partial", 0),
+                "jobs_matched": counts.get("matched", 0),
+                "jobs_rejected": counts.get("rejected", 0),
+                "jobs_applied": counts.get("applied", 0),
+                "jobs_failed": counts.get("failed", 0),
+                "jobs_skipped": counts.get("skipped", 0),
+                "average_score": avg_score,
+                "keywords": list(getattr(plan, "keywords", []) or [])[:20],
+                "planned_window": getattr(plan, "window", ""),
+                "planned_duration_minutes": getattr(plan, "duration_minutes", None),
+                "planned_max_jobs": getattr(plan, "max_jobs", None),
+            }
+            store.record(entry)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Session history write failed: %s", exc)
+
+    def _remember_good_job(self, job, evaluation) -> None:
+        """Persist a high-scoring job to database/good_jobs.json. Never raises."""
+        store = getattr(self, "good_jobs", None)
+        if store is None:
+            return
+        try:
+            from .learning import GOOD_JOB_SCORE
+            if evaluation.match_score < GOOD_JOB_SCORE:
+                return
+            store.add({
+                "title": job.job_title, "company": job.company,
+                "location": job.location, "salary": job.salary,
+                "industry": getattr(job, "company_description", "")[:120],
+                "skills": list(getattr(job, "skills", []) or [])[:15],
+                "responsibilities": (getattr(job, "responsibilities", "")
+                                     or "")[:400],
+                "keywords": list(getattr(job, "preferred_skills", []) or [])[:15],
+                "reason": getattr(evaluation, "reason", "")[:300],
+                "score": evaluation.match_score,
+                "career_profile": evaluation.career_profile,
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Good-job memory write failed: %s", exc)
 
     def _write_run_log_md(self, counts: dict, duration: float) -> None:
         """Write the full per-job stage trace + summary to a markdown file so the
@@ -189,6 +302,16 @@ class ScanPipeline:
         and every transition is logged with an explicit stage marker, so the
         job's lifecycle is fully provable and a crash loses nothing.
         """
+        # Human-like session budget: once the planned job cap or time window is
+        # spent, stop processing new jobs (a person ends their session).
+        if self._session_limit_reached():
+            counts["skipped"] = counts.get("skipped", 0) + 1
+            logger.info("Session budget spent (found=%s cap=%s) -- ending "
+                        "session; skipping %s", self._found,
+                        getattr(self, "session_max_jobs", 0),
+                        f"{job.portal}:{job.job_title}".strip())
+            return
+
         self._job_seq += 1
         n = self._job_seq
         tag = f"{job.portal}:{job.job_title}".strip()
@@ -205,6 +328,7 @@ class ScanPipeline:
             self._stage(n, "CARD_DETECTED", tag)
             job.job_id = self.jobs.insert(job)          # INSERT + commit
             counts["found"] += 1
+            self._found = counts["found"]
             self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
             self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
             self.stream.found(job)                       # -> FoundJobs.csv (live)
@@ -349,6 +473,7 @@ class ScanPipeline:
             self._status(ai_status="scored", resume=evaluation.career_profile, csv_status="MatchedJobs", db_status="matched")
             self.stream.matched(job, evaluation.match_score,
                                 evaluation.career_profile)   # -> MatchedJobs.csv
+            self._remember_good_job(job, evaluation)         # learn (score>=80)
             self._stage(n, "DECISION_COMPLETED",
                         f"MATCHED (score={evaluation.match_score})")
 

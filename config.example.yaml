@@ -201,6 +201,11 @@ human:
   upward_correction_chance: 0.15
   mouse_moves: true
   # seed: 42        # set for reproducible behaviour
+  # v3.1.0 human-behaviour tuning (all optional; sensible defaults in code):
+  break_chance: 0.12            # chance of a "checked my phone" break after a job
+  highlight_chance: 0.25        # 20-30%: occasionally drag-select the title etc.
+  keyboard_scroll_chance: 0.30  # sometimes PageDown/Space/ArrowDown, not the wheel
+  wander_chance: 0.5            # drift the mouse to whitespace/logo/scrollbar
 
 # Per-portal card selectors (config-driven extraction). The defaults in code are
 # UNVERIFIED best-known selectors -- turn on debug.visual_mode, run a search, and

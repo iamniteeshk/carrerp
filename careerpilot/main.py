@@ -107,6 +107,21 @@ class CareerPilot:
         self.pipeline.status_sink = self.diagnostics.status
         self.pipeline.diagnostics = self.diagnostics
 
+        # Learning + session memory (JSON stores next to the SQLite DB). These let
+        # CareerPilot vary behaviour over time and improve scoring from history.
+        from pathlib import Path as _Path
+        from .core.learning import GoodJobsStore, SessionHistoryStore
+        db_dir = _Path(config.database_path).parent
+        self.good_jobs = GoodJobsStore(db_dir / "good_jobs.json")
+        self.session_history = SessionHistoryStore(db_dir / "session_history.json")
+        self.pipeline.good_jobs = self.good_jobs
+        self.pipeline.session_history = self.session_history
+        # Feed past strong matches into the AI prompt so scoring improves.
+        try:
+            self.ai.learned_summary = self.good_jobs.summary()
+        except Exception:  # noqa: BLE001
+            self.ai.learned_summary = ""
+
         self.scheduler = Scheduler(
             self.pipeline, config.scan_interval_hours, self.telegram,
             self.job_service, reporter=self.reporter,

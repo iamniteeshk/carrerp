@@ -61,6 +61,61 @@ class CSVReporter:
         logger.info("Generated %s summary CSV(s) in %s", len(paths), self.report_dir)
         return paths
 
+    def generate_summary(self, runtime_seconds: float | None = None) -> Path:
+        """Write reports/summary.csv: one row per portal with the full funnel
+        (Found/Opened/Rejected/Matched/Applied/Failed), runtime, average Gemini
+        score and average reading time. Purely DB-derived so it is always
+        consistent with the database."""
+        conn = self.db.connect()
+        portals = [r["portal"] for r in conn.execute(
+            "SELECT DISTINCT portal FROM jobs WHERE portal IS NOT NULL "
+            "ORDER BY portal").fetchall()]
+
+        def scalar(sql: str, params: tuple = ()) -> float:
+            row = conn.execute(sql, params).fetchone()
+            val = row[0] if row else None
+            return val if val is not None else 0
+
+        fields = ["Portal", "Found", "Opened", "Rejected", "Matched", "Applied",
+                  "Failed", "Runtime", "Average Gemini Score",
+                  "Average Reading Time"]
+        rows = []
+        for p in portals:
+            found = int(scalar("SELECT COUNT(*) FROM jobs WHERE portal=?", (p,)))
+            opened = int(scalar(
+                "SELECT COUNT(*) FROM jobs WHERE portal=? AND "
+                "job_description IS NOT NULL AND length(job_description)>0", (p,)))
+            rejected = int(scalar(
+                "SELECT COUNT(*) FROM jobs WHERE portal=? AND status='REJECTED'",
+                (p,)))
+            matched = int(scalar(
+                "SELECT COUNT(*) FROM jobs WHERE portal=? AND status='MATCHED'",
+                (p,)))
+            applied = int(scalar(
+                "SELECT COUNT(*) FROM applications WHERE portal=?", (p,)))
+            failed = int(scalar(
+                "SELECT COUNT(*) FROM jobs WHERE portal=? AND "
+                "status IN ('FAILED','PARTIAL_DATA')", (p,)))
+            avg_score = scalar(
+                "SELECT AVG(match_score) FROM jobs WHERE portal=? AND "
+                "match_score IS NOT NULL", (p,))
+            avg_read = scalar(
+                "SELECT AVG(reading_ms) FROM jobs WHERE portal=? AND "
+                "reading_ms IS NOT NULL AND reading_ms>0", (p,))
+            rows.append({
+                "Portal": p, "Found": found, "Opened": opened,
+                "Rejected": rejected, "Matched": matched, "Applied": applied,
+                "Failed": failed,
+                "Runtime": (f"{runtime_seconds:.0f}s"
+                            if runtime_seconds is not None else ""),
+                "Average Gemini Score": (f"{avg_score:.1f}" if avg_score else ""),
+                "Average Reading Time": (f"{avg_read/1000:.1f}s" if avg_read
+                                         else ""),
+            })
+        path = self._write("summary.csv", fields, rows)
+        logger.info("Wrote portal summary -> %s (%s portal[s])", path, len(rows))
+        return path
+
     def generate_daily_summary(self) -> tuple[str, Path]:
         conn = self.db.connect()
         by_status = {r["status"]: r["c"] for r in conn.execute(

@@ -39,8 +39,18 @@ OFF_DOMAIN_TERMS = {
     # AI / ML / Data-Science research roles -- NOT this candidate's IT
     # infrastructure / digital-workplace / EUC / service-delivery domain.
     "ai", "ml", "artificial intelligence", "machine learning", "deep learning",
-    "generative ai", "llm", "nlp", "prompt engineer", "data scientist",
-    "data science", "data analyst", "computer vision",
+    "generative ai", "llm", "llms", "nlp", "prompt engineer", "data scientist",
+    "data science", "data analyst", "computer vision", "ai engineer",
+    "ml engineer",
+    # Hands-on software engineering / hardware roles -- individual-contributor,
+    # not IT-infrastructure leadership.
+    "developer", "programmer", "software engineer", "software architect",
+    "full stack", "fullstack", "full-stack", "frontend", "front end",
+    "front-end", "backend", "back end", "back-end", "python developer",
+    "java developer", "cloud developer", "web developer", "mobile developer",
+    "qa engineer", "quality assurance", "sdet", "test engineer", "testing",
+    "automation tester", "support engineer", "rtl", "vlsi", "semiconductor",
+    "embedded", "firmware", "asic", "fpga", "device driver",
 }
 
 # Generic seniority / management words that are NOT domain signals. They appear
@@ -74,8 +84,8 @@ class RuleEngine:
             self._employment_type_rule,
             self._shift_rule,
             self._location_rule,
-            self._excluded_domain_rule,
             self._title_rule,
+            self._excluded_domain_rule,
             self._blacklist_rule,
             self._keyword_rule,
         ):

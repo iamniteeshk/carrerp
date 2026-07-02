@@ -47,12 +47,13 @@ class JobService:
             """INSERT OR IGNORE INTO jobs
                (portal, company, job_title, location, salary, experience,
                 employment_type, shift, job_url, job_description, is_easy_apply,
-                status, source_id, discovered_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                status, source_id, reading_ms, discovered_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (job.portal, job.company, job.job_title, job.location, job.salary,
              job.experience, job.employment_type, job.shift, job.job_url,
              job.job_description, int(job.is_easy_apply), job.status.value,
-             job.source_id, _now(), _now()),
+             job.source_id, int(getattr(job, "reading_ms", 0) or 0),
+             _now(), _now()),
         )
         conn.commit()
         return cur.lastrowid
