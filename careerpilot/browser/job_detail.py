@@ -184,6 +184,12 @@ class JobDetailExtractor:
                     _log_state(BrowserState.SCROLLING_JOB)
                     rec = (self.diagnostics.recorder
                            if self.diagnostics is not None else None)
+                    # Occasionally drag-select the title (and sometimes company /
+                    # location / salary / skills), the way a person highlights
+                    # text while reading. Best-effort; never blocks extraction.
+                    for field in ("title", "company", "location", "salary",
+                                  "skills"):
+                        _maybe_highlight(page, sel.get(field), self.humanizer)
                     summary = self.humanizer.incremental_read(
                         page, description, recorder=rec, status_sink=sink)
                     job.reading_ms = summary.get("total_ms", 0)
@@ -309,6 +315,22 @@ def _extracted_summary(job) -> str:
     if getattr(job, "responsibilities", ""):
         parts.append("responsibilities")
     return ", ".join(parts) if parts else "none"
+
+
+def _maybe_highlight(page, selector: str | None, humanizer) -> None:
+    """Best-effort: occasionally drag-select the element at ``selector`` so the
+    browser looks like a person highlighting text. Never raises."""
+    if not selector or humanizer is None:
+        return
+    try:
+        el = page.query_selector(selector)
+        if el is None:
+            return
+        box = el.bounding_box()
+        if box:
+            humanizer.maybe_highlight(page, box)
+    except Exception:  # noqa: BLE001 - highlighting must never block extraction
+        return
 
 
 def _collect_list(page, selector: str | None) -> list[str]:

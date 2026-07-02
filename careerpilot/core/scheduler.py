@@ -37,22 +37,33 @@ class Scheduler:
         self._scheduler = BackgroundScheduler(
             daemon=True, executors={"default": ThreadPoolExecutor(max_workers=1)})
 
+    # Probability a recurring cycle is skipped, so the schedule is not perfectly
+    # regular (humans do not search on a fixed clock / every single day).
+    SKIP_CYCLE_PROBABILITY = 0.15
+
     def start(self, run_immediately: bool = True) -> None:
         self._scheduler.add_job(
             self._safe_scan, "interval", hours=self.interval_hours,
-            id="scan", max_instances=1, coalesce=True)
+            id="scan", max_instances=1, coalesce=True, args=[True])
         self._scheduler.add_job(
             self._daily_summary, "cron", hour=self.summary_hour, minute=0,
             id="summary")
         if run_immediately:
             # Run the first scan ON THE SCHEDULER'S WORKER THREAD (not the main
-            # thread), so Playwright is created and reused on one thread.
+            # thread), so Playwright is created and reused on one thread. The
+            # first scan always runs (allow_skip=False).
             self._scheduler.add_job(self._safe_scan, "date",
                                     run_date=datetime.now(), id="initial_scan")
         self._scheduler.start()
         logger.info("Scheduler started (every %sh)", self.interval_hours)
 
-    def _safe_scan(self) -> None:
+    def _safe_scan(self, allow_skip: bool = False) -> None:
+        if allow_skip:
+            import random
+            if random.random() < self.SKIP_CYCLE_PROBABILITY:
+                logger.info("Skipping this scan cycle (human-like: not every "
+                            "cycle is used)")
+                return
         try:
             self.pipeline.run_once()
         except Exception as exc:  # noqa: BLE001

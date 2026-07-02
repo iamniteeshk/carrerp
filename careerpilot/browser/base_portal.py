@@ -520,6 +520,12 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 on_job(j)
             except Exception as exc:  # noqa: BLE001 - one job never stops browse
                 _nav_logger.warning("on_job callback failed: %s", exc)
+            # Human-like break after a job (occasionally "stepped away").
+            if human_on:
+                try:
+                    humanizer.maybe_break(page)
+                except Exception as exc:  # noqa: BLE001 - never stop the scan
+                    _nav_logger.debug("maybe_break failed: %s", exc)
 
     return collected
 

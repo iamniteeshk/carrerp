@@ -342,6 +342,10 @@ def _build_human(d: dict) -> HumanConfig:
         upward_correction_chance=float(d.get("upward_correction_chance", 0.15)),
         mouse_moves=bool(d.get("mouse_moves", True)),
         seed=d.get("seed"),
+        break_chance=float(d.get("break_chance", 0.12)),
+        highlight_chance=float(d.get("highlight_chance", 0.25)),
+        keyboard_scroll_chance=float(d.get("keyboard_scroll_chance", 0.30)),
+        wander_chance=float(d.get("wander_chance", 0.5)),
     )
 
 
