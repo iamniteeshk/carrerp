@@ -93,22 +93,51 @@ class ScanPipeline:
         self.session_history = None       # learning.SessionHistoryStore
         self.session_plan = None          # learning.SessionPlan (for history)
 
-    def _apply_session_plan(self) -> None:
-        """Give this run a human-like shape: randomized job cap, time budget,
-        keyword order and (when honouring session windows) a time-of-day portal
-        selection so LinkedIn and Naukri are never opened simultaneously. Never
-        raises."""
+    def _apply_session_plan(self, now=None) -> None:
+        """Shape this run.
+
+        MANUAL mode (``honor_session_windows`` False -- the `scan` command and the
+        immediate first scan of `run`): ignore time windows entirely -- no time
+        budget, no job cap, ALL enabled portals -- so Chrome opens and jobs are
+        processed immediately (useful for testing/debugging).
+
+        AUTOMATED mode (``honor_session_windows`` True -- recurring unattended
+        scans): apply the human time-of-day session (morning=short LinkedIn,
+        lunch=Naukri, evening=both with an idle gap, weekend longer, off-hours
+        skipped) with a randomized duration budget, job cap and portal order.
+
+        Never raises.
+        """
         try:
             import random
             from datetime import datetime
-            from .learning import plan_daily_session, plan_session
+            from .learning import SessionPlan, plan_daily_session
             kws = list(getattr(self.collector, "keywords", []) or [])
             rng = random.Random()
-            now = datetime.now()
-            if self.honor_session_windows:
-                plan = plan_daily_session(rng, now, kws)
-            else:
-                plan = plan_session(rng, now.weekday(), kws)
+
+            if not self.honor_session_windows:
+                # ---- MANUAL: no windows, no caps, all portals, start now ----
+                if kws:
+                    rng.shuffle(kws)
+                    self.collector.keywords = kws
+                # Restore the full portal list in case a prior automated scan
+                # narrowed it (defensive; manual must always use every portal).
+                if self._all_portals is not None:
+                    self.collector.portals = list(self._all_portals)
+                self.session_max_jobs = 0        # 0 = unlimited
+                self.session_deadline = None      # no time budget
+                self.session_plan = SessionPlan(
+                    skip_today=False, window="manual", duration_minutes=0,
+                    max_jobs=0, is_weekend=False, keywords=kws,
+                    portals=[getattr(p, "portal_name", "")
+                             for p in getattr(self.collector, "portals", [])],
+                    idle_gaps=[])
+                logger.info("Session plan: MANUAL run (no time window, no caps, "
+                            "all portals) | portals=%s", self.session_plan.portals)
+                return
+
+            # ---- AUTOMATED: full human time-of-day session planning ----
+            plan = plan_daily_session(rng, now or datetime.now(), kws)
             self.session_plan = plan
             self.session_max_jobs = plan.max_jobs
             self.session_deadline = (time.time() + plan.duration_minutes * 60
@@ -117,17 +146,16 @@ class ScanPipeline:
                 self.collector.keywords = plan.keywords   # randomized this run
             # Portal selection (time-of-day). Snapshot the full list once so we
             # always select from all portals, never from a previous subset.
-            if self.honor_session_windows:
-                if self._all_portals is None:
-                    self._all_portals = list(getattr(self.collector, "portals", []))
-                if plan.portals:
-                    selected = [p for p in self._all_portals
-                                if getattr(p, "portal_name", "") in plan.portals]
-                    # Fall back to all only if none of the named portals exist.
-                    self.collector.portals = selected or list(self._all_portals)
-                else:
-                    # Off-hours / skip-day: a human is not searching -> no portal.
-                    self.collector.portals = []
+            if self._all_portals is None:
+                self._all_portals = list(getattr(self.collector, "portals", []))
+            if plan.portals:
+                selected = [p for p in self._all_portals
+                            if getattr(p, "portal_name", "") in plan.portals]
+                # Fall back to all only if none of the named portals exist.
+                self.collector.portals = selected or list(self._all_portals)
+            else:
+                # Off-hours / skip-day: a human is not searching -> no portal.
+                self.collector.portals = []
             logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
                         "portals=%s keyword_order=%s", plan.window,
                         plan.duration_minutes, plan.max_jobs, plan.portals,

@@ -137,6 +137,88 @@ def test_selector_failure_is_not_retried():
     assert "selector failure" in (out.failure_detail or "").lower()
 
 
+# ---- manual vs automated session separation (v3.1.1 hotfix) --------------
+
+import types
+from careerpilot.core.pipeline import ScanPipeline
+from careerpilot.core.scheduler import Scheduler
+
+
+class _Portal:
+    def __init__(self, name): self.portal_name = name
+
+
+def _pipe():
+    p = ScanPipeline.__new__(ScanPipeline)
+    p.collector = types.SimpleNamespace(
+        keywords=["Director", "Infrastructure"],
+        portals=[_Portal("LinkedIn"), _Portal("Naukri")])
+    p._all_portals = None
+    p.honor_session_windows = False
+    p.session_plan = None
+    p.session_max_jobs = 0
+    p.session_deadline = None
+    return p
+
+
+def _names(p):
+    return [x.portal_name for x in p.collector.portals]
+
+
+def test_manual_run_ignores_windows_and_uses_all_portals():
+    p = _pipe()
+    p.honor_session_windows = False
+    # Off-hours time that would otherwise be window=off.
+    p._apply_session_plan(now=datetime(2026, 7, 7, 3, 0))
+    assert p.session_plan.window == "manual"
+    assert set(_names(p)) == {"LinkedIn", "Naukri"}    # ALL portals
+    assert p.session_max_jobs == 0                     # unlimited
+    assert p.session_deadline is None                  # no time budget
+
+
+def test_auto_off_hours_scans_no_portal():
+    p = _pipe()
+    p.honor_session_windows = True
+    p._apply_session_plan(now=datetime(2026, 7, 7, 3, 0))
+    assert p.session_plan.window == "off"
+    assert p.collector.portals == []                   # nobody searches at 3am
+
+
+def test_auto_lunch_is_naukri_only():
+    p = _pipe()
+    p.honor_session_windows = True
+    p._apply_session_plan(now=datetime(2026, 7, 7, 12, 30))
+    assert _names(p) == ["Naukri"]
+
+
+def test_manual_restores_portals_after_automated_narrowed():
+    p = _pipe()
+    # An automated lunch scan narrows to Naukri only...
+    p.honor_session_windows = True
+    p._apply_session_plan(now=datetime(2026, 7, 7, 12, 30))
+    assert _names(p) == ["Naukri"]
+    # ...a subsequent manual run must restore ALL portals.
+    p.honor_session_windows = False
+    p._apply_session_plan(now=datetime(2026, 7, 7, 3, 0))
+    assert set(_names(p)) == {"LinkedIn", "Naukri"}
+
+
+def test_scheduler_immediate_scan_is_manual_recurring_is_automated():
+    s = Scheduler.__new__(Scheduler)
+    s.pipeline = types.SimpleNamespace(honor_session_windows=None, ran=0)
+    def _run_once():
+        s.pipeline.ran += 1
+    s.pipeline.run_once = _run_once
+    s.telegram = types.SimpleNamespace(send=lambda *a, **k: None)
+    # Immediate first scan (allow_skip=False) -> manual, always runs.
+    s._safe_scan(allow_skip=False)
+    assert s.pipeline.honor_session_windows is False and s.pipeline.ran == 1
+    # Recurring scan (allow_skip=True) -> honours human windows (set before any
+    # human-like skip decision).
+    s._safe_scan(allow_skip=True)
+    assert s.pipeline.honor_session_windows is True
+
+
 if __name__ == "__main__":
     import traceback
     passed = failed = 0
