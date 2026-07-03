@@ -120,10 +120,14 @@ class ScanPipeline:
             if self.honor_session_windows:
                 if self._all_portals is None:
                     self._all_portals = list(getattr(self.collector, "portals", []))
-                selected = [p for p in self._all_portals
-                            if getattr(p, "portal_name", "") in (plan.portals or [])]
-                # Fall back to all portals if the plan named none we recognise.
-                self.collector.portals = selected or list(self._all_portals)
+                if plan.portals:
+                    selected = [p for p in self._all_portals
+                                if getattr(p, "portal_name", "") in plan.portals]
+                    # Fall back to all only if none of the named portals exist.
+                    self.collector.portals = selected or list(self._all_portals)
+                else:
+                    # Off-hours / skip-day: a human is not searching -> no portal.
+                    self.collector.portals = []
             logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
                         "portals=%s keyword_order=%s", plan.window,
                         plan.duration_minutes, plan.max_jobs, plan.portals,
