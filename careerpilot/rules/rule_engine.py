@@ -54,7 +54,24 @@ OFF_DOMAIN_TERMS = {
     # Creative / media / design roles (LinkedIn surfaces many of these).
     "video editor", "social media", "graphic designer", "graphics designer",
     "content writer", "copywriter", "photographer", "animator", "ux designer",
-    "ui designer", "ui/ux",
+    "ui designer", "ui/ux", "designer", "ui", "ux", "coder", "tester",
+}
+
+# Junior / entry-level / individual-contributor seniority terms. A 25+ year
+# Director-level candidate must never see these. They reject regardless of a
+# domain keyword, UNLESS the title ALSO carries a strong senior leadership term
+# (e.g. "Executive Director" keeps 'Director'; "IT Executive" does not).
+JUNIOR_TERMS = {
+    "intern", "internship", "graduate", "fresher", "entry level", "entry-level",
+    "junior", "jr", "trainee", "apprentice", "associate engineer", "l1", "l2",
+    "l1 engineer", "l2 engineer", "executive", "coordinator", "assistant",
+}
+
+# Strong, unambiguous senior leadership terms that "rescue" a title from the
+# junior denylist above (and mark real seniority).
+STRONG_SENIOR_TERMS = {
+    "director", "head", "vp", "avp", "svp", "evp", "chief", "cio", "cto", "coo",
+    "president", "managing director",
 }
 
 # Generic seniority / management words that are NOT domain signals. They appear
@@ -88,6 +105,7 @@ class RuleEngine:
             self._employment_type_rule,
             self._shift_rule,
             self._location_rule,
+            self._seniority_rule,
             self._title_rule,
             self._excluded_domain_rule,
             self._blacklist_rule,
@@ -113,6 +131,13 @@ class RuleEngine:
         title = (job.job_title or "").lower().strip()
         if not title:
             return RuleResult(accepted=True)            # can't judge -> open
+
+        # Junior / entry-level / IC titles are never worth opening for this
+        # senior candidate (e.g. 'Fresher', 'Intern', 'IT Executive').
+        if self._is_junior_title(title):
+            logger.info("[prefilter] skip-open '%s' @ %s: junior/entry title",
+                        job.job_title, job.company)
+            return RuleResult(False, RejectionReason.INVALID_JOB_TITLE)
 
         # Clearly off-domain -> skip opening even if a generic leadership word
         # (Director/Head) is present, UNLESS the title also carries one of the
@@ -196,6 +221,29 @@ class RuleEngine:
         if "remote" in loc:
             return RuleResult(True)
         return RuleResult(False, RejectionReason.LOCATION_MISMATCH)
+
+    def _is_junior_title(self, title_lower: str) -> bool:
+        """True if the title is junior/entry-level/IC and NOT rescued by a strong
+        senior leadership term (Director/Head/VP/Chief/CIO/CTO...)."""
+        if not title_lower:
+            return False
+        for s in STRONG_SENIOR_TERMS:
+            if re.search(rf"\b{re.escape(s)}\b", title_lower):
+                return False
+        for j in JUNIOR_TERMS:
+            if re.search(rf"\b{re.escape(j)}\b", title_lower):
+                return True
+        return False
+
+    def _seniority_rule(self, job: Job) -> RuleResult:
+        """Reject junior / entry-level / IC titles for this senior candidate
+        (e.g. 'Fresher', 'IT Executive', 'L1 Engineer') -- unless the title has a
+        strong senior leadership term. Runs before the AI (saves tokens)."""
+        if self._is_junior_title((job.job_title or "").lower().strip()):
+            logger.info("Rejected '%s' @ %s: junior/entry-level title",
+                        job.job_title, job.company)
+            return RuleResult(False, RejectionReason.INVALID_JOB_TITLE)
+        return RuleResult(True)
 
     def _excluded_domain_rule(self, job: Job) -> RuleResult:
         """Hard off-domain gate that runs BEFORE the AI (saves tokens).

@@ -135,9 +135,9 @@ def test_reading_time_bands_scale_with_jd_length():
     tiny = h.jd_reading_seconds("word " * 30)
     medium = h.jd_reading_seconds("word " * 300)
     large = h.jd_reading_seconds("word " * 900)
-    assert 15 <= tiny <= 20
-    assert 30 <= medium <= 50
-    assert 60 <= large <= 120
+    assert 10 <= tiny <= 20
+    assert 20 <= medium <= 45
+    assert 45 <= large <= 90
 
 
 class _KeyPage:

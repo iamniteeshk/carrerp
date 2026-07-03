@@ -156,15 +156,23 @@ class JobDetailExtractor:
                 if v and hasattr(job, k) and not getattr(job, k, ""):
                     setattr(job, k, v)
             status, missing = assess_completeness(job)
-            job.read_status = status
-            job.missing_fields = missing
-            extracted = _extracted_summary(job)
-            _status(sink, open_job=title, browser_state=BrowserState.EXTRACTING.value,
-                    extracted_fields=extracted, missing_fields=", ".join(missing)
-                    or "none", reading_ms=getattr(job, "reading_ms", 0))
-            logger.info("Detail SKIP (cache hit) | read_status=%s | %s",
+            # Only REUSE a cache entry that is COMPLETE. A PARTIAL/incomplete
+            # cached job is never trusted -- re-open and re-extract it (item 6),
+            # so a bad earlier read cannot poison every future run.
+            if status == "COMPLETE":
+                job.read_status = status
+                job.missing_fields = missing
+                extracted = _extracted_summary(job)
+                _status(sink, open_job=title,
+                        browser_state=BrowserState.EXTRACTING.value,
+                        extracted_fields=extracted,
+                        missing_fields=", ".join(missing) or "none",
+                        reading_ms=getattr(job, "reading_ms", 0))
+                logger.info("Detail SKIP (cache hit, COMPLETE) | %s", url)
+                return job
+            logger.info("Cache hit but INCOMPLETE (read_status=%s) -- re-"
+                        "extracting instead of trusting the cache | %s",
                         status, url)
-            return job
 
         sel = self._selectors(portal)
         last_exc = None

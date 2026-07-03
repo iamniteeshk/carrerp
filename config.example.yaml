@@ -135,7 +135,10 @@ rules:
   minimum_experience: 15
   accepted_employment_types: [Full Time, Permanent]
   rejected_shifts: []
-  search_keywords: [Director IT Infrastructure, Associate Director, Head IT, IT Infrastructure Director, Digital Workplace, Infrastructure, EUC, Global IT, GCC, IT Operations]   # focused list to SEARCH (point 6)
+  # Senior-intent SEARCH phrases (combined with each location). Use full
+  # leadership phrases -- never bare generic words like "GCC"/"EUC"/"IT", which
+  # return junior/irrelevant results.
+  search_keywords: [Head IT, Director IT, Head Digital Workplace, Director Digital Workplace, Head EUC, Director EUC, IT Infrastructure Director, IT Service Delivery Head, Head IT Operations, Director IT Operations, Global IT Director, GCC IT Head, Enterprise Technology Director]
   accepted_titles: [Director, Associate Director, Head, AVP, VP, SVP, COO, General Manager, Infrastructure, IT Infrastructure, Digital Workplace, EUC, End User Computing, GCC, Global Capability, Global IT, IT Operations, Technology Operations, Service Delivery, Cloud, Data Center, Datacenter, Workplace, Information Technology, Technology, Operations]
   rejected_titles: [Desktop Support, Technical Support, Engineer, Analyst, L1, L2]
   blacklist_companies: []         # e.g. your current employer
