@@ -221,9 +221,19 @@ portals:
       experience: "span.expwdth, span.exp"
       url: "a.title"
   linkedin:
-    results_selector: "div.job-card-container"
+    results_selector: "div.job-card-container, li.jobs-search-results__list-item, li.scaffold-layout__list-item, div.job-card-list"
     fields:
-      title: "a.job-card-list__title, a.job-card-container__link"
-      company: ".job-card-container__primary-description"
-      location: "li.job-card-container__metadata-item"
-      url: "a.job-card-list__title, a.job-card-container__link"
+      title: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      company: ".artdeco-entity-lockup__subtitle, .job-card-container__primary-description, .job-card-container__company-name"
+      location: ".artdeco-entity-lockup__caption, .job-card-container__metadata-item, li.job-card-container__metadata-item"
+      url: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      easy_apply: ".job-card-container__footer-item, .job-card-list__footer-wrapper"
+    # Detail-page selectors (used after opening a job URL). Override any that
+    # come back empty in debug.visual_mode; code ships broader fallbacks too.
+    detail:
+      description: "#job-details, div.jobs-box__html-content, div.jobs-description__content"
+      title: "h1.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.t-24"
+      company: ".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__company-name"
+      location: ".job-details-jobs-unified-top-card__primary-description-container span.tvm__text, .job-details-jobs-unified-top-card__bullet"
+      skills: ".job-details-how-you-match__skills-item-subtitle, div.job-details-how-you-match__skills-item"
+      easy_apply: "button.jobs-apply-button, .jobs-apply-button--top-card button"

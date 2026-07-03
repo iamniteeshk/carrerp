@@ -40,14 +40,24 @@ class LinkedInPortal(BasePortal):
     # UNVERIFIED best-known selectors -- confirm with Visual Debug Mode and
     # override in config.yaml -> portals.linkedin. LinkedIn serves per-user
     # A/B markup, so these especially must be checked against your own account.
-    DEFAULT_RESULTS_SELECTOR = "div.job-card-container"
+    DEFAULT_RESULTS_SELECTOR = ("div.job-card-container, "
+                                "li.jobs-search-results__list-item, "
+                                "li.scaffold-layout__list-item, div.job-card-list")
     FIELD_SELECTORS = {
-        "title": "a.job-card-list__title, a.job-card-container__link",
-        "company": ".job-card-container__primary-description, "
-                   ".job-card-container__company-name",
-        "location": "li.job-card-container__metadata-item",
-        "url": "a.job-card-list__title, a.job-card-container__link",
-        "easy_apply": "li.job-card-container__footer-item",
+        "title": ("a.job-card-container__link, a.job-card-list__title, "
+                  "a.job-card-list__title--link, "
+                  ".artdeco-entity-lockup__title a, "
+                  ".job-card-list__entity-lockup a"),
+        "company": (".artdeco-entity-lockup__subtitle, "
+                    ".job-card-container__primary-description, "
+                    ".job-card-container__company-name"),
+        "location": (".artdeco-entity-lockup__caption, "
+                     ".job-card-container__metadata-item, "
+                     "li.job-card-container__metadata-item"),
+        "url": ("a.job-card-container__link, a.job-card-list__title, "
+                "a.job-card-list__title--link, .artdeco-entity-lockup__title a"),
+        "easy_apply": (".job-card-container__footer-item, "
+                       ".job-card-list__footer-wrapper"),
     }
 
     def __init__(self, session: BrowserSession, candidate: Candidate,

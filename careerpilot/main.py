@@ -176,6 +176,11 @@ class CareerPilot:
     def run(self) -> None:
         self._install_signal_handlers()
         self._write_pid_file()
+        # NOTE: time-of-day session windows + portal scheduling are applied ONLY
+        # to the recurring (unattended) scheduled scans -- see Scheduler._safe_scan.
+        # The immediate first scan and the manual `scan` command run everything
+        # right away (no window gating), so `run` always opens Chrome and works
+        # for testing/debugging.
         from . import __version__
         self.logger.info("Starting CareerPilot v%s (mode: %s)",
                          __version__, self.cfg.apply.mode)

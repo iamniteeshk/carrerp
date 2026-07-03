@@ -130,6 +130,19 @@ def test_excluded_title_terms_are_config_extensible():
     assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
 
 
+def test_rejects_creative_and_media_roles():
+    # v3.1.1 (items 1,15): LinkedIn surfaces these for infra searches. They must
+    # be skipped at the CARD stage (prefilter) so they are never opened, and also
+    # rejected by the full evaluate().
+    engine = RuleEngine(_rule_config())
+    for title in ("Social Media Manager", "Video Editor",
+                  "Senior Graphic Designer", "Content Writer"):
+        pre = engine.prefilter(_job(job_title=title))
+        assert not pre.accepted and pre.reason == RejectionReason.DOMAIN_MISMATCH, title
+        assert not engine.evaluate(_job(job_title=title,
+                                        job_description="creative role")).accepted
+
+
 def test_rejects_software_and_hardware_ic_roles():
     # v3.1.0: hands-on software/hardware IC roles are the wrong domain even with
     # a leadership word, and must be rejected before the AI is called.

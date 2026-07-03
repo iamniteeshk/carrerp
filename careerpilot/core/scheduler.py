@@ -58,6 +58,13 @@ class Scheduler:
         logger.info("Scheduler started (every %sh)", self.interval_hours)
 
     def _safe_scan(self, allow_skip: bool = False) -> None:
+        # Recurring (unattended) cycles honour the human time-of-day session and
+        # portal schedule; the immediate first scan (allow_skip=False) runs
+        # everything now so `run` is usable for testing/debugging.
+        try:
+            self.pipeline.honor_session_windows = bool(allow_skip)
+        except Exception:  # noqa: BLE001
+            pass
         if allow_skip:
             import random
             if random.random() < self.SKIP_CYCLE_PROBABILITY:
