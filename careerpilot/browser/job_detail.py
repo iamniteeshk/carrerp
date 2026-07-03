@@ -62,19 +62,51 @@ DEFAULT_DETAIL_SELECTORS = {
         "external_apply": "#company-site-button",
     },
     "linkedin": {
-        "container": "div.jobs-description__content, div.jobs-description",
-        "description": ("div.jobs-description__content, "
+        # UNVERIFIED best-known LinkedIn detail selectors (Jul-2026 markup) with
+        # multiple fallbacks per field. LinkedIn serves per-account A/B markup, so
+        # confirm with debug.visual_mode and override in
+        # config.yaml -> portals.linkedin.detail if any field comes back empty.
+        "container": ("#job-details, div.jobs-description__content, "
+                      "div.jobs-description, article.jobs-description__container"),
+        "description": ("#job-details, div.jobs-box__html-content, "
+                        "div.jobs-description__content .jobs-box__html-content, "
+                        "div.jobs-description-content__text, "
+                        "div.jobs-description__content, "
                         "article.jobs-description__container"),
-        "title": "h1.t-24, h2.job-details-jobs-unified-top-card__job-title",
-        "company": "a.job-details-jobs-unified-top-card__company-name",
-        "location": "span.job-details-jobs-unified-top-card__bullet",
-        "employment_type": "li.jobs-unified-top-card__job-insight",
-        "responsibilities": "div.jobs-description__content ul li",
-        "skills": "div.job-details-how-you-match__skills-item",
-        "company_description": "section.jobs-company__box",
+        "title": ("h1.job-details-jobs-unified-top-card__job-title, "
+                  ".job-details-jobs-unified-top-card__job-title, "
+                  ".jobs-unified-top-card__job-title, h1.t-24, h1"),
+        "company": (".job-details-jobs-unified-top-card__company-name a, "
+                    ".job-details-jobs-unified-top-card__company-name, "
+                    "a.jobs-unified-top-card__company-name, "
+                    ".jobs-unified-top-card__company-name"),
+        "location": (".job-details-jobs-unified-top-card__primary-description-container "
+                     "span.tvm__text, "
+                     ".job-details-jobs-unified-top-card__bullet, "
+                     ".jobs-unified-top-card__bullet"),
+        "experience": (".job-details-jobs-unified-top-card__job-insight span, "
+                       "li.jobs-unified-top-card__job-insight span"),
+        "employment_type": (".job-details-jobs-unified-top-card__job-insight "
+                            "span.job-details-jobs-unified-top-card__job-insight-view-model-secondary, "
+                            "li.jobs-unified-top-card__job-insight span"),
+        "responsibilities": ("#job-details ul li, "
+                             "div.jobs-description__content ul li"),
+        "skills": (".job-details-how-you-match__skills-item-subtitle, "
+                   ".job-details-jobs-unified-top-card__job-insight-text-button, "
+                   "div.job-details-how-you-match__skills-item"),
+        "company_description": ("section.jobs-company__box "
+                                ".jobs-company__company-description, "
+                                ".jobs-company__company-description, "
+                                "section.jobs-company__box"),
         "benefits": "div.jobs-description-benefits__text",
-        "easy_apply": "button.jobs-apply-button",
-        "external_apply": "a.jobs-apply-button--top-card",
+        "recruiter": (".hirer-card__hirer-information a, "
+                      ".hirer-card__container .jobs-poster__name, "
+                      ".jobs-poster__name, .hirer-card__hirer-information"),
+        "easy_apply": ("button.jobs-apply-button, "
+                       ".jobs-apply-button--top-card button, "
+                       "button.jobs-apply-button--top-card"),
+        "external_apply": ("a.jobs-apply-button--top-card, "
+                           "a[data-tracking-control-name*='apply']"),
     },
 }
 
@@ -218,6 +250,8 @@ class JobDetailExtractor:
                           _card_text(page, sel.get("company_description")))
                 self._set(job, "posted_date",
                           _card_text(page, sel.get("posted_date")))
+                self._set(job, "recruiter_name",
+                          _card_text(page, sel.get("recruiter")))
                 self._set(job, "raw_html", _safe_content(page))
                 skills = _collect_list(page, sel.get("skills"))
                 if skills:
@@ -247,16 +281,17 @@ class JobDetailExtractor:
                         reading_ms=getattr(job, "reading_ms", 0))
 
                 if status != "COMPLETE":
+                    # A selector failure is NOT retried: the page loaded fine, the
+                    # selectors simply did not match. Retrying would only reopen
+                    # the same DOM and waste time. Capture evidence, write a Failed
+                    # outcome, and move on (item 3). Only genuine navigation/
+                    # network exceptions (caught below) are retried.
                     reason = (f"EXTRACTION_FAILED: selector failure -- "
                               f"missing {', '.join(missing)}")
-                    logger.warning("Detail INCOMPLETE for %s (attempt %s) | %s",
-                                   url, attempt + 1, missing)
-                    if attempt < max_retries:
-                        continue
                     self._capture("job_detail_partial", page, job, portal, sel)
                     job.failure_detail = reason
-                    logger.warning("Detail PARTIAL for %s after %s attempts -- %s",
-                                   url, max_retries + 1, reason)
+                    logger.warning("Detail PARTIAL for %s (selector failure, no "
+                                   "retry) -- %s", url, reason)
                     return job
                 logger.info("Detail EXTRACTED COMPLETE | %s | jd_chars=%s | "
                             "missing_optional=%s", url, len(description or ""),
