@@ -51,6 +51,10 @@ OFF_DOMAIN_TERMS = {
     "qa engineer", "quality assurance", "sdet", "test engineer", "testing",
     "automation tester", "support engineer", "rtl", "vlsi", "semiconductor",
     "embedded", "firmware", "asic", "fpga", "device driver",
+    # Creative / media / design roles (LinkedIn surfaces many of these).
+    "video editor", "social media", "graphic designer", "graphics designer",
+    "content writer", "copywriter", "photographer", "animator", "ux designer",
+    "ui designer", "ui/ux",
 }
 
 # Generic seniority / management words that are NOT domain signals. They appear
