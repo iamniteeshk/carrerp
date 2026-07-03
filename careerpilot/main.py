@@ -176,6 +176,10 @@ class CareerPilot:
     def run(self) -> None:
         self._install_signal_handlers()
         self._write_pid_file()
+        # Autonomous run: honour time-of-day session windows + portal scheduling
+        # (morning=LinkedIn, lunch=Naukri, evening=both). A manual `scan` does not
+        # set this, so it always scans everything on demand.
+        self.pipeline.honor_session_windows = True
         from . import __version__
         self.logger.info("Starting CareerPilot v%s (mode: %s)",
                          __version__, self.cfg.apply.mode)

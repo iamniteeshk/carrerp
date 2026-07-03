@@ -83,28 +83,51 @@ class ScanPipeline:
         # Human-like session limits (set by main from a SessionPlan). 0/None off.
         self.session_max_jobs = 0
         self.session_deadline = None      # epoch seconds, or None
+        # When True (autonomous 'run'), the session plan is time-of-day aware and
+        # selects which portal(s) to use (morning=LinkedIn, lunch=Naukri, evening
+        # =both). Manual 'scan' leaves this False so it always scans everything.
+        self.honor_session_windows = False
+        self._all_portals = None          # snapshot of the full portal list
         # Optional learning stores (set by main). Persistence must never crash.
         self.good_jobs = None             # learning.GoodJobsStore
         self.session_history = None       # learning.SessionHistoryStore
         self.session_plan = None          # learning.SessionPlan (for history)
 
     def _apply_session_plan(self) -> None:
-        """Give this run a human-like shape: randomized job cap, time budget and
-        keyword order, so no two runs behave identically. Never raises."""
+        """Give this run a human-like shape: randomized job cap, time budget,
+        keyword order and (when honouring session windows) a time-of-day portal
+        selection so LinkedIn and Naukri are never opened simultaneously. Never
+        raises."""
         try:
             import random
             from datetime import datetime
-            from .learning import plan_session
+            from .learning import plan_daily_session, plan_session
             kws = list(getattr(self.collector, "keywords", []) or [])
-            plan = plan_session(random.Random(), datetime.now().weekday(), kws)
+            rng = random.Random()
+            now = datetime.now()
+            if self.honor_session_windows:
+                plan = plan_daily_session(rng, now, kws)
+            else:
+                plan = plan_session(rng, now.weekday(), kws)
             self.session_plan = plan
             self.session_max_jobs = plan.max_jobs
-            self.session_deadline = time.time() + plan.duration_minutes * 60
+            self.session_deadline = (time.time() + plan.duration_minutes * 60
+                                     if plan.duration_minutes else None)
             if plan.keywords:
                 self.collector.keywords = plan.keywords   # randomized this run
+            # Portal selection (time-of-day). Snapshot the full list once so we
+            # always select from all portals, never from a previous subset.
+            if self.honor_session_windows:
+                if self._all_portals is None:
+                    self._all_portals = list(getattr(self.collector, "portals", []))
+                selected = [p for p in self._all_portals
+                            if getattr(p, "portal_name", "") in (plan.portals or [])]
+                # Fall back to all portals if the plan named none we recognise.
+                self.collector.portals = selected or list(self._all_portals)
             logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
-                        "keyword_order=%s", plan.window, plan.duration_minutes,
-                        plan.max_jobs, plan.keywords[:5])
+                        "portals=%s keyword_order=%s", plan.window,
+                        plan.duration_minutes, plan.max_jobs, plan.portals,
+                        plan.keywords[:5])
         except Exception as exc:  # noqa: BLE001 - planning must never crash a scan
             logger.warning("Session planning failed (using defaults): %s", exc)
 
@@ -200,8 +223,19 @@ class ScanPipeline:
             except Exception:  # noqa: BLE001
                 pass
             plan = getattr(self, "session_plan", None)
+            from datetime import datetime, timedelta, timezone
+            end = datetime.now(timezone.utc)
+            start = end - timedelta(seconds=duration)
+            portals = list(getattr(plan, "portals", []) or [])
+            if not portals:
+                portals = [getattr(p, "portal_name", "")
+                           for p in getattr(self.collector, "portals", [])]
             entry = {
+                "start": start.isoformat(),
+                "end": end.isoformat(),
                 "runtime_seconds": round(duration, 1),
+                "portal": ", ".join(p for p in portals if p),
+                "jobs_searched": counts.get("found", 0) + counts.get("skipped", 0),
                 "jobs_found": counts.get("found", 0),
                 "jobs_opened": counts.get("found", 0) - counts.get("partial", 0),
                 "jobs_matched": counts.get("matched", 0),
