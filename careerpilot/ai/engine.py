@@ -65,15 +65,26 @@ RTL, VLSI, Semiconductor, Embedded, QA/Testing.
 
 How to decide match_score (0-100), weigh ALL of these, not just the title:
 - Domain fit vs the lists above -- this is the most important factor.
-- Experience & seniority: years and leadership level vs the role's requirement.
+- Years of experience required vs the candidate's 25+ years.
+- Leadership scope and team size (this candidate leads large teams/functions).
+- Relevance to IT infrastructure, End User Computing, Digital Workplace, IT
+  Service Delivery, Managed Services and GCC environments.
 - Technologies & responsibilities: overlap with what the candidate actually did.
 - Organisational/industry fit, location, and salary (if stated).
 
+Seniority: BOOST genuine senior leadership (Head, Director, Senior/Associate
+Director, VP/AVP/SVP, CIO/CTO, technology/service-delivery/infrastructure
+leader). PENALISE individual-contributor and junior/entry roles.
+
+CRITICAL: a hands-on software/developer/AI-ML role must score LOW even if its JD
+mentions matching keywords (cloud, infrastructure, operations) -- keyword overlap
+alone is NOT domain fit for an infrastructure LEADERSHIP candidate.
+
 Scoring guide (be consistent, not generous):
-- 85-100: strong fit in the candidate's own infrastructure/IT-leadership domain.
+- 85-100: strong fit -- senior IT-infrastructure/leadership role in-domain.
 - 60-84 : relevant domain, some gaps.
 - 40-59 : partly related; borderline.
-- 0-39  : wrong domain or wrong level -- do NOT apply.
+- 0-39  : wrong domain, IC/junior level, or developer role -- do NOT apply.
 
 Learned from this candidate's past strong matches (use as extra signal):
 {learned}
