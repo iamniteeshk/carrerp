@@ -17,6 +17,14 @@ from .database import Database
 
 logger = get_logger(__name__)
 
+# Statuses that must be retried on a later scan (AI outage, partial JD, mid-apply crash).
+RETRIABLE_STATUSES = {
+    JobStatus.QUEUED.value,
+    JobStatus.PARTIAL_DATA.value,
+    JobStatus.APPLYING.value,
+    JobStatus.FOUND.value,
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -27,19 +35,38 @@ class JobService:
         self.db = db
 
     def exists(self, job: Job) -> bool:
+        """True if this job already has a terminal (non-retriable) DB row.
+
+        Retriable statuses (QUEUED, PARTIAL_DATA, APPLYING, FOUND) do NOT count
+        as exists — the pipeline must be able to resume them after AI outages
+        or partial extraction failures.
+        """
+        row = self.find_existing(job)
+        if row is None:
+            return False
+        status = (row.get("status") or "").upper()
+        return status not in RETRIABLE_STATUSES
+
+    def find_existing(self, job: Job) -> dict[str, Any] | None:
         conn = self.db.connect()
         if job.job_url:
             row = conn.execute(
-                "SELECT 1 FROM jobs WHERE job_url = ?", (job.job_url,)
+                "SELECT * FROM jobs WHERE job_url = ?", (job.job_url,)
             ).fetchone()
             if row:
-                return True
+                return dict(row)
         row = conn.execute(
-            "SELECT 1 FROM jobs WHERE lower(company)=? AND lower(job_title)=? "
+            "SELECT * FROM jobs WHERE lower(company)=? AND lower(job_title)=? "
             "AND lower(location)=?",
             (job.company.lower(), job.job_title.lower(), job.location.lower()),
         ).fetchone()
-        return row is not None
+        return dict(row) if row else None
+
+    def is_retriable(self, job: Job) -> bool:
+        row = self.find_existing(job)
+        if row is None:
+            return False
+        return (row.get("status") or "").upper() in RETRIABLE_STATUSES
 
     def insert(self, job: Job) -> int:
         conn = self.db.connect()
@@ -90,20 +117,27 @@ class ApplicationService:
     def __init__(self, db: Database):
         self.db = db
 
+    def already_applied(self, job_id: int) -> bool:
+        """True only when a successful live APPLIED row exists for this job.
+
+        QUEUED / failed / dry-run rows must not permanently block a later apply.
+        """
+        conn = self.db.connect()
+        row = conn.execute(
+            "SELECT 1 FROM applications WHERE job_id=? AND dry_run=0 "
+            "AND application_status='APPLIED'",
+            (job_id,),
+        ).fetchone()
+        return row is not None
+
     def applied_today_count(self) -> int:
         conn = self.db.connect()
         row = conn.execute(
             "SELECT COUNT(*) AS c FROM applications "
-            "WHERE dry_run=0 AND date(applied_at)=date('now')"
+            "WHERE dry_run=0 AND application_status='APPLIED' "
+            "AND date(applied_at)=date('now')"
         ).fetchone()
         return row["c"] if row else 0
-
-    def already_applied(self, job_id: int) -> bool:
-        conn = self.db.connect()
-        row = conn.execute(
-            "SELECT 1 FROM applications WHERE job_id=? AND dry_run=0", (job_id,)
-        ).fetchone()
-        return row is not None
 
     def record(self, result: ApplicationResult) -> int:
         conn = self.db.connect()

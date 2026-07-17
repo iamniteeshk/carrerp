@@ -221,9 +221,27 @@ def _validate_env(cfg: dict, env_path: str | Path, report: ValidationReport) -> 
         load_dotenv(env_path)
     has_gemini = any(os.getenv(v, "").strip() for v in gemini_vars)
     has_deepseek = bool(os.getenv(deepseek_var, "").strip())
-    if not has_gemini and not has_deepseek:
+    # Also honour provider-driven api_key_envs / api_key_env.
+    providers = ai.get("providers") or {}
+    has_provider = False
+    for _name, p in providers.items():
+        p = p or {}
+        if not p.get("enabled", True):
+            continue
+        envs = list(p.get("api_key_envs") or [])
+        if p.get("api_key_env"):
+            envs.append(p["api_key_env"])
+        if any(os.getenv(v, "").strip() for v in envs):
+            has_provider = True
+            break
+        # Keyless local providers (no api_key_env configured).
+        if not envs and not p.get("requires_auth", False):
+            has_provider = True
+            break
+    if not has_gemini and not has_deepseek and not has_provider:
         report.error("no AI provider key set in environment "
-                     "(set a Gemini key or DeepSeek key in .env)")
+                     "(set a Gemini key or DeepSeek key in .env, or configure "
+                     "ai.providers.*.api_key_envs)")
 
 
 def _loc(message: str, fname: str, mapping: dict, key: str) -> str:

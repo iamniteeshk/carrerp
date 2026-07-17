@@ -65,8 +65,14 @@ class JobCache:
             logger.warning("Cache read failed for %s: %s", url, exc)
             return None
 
-    def needs_open(self, url: str, current_hash: str | None = None) -> bool:
-        """True if the job must be opened: not cached, or content changed."""
+    def needs_open(self, url: str, current_hash: str | None = None,
+                   *, max_age_days: int = 14) -> bool:
+        """True if the job must be opened: not cached, content changed, or stale.
+
+        ``max_age_days`` forces re-extraction of old cache entries so a 24x7
+        deployment does not reuse outdated postings forever. 0 disables age check.
+        """
+        import time
         cached = self.get(url)
         if cached is None:
             self.stats.misses += 1
@@ -76,6 +82,17 @@ class JobCache:
             self.stats.changed += 1
             logger.info("Cache CHANGED | %s (reopening)", job_key(url))
             return True
+        if max_age_days > 0:
+            try:
+                p = self._path(job_key(url))
+                age_days = (time.time() - p.stat().st_mtime) / 86400
+                if age_days > max_age_days:
+                    self.stats.changed += 1
+                    logger.info("Cache STALE | %s (%.0fd old, reopening)",
+                                job_key(url), age_days)
+                    return True
+            except OSError:
+                pass
         self.stats.hits += 1
         logger.info("Cache HIT | %s (reusing cached data)", job_key(url))
         return False

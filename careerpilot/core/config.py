@@ -86,7 +86,27 @@ class ApplyConfig:
     delay_between_applications_seconds: int
     retry_limit: int
     easy_apply_only: bool
+    # Production safety: always stop at the final confirmation page and require
+    # an explicit human approval before Submit. After sufficient live validation
+    # this can be set false; default True so we never accidentally submit.
+    require_final_confirmation: bool = True
+    # When True, unknown location cannot proceed to apply.
+    require_preferred_location: bool = False
 
+
+@dataclass
+class RetentionSettings:
+    """Long-running retention limits (days / max items)."""
+    cache_days: int = 30
+    report_days: int = 60
+    screenshot_days: int = 14
+    evidence_days: int = 14
+    backup_days: int = 30
+    human_interaction_days: int = 14
+    session_history_max: int = 500
+    good_jobs_max: int = 1000
+    vacuum_db: bool = True
+    maintenance_hour: int = 3  # local hour for daily cleanup
 
 @dataclass
 class EmailConfig:
@@ -128,6 +148,7 @@ class AppConfig:
     telegram_token: str = ""
     telegram_chat_id: str = ""
     source_path: str = ""    # absolute path of the loaded config file
+    retention: RetentionSettings = field(default_factory=RetentionSettings)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     # Convenience accessors kept for the rest of the codebase.
@@ -256,9 +277,28 @@ def load_config(config_path: str | Path = "config/config.yaml",
             apply_cfg.get("delay_between_applications_seconds", 120)),
         retry_limit=int(apply_cfg.get("retry_limit", 2)),
         easy_apply_only=bool(apply_cfg.get("easy_apply_only", True)),
+        require_final_confirmation=bool(
+            apply_cfg.get("require_final_confirmation", True)),
+        require_preferred_location=bool(
+            apply_cfg.get("require_preferred_location", False)),
     )
     if apply_obj.mode not in ("dry_run", "live"):
         raise ConfigError(f"apply.mode must be 'dry_run' or 'live', got '{apply_obj.mode}'")
+
+    # ---- retention / long-running maintenance ----
+    maint_cfg = raw.get("maintenance", {}) or {}
+    retention = RetentionSettings(
+        cache_days=int(maint_cfg.get("cache_days", 30)),
+        report_days=int(maint_cfg.get("report_days", 60)),
+        screenshot_days=int(maint_cfg.get("screenshot_days", 14)),
+        evidence_days=int(maint_cfg.get("evidence_days", 14)),
+        backup_days=int(maint_cfg.get("backup_days", 30)),
+        human_interaction_days=int(maint_cfg.get("human_interaction_days", 14)),
+        session_history_max=int(maint_cfg.get("session_history_max", 500)),
+        good_jobs_max=int(maint_cfg.get("good_jobs_max", 1000)),
+        vacuum_db=bool(maint_cfg.get("vacuum_db", True)),
+        maintenance_hour=int(maint_cfg.get("maintenance_hour", 3)),
+    )
 
     # ---- browser (config-driven engine/channel/viewport) ----
     viewport = browser.get("viewport", {}) or {}
@@ -321,6 +361,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
         telegram_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
         telegram_chat_id=(telegram_cfg.get("chat_id")
                           or os.getenv("TELEGRAM_CHAT_ID", "")),
+        retention=retention,
         _raw=raw,
     )
     try:

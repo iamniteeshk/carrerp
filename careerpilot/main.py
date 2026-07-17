@@ -126,7 +126,9 @@ class CareerPilot:
             self.pipeline, config.scan_interval_hours, self.telegram,
             self.job_service, reporter=self.reporter,
             backup_path=config.backup_path,
-            summary_hour=config.daily_summary_hour)
+            summary_hour=config.daily_summary_hour,
+            maintenance_hour=getattr(config.retention, "maintenance_hour", 3),
+            app_config=config)
 
     def _candidate_profile(self) -> str:
         return self.cfg.candidate.summary()
@@ -175,7 +177,12 @@ class CareerPilot:
 
     def run(self) -> None:
         self._install_signal_handlers()
-        self._write_pid_file()
+        if not self._acquire_pid_lock():
+            self.logger.error(
+                "Another CareerPilot instance appears to be running "
+                "(PID file %s). Stop it first or remove a stale PID file.",
+                self._PID_FILE)
+            sys.exit(4)
         # NOTE: time-of-day session windows + portal scheduling are applied ONLY
         # to the recurring (unattended) scheduled scans -- see Scheduler._safe_scan.
         # The immediate first scan and the manual `scan` command run everything
@@ -209,16 +216,43 @@ class CareerPilot:
 
     _PID_FILE = Path("careerpilot.pid")
 
-    def _write_pid_file(self) -> None:
+    def _acquire_pid_lock(self) -> bool:
+        """Write PID file only if no other live process owns it."""
         try:
+            if self._PID_FILE.exists():
+                raw = self._PID_FILE.read_text(encoding="utf-8").strip()
+                try:
+                    old_pid = int(raw)
+                except ValueError:
+                    old_pid = -1
+                if old_pid > 0:
+                    try:
+                        os.kill(old_pid, 0)
+                        # Process exists — refuse to start a second instance.
+                        return False
+                    except OSError:
+                        # Stale PID file; replace it.
+                        self.logger.warning(
+                            "Removing stale PID file (process %s not running)",
+                            old_pid)
             self._PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+            return True
         except OSError as exc:
             self.logger.warning("Could not write PID file: %s", exc)
+            return True  # do not block startup on filesystem issues
+
+    def _write_pid_file(self) -> None:
+        self._acquire_pid_lock()
 
     def _remove_pid_file(self) -> None:
         try:
             if self._PID_FILE.exists():
-                self._PID_FILE.unlink()
+                # Only remove if it still points at us.
+                try:
+                    if int(self._PID_FILE.read_text(encoding="utf-8").strip()) == os.getpid():
+                        self._PID_FILE.unlink()
+                except (ValueError, OSError):
+                    self._PID_FILE.unlink(missing_ok=True)
         except OSError as exc:
             self.logger.warning("Could not remove PID file: %s", exc)
 
@@ -845,8 +879,33 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     elif command == "dashboard":
         pilot.run_dashboard()
+    elif command == "maintenance":
+        from .core.maintenance import RetentionConfig, run_maintenance, write_health_heartbeat
+        ret = config.retention
+        result = run_maintenance(
+            cache_dir="cache/jobs",
+            report_dir=config.report_path,
+            screenshot_dir=config.screenshot_path,
+            evidence_dir=getattr(config.debug, "evidence_dir", "debug"),
+            backup_dir=config.backup_path,
+            database_path=config.database_path,
+            config=RetentionConfig(
+                cache_days=ret.cache_days, report_days=ret.report_days,
+                screenshot_days=ret.screenshot_days,
+                evidence_days=ret.evidence_days, backup_days=ret.backup_days,
+                human_interaction_days=ret.human_interaction_days,
+                session_history_max=ret.session_history_max,
+                good_jobs_max=ret.good_jobs_max, vacuum_db=ret.vacuum_db,
+            ),
+        )
+        write_health_heartbeat(status="ok", extra=result.as_dict())
+        print(f"Maintenance complete: {result.as_dict()}")
+        return 0 if not result.errors else 1
     else:
         print(f"Unknown command: {command}", file=sys.stderr)
+        print("Commands: run | scan | dashboard | doctor | check | validate | "
+              "maintenance | models | ai-health | checklist | export",
+              file=sys.stderr)
         return 1
     return 0
 

@@ -163,6 +163,24 @@ apply:
   delay_between_applications_seconds: 180
   retry_limit: 3
   easy_apply_only: true           # external ATS -> manual review
+  # Production safety: always stop before final Submit and wait for explicit
+  # human confirmation. Set false only after sufficient live validation.
+  require_final_confirmation: true
+  # When true, refuse to apply if location is unknown or outside preferred list.
+  require_preferred_location: false
+
+# Long-running retention (24x7). Daily cleanup runs at maintenance_hour:15.
+maintenance:
+  cache_days: 30
+  report_days: 60
+  screenshot_days: 14
+  evidence_days: 14
+  backup_days: 30
+  human_interaction_days: 14
+  session_history_max: 500
+  good_jobs_max: 1000
+  vacuum_db: true
+  maintenance_hour: 3
 
 logging:
   dir: logs

@@ -93,14 +93,29 @@ class Doctor:
 
     def _check_gemini_keys(self) -> None:
         assert self.config
+        # Prefer provider-driven keys; fall back to legacy gemini_keys list.
         n = len(self.config.ai.gemini_keys)
+        provider_keys = 0
+        for spec in getattr(self.config.ai, "providers", []) or []:
+            if not getattr(spec, "enabled", True):
+                continue
+            keys = getattr(spec, "api_keys", None) or []
+            if keys:
+                provider_keys += len(keys)
+            elif not getattr(spec, "requires_auth", True):
+                provider_keys += 1  # keyless local provider
         if n > 0:
             self._add("Gemini API keys", PASS, f"{n} key(s) configured")
+        elif provider_keys > 0:
+            self._add("AI provider keys", PASS,
+                      f"{provider_keys} provider key(s)/endpoint(s) configured")
         elif self.config.ai.deepseek_key:
             self._add("Gemini API keys", WARN,
                       "no Gemini keys; relying on DeepSeek fallback", mandatory=False)
         else:
-            self._add("Gemini API keys", FAIL, "no Gemini keys and no DeepSeek key")
+            self._add("AI provider keys", FAIL,
+                      "no AI provider key configured "
+                      "(set ai.providers.*.api_key_envs or legacy gemini_key_env_vars)")
 
     def _check_deepseek(self) -> None:
         assert self.config

@@ -50,6 +50,12 @@ class ConfidenceGate:
         if self._applied_lifetime < self.cfg.first_run_confirmations:
             return GateDecision(True, True, "first-run confirmation window")
 
+        # Production default: always stop before final Submit and wait for an
+        # explicit human confirmation. Set require_final_confirmation: false
+        # only after sufficient live validation.
+        if getattr(self.cfg, "require_final_confirmation", True):
+            return GateDecision(True, True, "final confirmation required before submit")
+
         if self.cfg.mode == "live":
             return GateDecision(True, False, "auto-submit")
         return GateDecision(True, True, "dry-run mode")

@@ -1,6 +1,7 @@
 """Scheduler (APScheduler).
 
-Runs the scan pipeline at the configured interval and sends a daily summary.
+Runs the scan pipeline at the configured interval, sends a daily summary, and
+runs retention maintenance so a 24x7 deployment does not grow without bound.
 Intervals are configurable (P003 §14). The scheduler catches pipeline errors
 so a single bad cycle never kills the schedule.
 """
@@ -24,7 +25,8 @@ logger = get_logger(__name__)
 class Scheduler:
     def __init__(self, pipeline: ScanPipeline, interval_hours: int,
                  telegram: TelegramService, job_service: JobService,
-                 reporter=None, backup_path: str = "", summary_hour: int = 20):
+                 reporter=None, backup_path: str = "", summary_hour: int = 20,
+                 maintenance_hour: int = 3, app_config=None):
         self.pipeline = pipeline
         self.interval_hours = interval_hours
         self.telegram = telegram
@@ -32,6 +34,8 @@ class Scheduler:
         self.reporter = reporter
         self.backup_path = backup_path
         self.summary_hour = summary_hour
+        self.maintenance_hour = maintenance_hour
+        self.app_config = app_config
         # ONE worker thread: Playwright sync objects are thread-bound, so every
         # scan (immediate and recurring) must run on the same thread.
         self._scheduler = BackgroundScheduler(
@@ -48,6 +52,9 @@ class Scheduler:
         self._scheduler.add_job(
             self._daily_summary, "cron", hour=self.summary_hour, minute=0,
             id="summary")
+        self._scheduler.add_job(
+            self._daily_maintenance, "cron", hour=self.maintenance_hour, minute=15,
+            id="maintenance")
         if run_immediately:
             # Run the first scan ON THE SCHEDULER'S WORKER THREAD (not the main
             # thread), so Playwright is created and reused on one thread. The
@@ -55,7 +62,8 @@ class Scheduler:
             self._scheduler.add_job(self._safe_scan, "date",
                                     run_date=datetime.now(), id="initial_scan")
         self._scheduler.start()
-        logger.info("Scheduler started (every %sh)", self.interval_hours)
+        logger.info("Scheduler started (every %sh, maintenance at %02d:15)",
+                    self.interval_hours, self.maintenance_hour)
 
     def _safe_scan(self, allow_skip: bool = False) -> None:
         # Recurring (unattended) cycles honour the human time-of-day session and
@@ -72,9 +80,17 @@ class Scheduler:
                             "cycle is used)")
                 return
         try:
+            from ..core.maintenance import write_health_heartbeat
+            write_health_heartbeat(status="scanning")
             self.pipeline.run_once()
+            write_health_heartbeat(status="ok")
         except Exception as exc:  # noqa: BLE001
             logger.exception("Scheduled scan crashed: %s", exc)
+            try:
+                from ..core.maintenance import write_health_heartbeat
+                write_health_heartbeat(status="error", extra={"error": str(exc)})
+            except Exception:  # noqa: BLE001
+                pass
             self.telegram.send(NotificationType.CRITICAL_ERROR,
                                f"Scan cycle crashed: {exc}")
 
@@ -92,6 +108,39 @@ class Scheduler:
                 self.pipeline.scans.db.backup(self.backup_path)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Daily summary/backup failed: %s", exc)
+
+    def _daily_maintenance(self) -> None:
+        """Retention cleanup so long-running installs do not grow forever."""
+        try:
+            from ..core.maintenance import RetentionConfig, run_maintenance
+            cfg = self.app_config
+            ret = getattr(cfg, "retention", None) if cfg is not None else None
+            retention = RetentionConfig(
+                cache_days=getattr(ret, "cache_days", 30),
+                report_days=getattr(ret, "report_days", 60),
+                screenshot_days=getattr(ret, "screenshot_days", 14),
+                evidence_days=getattr(ret, "evidence_days", 14),
+                backup_days=getattr(ret, "backup_days", 30),
+                human_interaction_days=getattr(ret, "human_interaction_days", 14),
+                session_history_max=getattr(ret, "session_history_max", 500),
+                good_jobs_max=getattr(ret, "good_jobs_max", 1000),
+                vacuum_db=getattr(ret, "vacuum_db", True),
+            ) if ret is not None else RetentionConfig()
+            result = run_maintenance(
+                cache_dir="cache/jobs",
+                report_dir=getattr(cfg, "report_path", "reports") if cfg else "reports",
+                screenshot_dir=(getattr(cfg, "screenshot_path", "screenshots")
+                                if cfg else "screenshots"),
+                evidence_dir=(getattr(getattr(cfg, "debug", None), "evidence_dir",
+                                      "debug") if cfg else "debug"),
+                backup_dir=getattr(cfg, "backup_path", "database/backups")
+                if cfg else "database/backups",
+                database_path=getattr(cfg, "database_path", "") if cfg else "",
+                config=retention,
+            )
+            logger.info("Daily maintenance: %s", result.as_dict())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Daily maintenance failed: %s", exc)
 
     def shutdown(self) -> None:
         if self._scheduler.running:
