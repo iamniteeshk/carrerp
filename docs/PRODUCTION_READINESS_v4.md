@@ -32,9 +32,20 @@ are intentionally incomplete against live DOM and will **never** report
 | Keyboard Space could activate buttons | Low | Prefer PageDown/ArrowDown |
 | Idle mouse used hardcoded viewport | Low | Prefer live `page.viewport_size` |
 
-## Production profile
+## Windows dedicated PC (GEEKOM / fresh Windows 11)
 
-Use `config.production.example.yaml`:
+One-command onboarding:
+
+```powershell
+.\setup_windows.ps1 -ProductionConfig
+python doctor.py --fix
+```
+
+See `docs/INSTALL_WINDOWS.md` for power settings, Chrome profiles, Task
+Scheduler auto-start, backup/restore, and the Production Ready checklist.
+
+`doctor --fix` repairs folders, DB schema, Playwright browsers, and config
+templates. It never invents API keys or portal logins.
 
 - Chennai-first `search_locations`
 - `require_final_confirmation: true`
