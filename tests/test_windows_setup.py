@@ -47,7 +47,28 @@ def test_find_browser_bundled_channel():
 def test_runtime_dirs_include_cache_and_profiles():
     joined = " ".join(RUNTIME_DIRS)
     check("runtime has cache", "cache" in joined)
-    check("runtime has linkedin profile dir", "profiles_browser/linkedin" in joined)
+    check("runtime has browser or profiles_browser",
+          "browser/linkedin" in joined or "profiles_browser/linkedin" in joined)
+
+
+def _isolate_data_root(tmp: Path):
+    """Point path resolution at tmp and stop detect_app_root walking to the repo."""
+    (tmp / "careerpilot").mkdir(exist_ok=True)
+    (tmp / "careerpilot" / "__init__.py").write_text("# test\n")
+    keys = ("CAREERPILOT_DATA_ROOT", "CAREERPILOT_HOME", "CAREERPILOT_BACKUPS_ROOT")
+    old = {k: os.environ.get(k) for k in keys}
+    os.environ["CAREERPILOT_DATA_ROOT"] = str(tmp)
+    for k in ("CAREERPILOT_HOME", "CAREERPILOT_BACKUPS_ROOT"):
+        os.environ.pop(k, None)
+    return old
+
+
+def _restore_env(old: dict):
+    for k, v in old.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
 
 
 def test_doctor_fix_creates_folders_and_db():
@@ -55,6 +76,7 @@ def test_doctor_fix_creates_folders_and_db():
         tmp = Path(tmp)
         cfg, env = make_deployment(tmp)
         old = os.getcwd()
+        old_env = _isolate_data_root(tmp)
         try:
             os.chdir(tmp)
             for name in ("logs", "screenshots", "reports", "cache"):
@@ -68,13 +90,17 @@ def test_doctor_fix_creates_folders_and_db():
             check("fix created logs", (tmp / "logs").is_dir())
             check("fix created cache/jobs or cache",
                   (tmp / "cache").is_dir() or (tmp / "cache" / "jobs").is_dir())
-            check("fix created profiles_browser/linkedin",
-                  (tmp / "profiles_browser" / "linkedin").is_dir())
+            check("fix created profiles_browser/linkedin or browser/linkedin",
+                  (tmp / "profiles_browser" / "linkedin").is_dir()
+                  or (tmp / "browser" / "linkedin").is_dir())
             check("database file exists after fix",
                   Path(doc.config.database_path).exists() if doc.config else False)
             check("doctor completed report", len(doc.results) >= 5)
+            check("doctor has readiness score",
+                  getattr(doc, "readiness_score", 0) > 0)
         finally:
             os.chdir(old)
+            _restore_env(old_env)
 
 
 def test_doctor_reports_missing_ai_key_clearly():
@@ -84,6 +110,7 @@ def test_doctor_reports_missing_ai_key_clearly():
         Path(env).write_text("# empty\n")
         old_key = os.environ.pop("GEMINI_API_KEY_1", None)
         old_cwd = os.getcwd()
+        old_env = _isolate_data_root(tmp)
         try:
             os.chdir(tmp)
             doc = Doctor(cfg, env, fix=False)
@@ -95,6 +122,7 @@ def test_doctor_reports_missing_ai_key_clearly():
                   msgs)
         finally:
             os.chdir(old_cwd)
+            _restore_env(old_env)
             if old_key is not None:
                 os.environ["GEMINI_API_KEY_1"] = old_key
 

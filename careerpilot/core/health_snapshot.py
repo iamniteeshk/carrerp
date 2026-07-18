@@ -19,9 +19,18 @@ def _utcnow() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _pid_alive(pid_file: Path = Path("careerpilot.pid")) -> dict[str, Any]:
+def _default_pid_file() -> Path:
+    try:
+        from .paths import get_layout
+        return get_layout().pid_file
+    except Exception:  # noqa: BLE001
+        return Path("careerpilot.pid")
+
+
+def _pid_alive(pid_file: Path | None = None) -> dict[str, Any]:
+    pid_file = pid_file or _default_pid_file()
     if not pid_file.exists():
-        return {"running": False, "pid": None, "detail": "no careerpilot.pid"}
+        return {"running": False, "pid": None, "detail": f"no {pid_file.name}"}
     try:
         pid = int(pid_file.read_text(encoding="utf-8").strip())
     except ValueError:
@@ -72,11 +81,31 @@ def _resource_usage() -> dict[str, Any]:
 
 
 def collect_health(*, config=None, db_path: str = "",
-                   heartbeat_path: str = "logs/health.json") -> dict[str, Any]:
+                   heartbeat_path: str = "") -> dict[str, Any]:
     """Build a single JSON-serialisable health snapshot. Never raises."""
+    try:
+        from .paths import get_layout
+        layout = get_layout()
+        data_root = layout.data_root
+        pid_file = layout.pid_file
+        default_hb = layout.logs_dir / "health.json"
+        default_browser = layout.browser_dir
+    except Exception:  # noqa: BLE001
+        layout = None
+        data_root = Path(".")
+        pid_file = Path("careerpilot.pid")
+        default_hb = Path("logs/health.json")
+        default_browser = Path("browser")
+
+    if not heartbeat_path:
+        if config is not None and getattr(config, "log_path", None):
+            heartbeat_path = str(Path(config.log_path) / "health.json")
+        else:
+            heartbeat_path = str(default_hb)
+
     snap: dict[str, Any] = {
         "timestamp": _utcnow(),
-        "process": _pid_alive(),
+        "process": _pid_alive(pid_file),
         "resources": _resource_usage(),
         "disk": {},
         "database": {},
@@ -87,9 +116,13 @@ def collect_health(*, config=None, db_path: str = "",
         "last_scan": {},
         "last_application": {},
         "heartbeat": {},
+        "layout": {
+            "data_root": str(data_root),
+            "pid_file": str(pid_file),
+        },
     }
     try:
-        usage = shutil.disk_usage(".")
+        usage = shutil.disk_usage(str(data_root))
         snap["disk"] = {
             "free_gb": round(usage.free / (1024 ** 3), 2),
             "total_gb": round(usage.total / (1024 ** 3), 2),
@@ -149,8 +182,8 @@ def collect_health(*, config=None, db_path: str = "",
 
     # Browser: presence of profile dirs + process heuristic.
     try:
-        profiles = Path(getattr(config, "browser_profiles_path", "profiles_browser")
-                        if config else "profiles_browser")
+        profiles = Path(getattr(config, "browser_profiles_path", str(default_browser))
+                        if config else str(default_browser))
         snap["browser"] = {
             "profile_dir_exists": profiles.exists(),
             "linkedin_profile": (profiles / "linkedin").exists(),
@@ -188,8 +221,14 @@ def collect_health(*, config=None, db_path: str = "",
     return snap
 
 
-def write_health_snapshot(path: str | Path = "logs/health_snapshot.json",
-                          **kwargs) -> Path:
+def write_health_snapshot(path: str | Path | None = None, **kwargs) -> Path:
+    if path is None:
+        try:
+            from .paths import get_layout
+            layout = get_layout()
+            path = layout.logs_dir / "health_snapshot.json"
+        except Exception:  # noqa: BLE001
+            path = Path("logs/health_snapshot.json")
     snap = collect_health(**kwargs)
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)

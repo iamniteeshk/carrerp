@@ -8,8 +8,13 @@ config.yaml
 profiles/
 documents/
 resumes/
+certificates/
 
-# Runtime artifacts.
+# Production data root (when using sibling / env layout).
+/data/
+/backups/
+
+# Runtime artifacts (legacy root layout + production names).
 careerpilot.pid
 /database/
 /logs/
@@ -17,8 +22,16 @@ careerpilot.pid
 # Runtime artifacts (root-level only -- not careerpilot/reports Python package).
 /reports/
 /profiles_browser/
+/browser/
 /cache/
 /debug/
+/health/
+/temp/
+/exports/
+/human_interactions/
+
+# Generated Task Scheduler wrapper (created by Register-CareerPilotStartup.ps1).
+scripts/run_careerpilot_task.cmd
 
 # Python.
 __pycache__/

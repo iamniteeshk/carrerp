@@ -98,7 +98,10 @@ def test_scripts_exist():
                  "scripts/restore.ps1", "scripts/health.ps1",
                  "scripts/Allow-DashboardLan.ps1",
                  "scripts/Register-CareerPilotStartup.ps1",
-                 "docs/PRODUCTION_CHECKLIST.md", "requirements.lock"):
+                 "scripts/export_data.ps1", "scripts/import_data.ps1",
+                 "docs/PRODUCTION_CHECKLIST.md", "docs/DATA_STRUCTURE.md",
+                 "docs/USER_FILES.md", "docs/BACKUP_AND_RESTORE.md",
+                 "docs/MIGRATION_GUIDE.md", "requirements.lock"):
         check(name, (root / name).exists())
     reg = (root / "scripts/Register-CareerPilotStartup.ps1").read_text(
         encoding="utf-8")

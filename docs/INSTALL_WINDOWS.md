@@ -16,6 +16,21 @@ Keep `apply.mode: dry_run` and `require_final_confirmation: true`.
 **Python on Windows:** always prefer the **`py` launcher** (see
 `docs/WINDOWS_PYTHON.md`). Do not rely on the WindowsApps `python` stub.
 
+## Production filesystem (app vs data)
+
+Recommended dedicated-PC layout:
+
+```
+C:\CareerPilot\          set CAREERPILOT_HOME here
+  app\                   Git clone (this repository)
+  data\                  all user/runtime files
+  backups\               dated full backups
+```
+
+If you clone into `C:\CareerPilot\app`, `setup_windows.ps1` and Doctor resolve
+the sibling `data\` automatically. Details: `docs/DATA_STRUCTURE.md`,
+`docs/USER_FILES.md`, `docs/BACKUP_AND_RESTORE.md`, `docs/MIGRATION_GUIDE.md`.
+
 ---
 
 ## What CareerPilot actually needs

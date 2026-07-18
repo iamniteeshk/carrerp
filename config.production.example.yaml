@@ -72,7 +72,7 @@ browser:
   viewport:
     width: 1366
     height: 900
-  profiles_path: profiles_browser
+  profiles_path: browser
   screenshots_path: screenshots
   timeout_seconds: 45
   networkidle_timeout_ms: 10000

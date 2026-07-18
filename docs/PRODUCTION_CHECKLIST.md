@@ -4,7 +4,8 @@ Use this on the dedicated Windows PC (e.g. GEEKOM A7 Max) **before** treating
 the box as permanently deployed. Check each box only after you have personally
 verified it.
 
-Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
+Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`,
+`docs/DATA_STRUCTURE.md`, `docs/MIGRATION_GUIDE.md`.
 
 ---
 
@@ -19,20 +20,21 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 
 ## Install & configuration
 
-- [ ] Repository cloned to the install root
+- [ ] Cloned to `C:\CareerPilot\app` (or equivalent) with `CAREERPILOT_HOME` set
+- [ ] User data lives under `data\` (not inside the Git tree)
 - [ ] `.\setup_windows.ps1 -ProductionConfig` completed successfully
-- [ ] `.env` has a real `GEMINI_API_KEY_1`
+- [ ] `data\.env` has a real `GEMINI_API_KEY_1`
 - [ ] Telegram configured (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) — or consciously skipped
-- [ ] `config\config.yaml` candidate details filled (no placeholders)
-- [ ] Resume PDF present in each used `profiles\<Name>\`
-- [ ] `py doctor.py` → **RESULT: PASS** (no mandatory FAILs)
-- [ ] `py doctor.py --fix` re-run after any Windows change
+- [ ] `data\config\config.yaml` candidate details filled (no placeholders)
+- [ ] Resume PDF present in each used `data\profiles\<Name>\`
+- [ ] `py -m careerpilot.main doctor` → **RESULT: PASS** + readiness score reviewed
+- [ ] `py -m careerpilot.main doctor --fix` re-run after any Windows change
 
 ## Browser sessions
 
-- [ ] Chrome / Playwright profile dirs exist under `profiles_browser\`
-- [ ] Chrome profile logged into **LinkedIn** (session survives restart)
-- [ ] Chrome profile logged into **Naukri** (session survives restart)
+- [ ] Playwright profile dirs exist under `data\browser\` (or legacy `profiles_browser\`)
+- [ ] Profile logged into **LinkedIn** (session survives restart)
+- [ ] Profile logged into **Naukri** (session survives restart)
 - [ ] Headed browser launches via `py -m careerpilot.main scan`
 
 ## Functional validation

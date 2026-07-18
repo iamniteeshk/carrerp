@@ -62,6 +62,9 @@ class CareerPilot:
         self.logger = get_logger("main")
         self._sessions: list[BrowserSession] = []
         self._shutting_down = False
+        from .paths import get_layout
+        self._layout = get_layout()
+        self._PID_FILE = self._layout.pid_file
 
         self.db = Database(config.database_path)
         self.db.initialize()
@@ -805,35 +808,25 @@ def _cmd_probe_open(pilot, argv: list[str]) -> int:
     return 0
 
 
-def _bootstrap_config() -> None:
-    """On a fresh install the ZIP ships NO runtime data and NO personal config,
-    only *.example templates. Create the real config + profiles from the examples
-    on first run so the app runs directly, and tell the user to review them."""
-    import shutil
-    # 1) config/config.yaml from config.example.yaml (includes candidate section)
-    target = os.path.join("config", "config.yaml")
-    if not os.path.exists(target):
-        example = None
-        for cand in ("config.example.yaml",
-                     os.path.join("config", "config.example.yaml")):
-            if os.path.exists(cand):
-                example = cand
-                break
-        if example:
-            os.makedirs("config", exist_ok=True)
-            shutil.copyfile(example, target)
-            print(f"[first-run] Created {target} from {example}. Review your "
-                  f"search_keywords, accepted_titles, locations and AI keys.")
-    # 2) profiles/ from profiles.example/ (career-profile templates)
-    if not os.path.isdir("profiles") and os.path.isdir("profiles.example"):
-        shutil.copytree("profiles.example", "profiles")
-        print("[first-run] Created profiles/ from profiles.example/. Edit these "
-              "with your real experience before a live run.")
-    # 3) .env from .env.example (AI keys) -- optional; app runs without it
-    if not os.path.exists(".env") and os.path.exists(".env.example"):
-        shutil.copyfile(".env.example", ".env")
-        print("[first-run] Created .env from .env.example. Add your AI API key "
-              "to enable matching.")
+def _bootstrap_config() -> list[str]:
+    """Scaffold the data root from shipped examples. Never overwrites user files.
+
+    Production layout puts real files under ``CAREERPILOT_DATA_ROOT`` (sibling
+    ``data/`` when the repo lives in ``app/``). Legacy single-folder mode still
+    works when data root == app root.
+    """
+    from .core.bootstrap import ensure_scaffold
+    from .core.paths import get_layout
+
+    actions = ensure_scaffold()
+    layout = get_layout()
+    if actions:
+        print(f"[first-run] data root = {layout.data_root}")
+        for a in actions:
+            print(f"[first-run] {a}")
+        print("[first-run] Review candidate details, resumes, and .env keys "
+              "before a live run. See docs/DATA_STRUCTURE.md.")
+    return actions
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -841,27 +834,31 @@ def main(argv: list[str] | None = None) -> int:
     command = argv[0] if argv else "run"
 
     from .core.bootstrap import ensure_scaffold
+    from .core.paths import get_layout
 
     # 'setup' explicitly scaffolds a fresh clone, then points the user onward.
     if command == "setup":
         actions = ensure_scaffold()
+        layout = get_layout()
         if actions:
             print("CareerPilot setup complete:")
             for a in actions:
                 print(f"  - {a}")
         else:
             print("Nothing to do -- already set up.")
+        print(f"\nData root: {layout.data_root}")
+        print(f"App root:  {layout.app_root}")
         print("\nNext steps:")
-        print("  1. Edit config/config.yaml -> set your real candidate details "
-              "(name, email, phone) and rules.")
-        print("  2. Put your resume.pdf in each profiles/<Name>/ folder.")
-        print("  3. Add API keys to .env")
+        print(f"  1. Edit {layout.config_yaml} -> candidate details + rules")
+        print(f"  2. Put resume.pdf in each {layout.profiles_dir}/<Name>/ folder")
+        print(f"  3. Add API keys to {layout.env_file}")
         print("  4. py -m careerpilot.main doctor")
+        print("  See docs/DATA_STRUCTURE.md and docs/MIGRATION_GUIDE.md")
         return 0
 
     # Auto-bootstrap on first run so the project is clone-and-run even without
     # an explicit 'setup'. Never overwrites existing files.
-    ensure_scaffold()
+    _bootstrap_config()
 
     # 'models' connects to every enabled provider, lists their models with
     # metadata, and exports reports/models.json + reports/models.csv.
@@ -874,12 +871,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # The doctor must run even when config is broken -- that's its job.
     if command == "doctor":
-        _bootstrap_config()   # a fresh install has only *.example templates
         fix = "--fix" in argv or "-f" in argv
         production = "--production" in argv
         return 0 if run_doctor(fix=fix, production=production) else 3
 
-    _bootstrap_config()
     try:
         config = load_config()
     except ConfigError as exc:
@@ -972,17 +967,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Maintenance complete: {result.as_dict()}")
         return 0 if not result.errors else 1
     elif command == "backup":
-        from .core.backup_ops import create_backup
+        from .core.backup_ops import create_backup, verify_backup
         include_chrome = "--chrome" in argv or "--include-chrome" in argv
+        compress = "--zip" in argv or "--compress" in argv
         result = create_backup(
-            config_path="config/config.yaml",
-            env_path=".env",
             database_path=config.database_path,
             profiles_dir=config.profiles_dir,
             browser_profiles=config.browser_profiles_path,
             logs_dir=config.log_path,
             reports_dir=config.report_path,
             include_chrome_profiles=include_chrome,
+            compress=compress,
         )
         print(f"Backup -> {result.path}")
         print(f"  copied: {result.copied}")
@@ -991,7 +986,10 @@ def main(argv: list[str] | None = None) -> int:
         if result.errors:
             print(f"  errors: {result.errors}")
             return 1
-        return 0
+        v = verify_backup(result.path)
+        print(f"  verify: {'OK' if v['ok'] else 'INCOMPLETE'} "
+              f"present={v['present']} missing={v['missing']}")
+        return 0 if v["ok"] else 1
     elif command == "restore":
         from .core.backup_ops import restore_backup
         if len(argv) < 2:

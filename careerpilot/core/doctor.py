@@ -1,20 +1,18 @@
 """Startup validation -- the "doctor" routine.
 
-Runs pre-flight checks and prints a clear PASS / WARNING / FAIL report.
-Mandatory failures cause a non-zero exit (fail fast).
+Runs pre-flight checks and prints a clear PASS / WARNING / FAIL report plus a
+**readiness score** (0–100). Mandatory failures cause a non-zero exit.
+
+All checks are data-root aware (``CAREERPILOT_DATA_ROOT`` / sibling ``data/``).
 
 Run via:
-    python -m careerpilot.main doctor
-    python -m careerpilot.main doctor --fix
-    python doctor.py [--fix]
-
-``--fix`` safely repairs what can be automated (folders, DB schema, Playwright
-browser binary, config templates, Chrome profile dirs). It never invents API
-keys, Telegram credentials, or website logins — those always need a human.
+    py -m careerpilot.main doctor
+    py -m careerpilot.main doctor --fix
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -24,6 +22,7 @@ from pathlib import Path
 from .bootstrap import ensure_scaffold
 from .config import AppConfig, ConfigError, load_config
 from .logging_setup import get_logger
+from .paths import get_layout
 from . import windows_env as wenv
 
 logger = get_logger(__name__)
@@ -31,10 +30,39 @@ logger = get_logger(__name__)
 PASS, FAIL, WARN, SKIP = "PASS", "FAIL", "WARN", "SKIP"
 _SYMBOL = {PASS: "[ OK ]", FAIL: "[FAIL]", WARN: "[WARN]", SKIP: "[SKIP]"}
 
-RUNTIME_DIRS = (
-    "logs", "database", "database/backups", "screenshots", "reports",
-    "profiles_browser", "cache", "cache/jobs", "documents", "debug",
-)
+# Weighted readiness: mandatory FAIL zeros that weight; WARN halves it.
+_SCORE_WEIGHTS: dict[str, int] = {
+    "Python": 5,
+    "Virtual environment": 4,
+    "Git": 2,
+    "py launcher": 3,
+    "Disk space": 5,
+    "Data root": 6,
+    "Configuration": 8,
+    ".env file": 6,
+    "AI provider keys": 8,
+    "Gemini API keys": 8,
+    "Required folders": 6,
+    "Write permissions": 6,
+    "Database": 7,
+    "Resume files": 7,
+    "Career Profiles": 5,
+    "Candidate profile": 4,
+    "Chrome profile dirs": 4,
+    "LinkedIn login": 3,
+    "Naukri login": 3,
+    "Playwright package": 5,
+    "Playwright Chromium": 5,
+    "Dashboard port": 2,
+    "Backups root": 3,
+    "Logs dir": 2,
+    "Reports dir": 2,
+    "Cache dir": 2,
+    "Certificates (optional)": 1,
+    "Photo (optional)": 1,
+    "Scheduler config": 2,
+    "Startup task": 3,
+}
 
 
 @dataclass
@@ -56,16 +84,36 @@ class FixAction:
 class Doctor:
     """Collects and reports pre-flight checks. Optionally auto-repairs safe issues."""
 
-    def __init__(self, config_path: str = "config/config.yaml",
-                 env_path: str = ".env", *, fix: bool = False,
+    def __init__(self, config_path: str | None = None,
+                 env_path: str | None = None, *, fix: bool = False,
                  production: bool = False):
-        self.config_path = config_path
-        self.env_path = env_path
+        self.layout = get_layout()
+        # Resolve defaults against the data root (not cwd).
+        if config_path is None:
+            if self.layout.config_yaml.exists():
+                self.config_path = str(self.layout.config_yaml)
+            elif (self.layout.app_root / "config" / "config.yaml").exists():
+                self.config_path = str(
+                    self.layout.app_root / "config" / "config.yaml")
+            else:
+                self.config_path = str(self.layout.config_yaml)
+        else:
+            self.config_path = config_path
+        if env_path is None:
+            if self.layout.env_file.exists():
+                self.env_path = str(self.layout.env_file)
+            elif (self.layout.app_root / ".env").exists():
+                self.env_path = str(self.layout.app_root / ".env")
+            else:
+                self.env_path = str(self.layout.env_file)
+        else:
+            self.env_path = env_path
         self.fix = fix
         self.production = production
         self.results: list[CheckResult] = []
         self.fixes: list[FixAction] = []
         self.config: AppConfig | None = None
+        self.readiness_score: int = 0
 
     def run(self) -> bool:
         """Run all checks. Returns True if no mandatory check failed."""
@@ -80,6 +128,7 @@ class Doctor:
         self._check_windows()
         self._check_disk()
         self._check_internet()
+        self._check_data_root()
 
         self._check_schema()
         self._check_config()
@@ -92,15 +141,21 @@ class Doctor:
             self._check_write_permissions()
             self._check_database()
             self._check_profiles()
+            self._check_candidate()
+            self._check_optional_assets()
             self._check_browser_profiles()
             self._check_system_browser()
             self._check_port()
             self._check_maintenance_config()
+            self._check_scheduler()
+            self._check_backups_logs_cache()
         else:
             self._check_env_file_raw()
 
         self._check_playwright()
         self._check_browser_binary()
+        self._check_startup_task()
+        self.readiness_score = self._compute_readiness()
         self._print_report()
         return not any(r.status == FAIL and r.mandatory for r in self.results)
 
@@ -109,41 +164,35 @@ class Doctor:
     def _apply_safe_fixes(self) -> None:
         """Repair only safe, non-secret issues. Idempotent."""
         print("Doctor --fix: applying safe repairs...\n")
+        print(f"  data root = {self.layout.data_root}")
+        print(f"  app root  = {self.layout.app_root}")
+        print(f"  backups   = {self.layout.backups_root}\n")
 
-        # 1. Scaffold config / profiles / .env templates / base dirs.
         try:
-            actions = ensure_scaffold(self.config_path)
+            actions = ensure_scaffold(self.config_path, prefer_production=self.production,
+                                      env_path=self.env_path)
             for a in actions:
                 self.fixes.append(FixAction(a, True))
         except Exception as exc:  # noqa: BLE001
             self.fixes.append(FixAction("ensure_scaffold", False, str(exc)))
 
-        # 2. Prefer production template when requested and config is still stock.
         if self.production:
             self._maybe_copy_production_config()
 
-        # 3. Extra runtime directories (incl. cache / backups).
-        for name in RUNTIME_DIRS:
-            d = Path(name)
-            if not d.exists():
-                try:
-                    d.mkdir(parents=True, exist_ok=True)
-                    self.fixes.append(FixAction(f"created {name}/", True))
-                except OSError as exc:
-                    self.fixes.append(FixAction(f"create {name}/", False, str(exc)))
-
-        # 4. Per-portal Chrome profile dirs (Playwright user-data-dir).
+        # Extra legacy Chrome profile dirs when still using profiles_browser.
         for portal in ("linkedin", "naukri"):
-            d = Path("profiles_browser") / portal
-            if not d.exists():
-                try:
-                    d.mkdir(parents=True, exist_ok=True)
-                    self.fixes.append(FixAction(
-                        f"created Chrome profile dir {d}/", True))
-                except OSError as exc:
-                    self.fixes.append(FixAction(f"create {d}/", False, str(exc)))
+            for base in (self.layout.browser_dir,
+                         self.layout.data_root / "profiles_browser"):
+                d = base / portal
+                if not d.exists():
+                    try:
+                        d.mkdir(parents=True, exist_ok=True)
+                        self.fixes.append(FixAction(
+                            f"created Chrome profile dir {d}/", True))
+                    except OSError as exc:
+                        self.fixes.append(FixAction(
+                            f"create {d}/", False, str(exc)))
 
-        # 5. Initialize database schema.
         try:
             cfg_path = Path(self.config_path)
             if cfg_path.exists():
@@ -157,7 +206,6 @@ class Doctor:
         except Exception as exc:  # noqa: BLE001
             self.fixes.append(FixAction("database initialize", False, str(exc)))
 
-        # 6. Install Playwright Chromium if missing.
         ok, msg = wenv.playwright_browser_installed()
         if not ok:
             self.fixes.append(FixAction(
@@ -187,14 +235,18 @@ class Doctor:
             print()
 
     def _maybe_copy_production_config(self) -> None:
-        """Copy config.production.example.yaml when no real config exists yet."""
         target = Path(self.config_path)
-        prod = Path("config.production.example.yaml")
+        prod = self.layout.app_root / "config.production.example.yaml"
         if target.exists() or not prod.exists():
             return
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(prod, target)
+            text = target.read_text(encoding="utf-8")
+            text2 = text.replace("profiles_path: profiles_browser",
+                                 "profiles_path: browser")
+            if text2 != text:
+                target.write_text(text2, encoding="utf-8")
             self.fixes.append(FixAction(
                 f"created {target} from config.production.example.yaml", True))
         except OSError as exc:
@@ -206,20 +258,35 @@ class Doctor:
              mandatory: bool = True, fixed: bool = False) -> None:
         self.results.append(CheckResult(name, status, message, mandatory, fixed))
 
+    def _check_data_root(self) -> None:
+        layout = self.layout
+        mode = ("production sibling" if layout.data_root != layout.app_root
+                else "legacy (data inside app/repo)")
+        env_hint = ""
+        if os.getenv("CAREERPILOT_DATA_ROOT"):
+            env_hint = " via CAREERPILOT_DATA_ROOT"
+        elif os.getenv("CAREERPILOT_HOME"):
+            env_hint = " via CAREERPILOT_HOME"
+        self._add("Data root", PASS,
+                  f"{layout.data_root} ({mode}{env_hint})", mandatory=False)
+        # Writable data root is mandatory for production.
+        ok, msg = wenv.path_writable(str(layout.data_root))
+        if not ok:
+            self._add("Data root writable", FAIL, msg)
+        else:
+            self._add("Data root writable", PASS, "writable")
+
     def _check_host_python(self) -> None:
         ok, msg = wenv.python_version_ok()
         self._add("Python", PASS if ok else FAIL, msg)
 
     def _check_py_launcher(self) -> None:
-        """On Windows, prefer ``py``. Missing bare ``python`` is OK."""
         if not wenv.is_windows():
             self._add("py launcher", SKIP, "non-Windows host", mandatory=False)
             return
         ok, msg = wenv.py_launcher_available()
-        # WARN not FAIL — .venv\Scripts\python.exe is enough after setup.
         self._add("py launcher", PASS if ok else WARN, msg, mandatory=False)
-        # Explicitly do NOT fail if `python` is missing from PATH.
-        bare = __import__("shutil").which("python")
+        bare = shutil.which("python")
         if bare and "WindowsApps" in bare:
             self._add("python on PATH", WARN,
                       f"WindowsApps stub at {bare} — use py or .venv instead",
@@ -238,7 +305,7 @@ class Doctor:
         self._add("Git", PASS if ok else WARN, msg, mandatory=False)
 
     def _check_venv(self) -> None:
-        ok, msg = wenv.venv_active_or_present(Path.cwd())
+        ok, msg = wenv.venv_active_or_present(self.layout.app_root)
         self._add("Virtual environment", PASS if ok else WARN, msg,
                   mandatory=False)
 
@@ -252,7 +319,12 @@ class Doctor:
         self._add("Windows", PASS if ok else WARN, msg, mandatory=False)
 
     def _check_disk(self) -> None:
-        ok, msg = wenv.disk_free_gb(".")
+        target = self.layout.data_root
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            target = self.layout.data_root.parent if self.layout.data_root.parent.exists() else Path(".")
+        ok, msg = wenv.disk_free_gb(str(target))
         self._add("Disk space", PASS if ok else FAIL, msg)
 
     def _check_internet(self) -> None:
@@ -287,7 +359,7 @@ class Doctor:
             self._add(".env file", PASS, self.env_path)
         else:
             self._add(".env file", FAIL,
-                      f"{self.env_path} not found (copy .env.example to .env "
+                      f"{self.env_path} not found (copy .env.example to data/.env "
                       f"or run: py -m careerpilot.main doctor --fix)")
 
     def _check_env_file_raw(self) -> None:
@@ -351,10 +423,14 @@ class Doctor:
         assert self.config
         c = self.config
         folders = {
-            "logs": c.log_path, "screenshots": c.screenshot_path,
-            "reports": c.report_path, "backups": c.backup_path,
-            "profiles_browser": c.browser_profiles_path,
-            "cache": "cache",
+            "logs": c.log_path,
+            "screenshots": c.screenshot_path,
+            "reports": c.report_path,
+            "db_backups": c.backup_path,
+            "browser": c.browser_profiles_path,
+            "cache": str(self.layout.cache_dir),
+            "documents": c.documents_dir,
+            "debug": getattr(c.debug, "evidence_dir", str(self.layout.debug_dir)),
         }
         problems = []
         for name, path in folders.items():
@@ -369,19 +445,29 @@ class Doctor:
 
     def _check_write_permissions(self) -> None:
         assert self.config
-        targets = [self.config.log_path, self.config.report_path,
-                   self.config.database_path and str(Path(self.config.database_path).parent)]
+        targets = [
+            self.config.log_path,
+            self.config.report_path,
+            str(Path(self.config.database_path).parent),
+            str(self.layout.backups_root),
+            str(self.layout.temp_dir),
+        ]
         bad = []
         for t in targets:
             if not t:
                 continue
+            try:
+                Path(t).mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
             ok, msg = wenv.path_writable(t)
             if not ok:
                 bad.append(msg)
         if bad:
             self._add("Write permissions", FAIL, "; ".join(bad))
         else:
-            self._add("Write permissions", PASS, "logs/reports/database writable")
+            self._add("Write permissions", PASS,
+                      "logs/reports/database/backups/temp writable")
 
     def _check_database(self) -> None:
         assert self.config
@@ -420,13 +506,73 @@ class Doctor:
                       + ("OK" if default_ok else "MISSING RESUME"),
                       mandatory=not default_ok)
 
+    def _check_candidate(self) -> None:
+        assert self.config
+        c = self.config.candidate
+        name = (getattr(c, "full_name", None) or "").strip()
+        email = (getattr(c, "email", None) or "").strip()
+        if not name or name.lower() in ("your name", "changeme"):
+            self._add("Candidate profile", WARN,
+                      "candidate.full_name still looks like a placeholder — "
+                      "edit config/config.yaml",
+                      mandatory=False)
+        elif not email or "your_email" in email.lower():
+            self._add("Candidate profile", WARN,
+                      "candidate.email still looks like a placeholder",
+                      mandatory=False)
+        else:
+            self._add("Candidate profile", PASS,
+                      f"{name} <{email}>", mandatory=False)
+
+    def _check_optional_assets(self) -> None:
+        """Photo / certificates are user assets — optional, not consumed by apply."""
+        certs = self.layout.certificates_dir
+        if certs.exists() and any(certs.iterdir()):
+            self._add("Certificates (optional)", PASS,
+                      f"files under {certs}", mandatory=False)
+        else:
+            self._add("Certificates (optional)", SKIP,
+                      f"empty {certs} (optional — not used by apply today)",
+                      mandatory=False)
+
+        # Look for a headshot next to documents or under profiles.
+        photo_names = ("photo.jpg", "photo.jpeg", "photo.png",
+                       "headshot.jpg", "headshot.png")
+        found = None
+        for base in (self.layout.documents_dir, self.layout.profiles_dir):
+            for n in photo_names:
+                p = base / n
+                if p.exists():
+                    found = p
+                    break
+            if found:
+                break
+            # Also scan profile folders one level deep
+            if base == self.layout.profiles_dir and base.exists():
+                for child in base.iterdir():
+                    if not child.is_dir():
+                        continue
+                    for n in photo_names:
+                        p = child / n
+                        if p.exists():
+                            found = p
+                            break
+                    if found:
+                        break
+        if found:
+            self._add("Photo (optional)", PASS, str(found), mandatory=False)
+        else:
+            self._add("Photo (optional)", SKIP,
+                      "no photo.jpg/headshot under documents/ or profiles/ "
+                      "(optional — not used by apply today)",
+                      mandatory=False)
+
     def _check_browser_profiles(self) -> None:
         assert self.config
         path = Path(self.config.browser_profiles_path)
         linkedin = path / "linkedin"
         naukri = path / "naukri"
-        has_any = path.exists() and any(path.iterdir()) if path.exists() else False
-        # Heuristic: a used Playwright profile usually has Default/ or Local State.
+
         def _looks_used(d: Path) -> bool:
             if not d.exists():
                 return False
@@ -437,6 +583,7 @@ class Doctor:
             except OSError:
                 return False
 
+        has_any = path.exists() and any(path.iterdir()) if path.exists() else False
         if not has_any:
             self._add("Chrome profile dirs", WARN,
                       f"empty {path} — first headed run creates profiles; "
@@ -476,9 +623,6 @@ class Doctor:
         if ok:
             self._add("System browser", PASS, msg, mandatory=False)
             return
-        # Playwright falls back to bundled Chromium when the channel is missing
-        # (see browser/session.py). On Windows production this is a WARN so the
-        # operator installs Chrome; it is not a hard FAIL that blocks setup.
         self._add("System browser", WARN,
                   msg + " — CareerPilot will fall back to bundled Chromium",
                   mandatory=False)
@@ -504,6 +648,35 @@ class Doctor:
                       f"daily@{ret.maintenance_hour:02d}:15",
                       mandatory=False)
 
+    def _check_scheduler(self) -> None:
+        assert self.config
+        hrs = int(self.config.scan_interval_hours or 0)
+        if hrs <= 0:
+            self._add("Scheduler config", WARN,
+                      "scan_interval_hours <= 0", mandatory=False)
+        else:
+            self._add("Scheduler config", PASS,
+                      f"scan every {hrs}h, daily summary @{self.config.daily_summary_hour}:00",
+                      mandatory=False)
+
+    def _check_backups_logs_cache(self) -> None:
+        layout = self.layout
+        try:
+            layout.backups_root.mkdir(parents=True, exist_ok=True)
+            self._add("Backups root", PASS, str(layout.backups_root),
+                      mandatory=False)
+        except OSError as exc:
+            self._add("Backups root", FAIL, str(exc))
+
+        for label, path in (("Logs dir", layout.logs_dir),
+                            ("Reports dir", layout.reports_dir),
+                            ("Cache dir", layout.cache_dir)):
+            try:
+                path.mkdir(parents=True, exist_ok=True)
+                self._add(label, PASS, str(path), mandatory=False)
+            except OSError as exc:
+                self._add(label, FAIL, str(exc))
+
     def _check_playwright(self) -> None:
         import importlib.util
         if importlib.util.find_spec("playwright") is not None:
@@ -525,11 +698,70 @@ class Doctor:
                 hint += " — run: py -m careerpilot.main doctor --fix"
             self._add("Playwright Chromium", FAIL, hint)
 
+    def _check_startup_task(self) -> None:
+        if not wenv.is_windows():
+            self._add("Startup task", SKIP, "non-Windows", mandatory=False)
+            return
+        try:
+            r = subprocess.run(
+                ["schtasks", "/Query", "/TN", "CareerPilot"],
+                capture_output=True, text=True, timeout=15)
+            if r.returncode == 0:
+                self._add("Startup task", PASS,
+                          "Task Scheduler 'CareerPilot' registered",
+                          mandatory=False)
+            else:
+                self._add("Startup task", WARN,
+                          "not registered — run scripts\\Register-CareerPilotStartup.ps1",
+                          mandatory=False)
+        except Exception as exc:  # noqa: BLE001
+            self._add("Startup task", SKIP, str(exc), mandatory=False)
+
+    def _compute_readiness(self) -> int:
+        """0–100 score from weighted check results."""
+        by_name: dict[str, CheckResult] = {}
+        for r in self.results:
+            # Keep worst status per name
+            prev = by_name.get(r.name)
+            if prev is None:
+                by_name[r.name] = r
+                continue
+            order = {FAIL: 0, WARN: 1, SKIP: 2, PASS: 3}
+            if order.get(r.status, 9) < order.get(prev.status, 9):
+                by_name[r.name] = r
+
+        total = earned = 0
+        for name, weight in _SCORE_WEIGHTS.items():
+            total += weight
+            r = by_name.get(name)
+            if r is None:
+                earned += weight * 0.5  # unknown → half credit
+                continue
+            if r.status == PASS:
+                earned += weight
+            elif r.status == WARN:
+                earned += weight * 0.5
+            elif r.status == SKIP:
+                earned += weight * 0.75
+            # FAIL → 0
+        if total <= 0:
+            return 0
+        return int(round(100 * earned / total))
+
     # ---- report ----------------------------------------------------------
 
     def _print_report(self) -> None:
-        lines = ["", "=" * 64, "  CareerPilot Doctor — production pre-flight",
-                 "=" * 64]
+        layout = self.layout
+        lines = [
+            "",
+            "=" * 64,
+            "  CareerPilot Doctor — production pre-flight",
+            "=" * 64,
+            f"  data root : {layout.data_root}",
+            f"  app root  : {layout.app_root}",
+            f"  backups   : {layout.backups_root}",
+            "-" * 64,
+        ]
         for r in self.results:
             tag = "" if r.mandatory else "  (optional)"
             lines.append(f" {_SYMBOL[r.status]}  {r.name}{tag}")
@@ -537,7 +769,18 @@ class Doctor:
                 lines.append(f"          {r.message}")
         failed = [r for r in self.results if r.status == FAIL and r.mandatory]
         warns = [r for r in self.results if r.status == WARN]
+        score = self.readiness_score
         lines.append("=" * 64)
+        lines.append(f"  READINESS SCORE: {score}/100")
+        if score >= 90:
+            lines.append("  Band: PRODUCTION-READY (resolve remaining WARNs for 24x7)")
+        elif score >= 70:
+            lines.append("  Band: DRY-RUN READY (fill keys/resumes/logins before live)")
+        elif score >= 40:
+            lines.append("  Band: SETUP INCOMPLETE")
+        else:
+            lines.append("  Band: NOT READY")
+        lines.append("-" * 64)
         if failed:
             lines.append(f"  RESULT: FAIL — {len(failed)} mandatory check(s) failed.")
             lines.append("  Fix the items above before starting CareerPilot.")
@@ -557,8 +800,8 @@ class Doctor:
         print("\n".join(lines))
 
 
-def run_doctor(config_path: str = "config/config.yaml",
-               env_path: str = ".env", *, fix: bool = False,
+def run_doctor(config_path: str | None = None,
+               env_path: str | None = None, *, fix: bool = False,
                production: bool = False) -> bool:
     return Doctor(config_path, env_path, fix=fix,
                   production=production).run()

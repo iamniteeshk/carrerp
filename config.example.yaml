@@ -102,7 +102,9 @@ browser:
   viewport:
     width: 1366
     height: 900
-  profiles_path: profiles_browser # persistent per-portal login sessions
+  # Playwright user-data dirs (cookies/sessions). Prefer "browser" under the
+  # data root; "profiles_browser" still works for legacy installs.
+  profiles_path: browser
   screenshots_path: screenshots
   timeout_seconds: 30
   networkidle_timeout_ms: 8000   # max wait for SPA network to settle

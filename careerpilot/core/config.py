@@ -149,6 +149,9 @@ class AppConfig:
     telegram_chat_id: str = ""
     source_path: str = ""    # absolute path of the loaded config file
     retention: RetentionSettings = field(default_factory=RetentionSettings)
+    data_root: str = ""      # CAREERPILOT_DATA_ROOT (absolute)
+    app_root: str = ""       # Git / application root
+    backups_root: str = ""   # dated full backups root
     dashboard_password_env: str = "DASHBOARD_PASSWORD"
     dashboard_session_hours: int = 12
     dashboard_legacy_flask: bool = False
@@ -170,16 +173,52 @@ class AppConfig:
 
 
 
-def load_config(config_path: str | Path = "config/config.yaml",
-                env_path: str | Path = ".env") -> AppConfig:
-    """Load and validate configuration. Raises ConfigError on any problem."""
+def load_config(config_path: str | Path | None = None,
+                env_path: str | Path | None = None) -> AppConfig:
+    """Load and validate configuration. Raises ConfigError on any problem.
+
+    Relative paths in config.yaml are resolved against the data root
+    (``CAREERPILOT_DATA_ROOT`` / sibling ``data/`` / legacy cwd). See
+    ``careerpilot.core.paths``.
+    """
+    from .paths import get_layout
+
+    layout = get_layout()
+    if config_path is None:
+        legacy = layout.app_root / "config" / "config.yaml"
+        if layout.config_yaml.exists():
+            config_path = layout.config_yaml
+        elif legacy.exists():
+            config_path = legacy
+        else:
+            config_path = layout.config_yaml
+    else:
+        config_path = Path(config_path)
+
+    if env_path is None:
+        legacy_env = layout.app_root / ".env"
+        if layout.env_file.exists():
+            env_path = layout.env_file
+        elif legacy_env.exists():
+            env_path = legacy_env
+        else:
+            env_path = layout.env_file
+    else:
+        env_path = Path(env_path)
+
     config_path = Path(config_path)
     if not config_path.exists():
-        raise ConfigError(f"Config file not found: {config_path}")
+        raise ConfigError(
+            f"Config file not found: {config_path}\n"
+            f"  data root = {layout.data_root}\n"
+            f"  Expected: {layout.config_yaml}")
     if Path(env_path).exists():
         load_dotenv(env_path)
 
     raw = strip_line_meta(load_yaml(config_path))
+
+    def _abs(rel: str) -> str:
+        return str(layout.resolve(rel))
 
     # Sections (new layout). Each falls back to old top-level keys below.
     application = raw.get("application", {}) or {}
@@ -225,8 +264,8 @@ def load_config(config_path: str | Path = "config/config.yaml",
         providers=provider_specs,
     )
 
-    # ---- career profiles (modern 'profiles:' section only) ----
-    profiles_dir = profiles_cfg.get("dir", "profiles")
+    # ---- career profiles (resolved under data root) ----
+    profiles_dir = _abs(profiles_cfg.get("dir", "profiles"))
     default_profile = profiles_cfg.get("default")
     if not default_profile:
         raise ConfigError("config.yaml must set 'profiles.default'")
@@ -311,7 +350,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
         headless=bool(browser.get("headless", False)),
         viewport_width=int(viewport.get("width", 1366)),
         viewport_height=int(viewport.get("height", 900)),
-        profiles_path=browser.get("profiles_path", "profiles_browser"),
+        profiles_path=_abs(browser.get("profiles_path") or "browser"),
         timeout_seconds=int(browser.get("timeout_seconds", 30)),
         networkidle_timeout_ms=int(browser.get("networkidle_timeout_ms", 8000)),
         render_settle_ms=int(browser.get("render_settle_ms", 800)),
@@ -319,13 +358,13 @@ def load_config(config_path: str | Path = "config/config.yaml",
         open_jobs=bool(browser.get("open_jobs", True)),
     )
 
-    # ---- paths (modern sections only) ----
-    database_path = db.get("path", "database/careerpilot.db")
-    backup_path = db.get("backups_path", "database/backups")
-    screenshot_path = browser.get("screenshots_path", "screenshots")
-    log_path = logging_cfg.get("dir", "logs")
-    report_path = application.get("reports_dir", "reports")
-    documents_dir = documents_cfg.get("dir", "documents")
+    # ---- paths (absolute under data root) ----
+    database_path = _abs(db.get("path", "database/careerpilot.db"))
+    backup_path = _abs(db.get("backups_path", "database/backups"))
+    screenshot_path = _abs(browser.get("screenshots_path", "screenshots"))
+    log_path = _abs(logging_cfg.get("dir", "logs"))
+    report_path = _abs(application.get("reports_dir", "reports"))
+    documents_dir = _abs(documents_cfg.get("dir", "documents"))
 
     email = EmailConfig(
         enabled=bool(email_cfg.get("enabled", False)),
@@ -368,12 +407,21 @@ def load_config(config_path: str | Path = "config/config.yaml",
         telegram_chat_id=(telegram_cfg.get("chat_id")
                           or os.getenv("TELEGRAM_CHAT_ID", "")),
         retention=retention,
+        data_root=str(layout.data_root),
+        app_root=str(layout.app_root),
+        backups_root=str(layout.backups_root),
         _raw=raw,
     )
     try:
         cfg.source_path = str(config_path.resolve())
     except Exception:  # noqa: BLE001
         cfg.source_path = str(config_path)
+    # Ensure debug evidence dir is under the data root.
+    try:
+        ev = getattr(cfg.debug, "evidence_dir", "debug") or "debug"
+        cfg.debug.evidence_dir = _abs(ev)
+    except Exception:  # noqa: BLE001
+        pass
     _validate_semantics(cfg)
     return cfg
 

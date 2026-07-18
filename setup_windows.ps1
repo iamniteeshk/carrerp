@@ -100,6 +100,28 @@ Write-Host "CareerPilot Windows setup" -ForegroundColor White
 Write-Host "Root: $Root"
 Write-Host "Launcher policy: py → python3 → python (venv preferred after create)"
 
+# Production layout: when repo lives in ...\CareerPilot\app, use sibling data\.
+$leaf = Split-Path $Root -Leaf
+if ($leaf -eq "app") {
+    $HomeDir = Split-Path $Root -Parent
+    if (-not $env:CAREERPILOT_HOME) {
+        $env:CAREERPILOT_HOME = $HomeDir
+        Write-Ok "CAREERPILOT_HOME=$HomeDir (session)"
+    }
+    $dataDir = Join-Path $HomeDir "data"
+    $backupsDir = Join-Path $HomeDir "backups"
+    New-Item -ItemType Directory -Force -Path $dataDir, $backupsDir | Out-Null
+    if (-not $env:CAREERPILOT_DATA_ROOT) {
+        $env:CAREERPILOT_DATA_ROOT = $dataDir
+    }
+    Write-Ok "data root = $dataDir"
+} elseif ($env:CAREERPILOT_HOME) {
+    Write-Ok "CAREERPILOT_HOME=$($env:CAREERPILOT_HOME)"
+} else {
+    Write-Warn "Repo not in ...\app — using legacy in-repo data dirs (gitignored)."
+    Write-Warn "For production: clone into C:\CareerPilot\app and set CAREERPILOT_HOME."
+}
+
 # ---- 1. Git ----
 Write-Step "Checking Git"
 if (Test-Cmd "git") {
@@ -221,17 +243,22 @@ Write-Host "============================================================" -Foreg
 Write-Host " Setup finished" -ForegroundColor White
 Write-Host "============================================================" -ForegroundColor White
 Write-Host "Windows commands use the py launcher (or .venv after setup):"
-Write-Host "  1. Edit .env               -> GEMINI_API_KEY_1=..."
-Write-Host "  2. Edit .env               -> TELEGRAM_* + DASHBOARD_PASSWORD"
-Write-Host "  3. Edit config\config.yaml -> candidate details"
-Write-Host "  4. Copy resume.pdf into each profiles\<Name>\ folder"
-Write-Host "  5. Re-run doctor:   py -m careerpilot.main doctor"
-Write-Host "     (or)             .\.venv\Scripts\python.exe -m careerpilot.main doctor"
-Write-Host "  6. First login:     py -m careerpilot.main scan"
-Write-Host "  7. Start 24x7:      py -m careerpilot.main run"
-Write-Host "                      or .\scripts\run_careerpilot.ps1"
+if ($env:CAREERPILOT_DATA_ROOT) {
+    Write-Host "  Data root: $($env:CAREERPILOT_DATA_ROOT)"
+    Write-Host "  1. Edit data\.env               -> GEMINI_API_KEY_1=..."
+    Write-Host "  2. Edit data\config\config.yaml -> candidate details"
+    Write-Host "  3. Copy resume.pdf into data\profiles\<Name>\"
+} else {
+    Write-Host "  1. Edit .env               -> GEMINI_API_KEY_1=..."
+    Write-Host "  2. Edit config\config.yaml -> candidate details"
+    Write-Host "  3. Copy resume.pdf into profiles\<Name>\"
+}
+Write-Host "  4. Re-run doctor:   py -m careerpilot.main doctor"
+Write-Host "  5. First login:     py -m careerpilot.main scan"
+Write-Host "  6. Start 24x7:      py -m careerpilot.main run"
+Write-Host "  7. Register startup: .\scripts\Register-CareerPilotStartup.ps1"
 Write-Host ""
-Write-Host "Docs: docs\INSTALL_WINDOWS.md"
+Write-Host "Docs: docs\DATA_STRUCTURE.md  docs\INSTALL_WINDOWS.md"
 Write-Host "============================================================"
 
 if ($doctorExit -ne 0) {
