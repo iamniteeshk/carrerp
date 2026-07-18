@@ -43,6 +43,7 @@ class _Jobs:
         self.status_by_id = {}
         self._id = 0
     def exists(self, job): return False
+    def find_existing(self, job): return None
     def insert(self, job):
         self._id += 1
         return self._id

@@ -163,7 +163,7 @@ def test_keyboard_scroll_presses_a_key():
     h = Humanizer(HumanConfig(enabled=True, seed=2))
     page = _KeyPage()
     key = h.keyboard_scroll(page)
-    assert key in ("PageDown", "Space", "ArrowDown")
+    assert key in ("PageDown", "ArrowDown")
     assert page.keys and page.keys[0] == key
 
 

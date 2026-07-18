@@ -1,6 +1,9 @@
 # Start CareerPilot (scheduler + dashboard) from PowerShell.
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
-if (Test-Path ".venv\Scripts\Activate.ps1") { . ".venv\Scripts\Activate.ps1" }
+if (-not (Test-Path ".venv\Scripts\python.exe")) {
+    Write-Host "ERROR: .venv missing. Run .\setup_windows.ps1 first." -ForegroundColor Red
+    exit 1
+}
 Write-Host "Starting CareerPilot. Press Ctrl+C to stop." -ForegroundColor Cyan
-python -m careerpilot.main run
+& .\.venv\Scripts\python.exe -m careerpilot.main run

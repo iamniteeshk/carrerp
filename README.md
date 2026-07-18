@@ -6,12 +6,12 @@ engine, scores fit with an AI engine, selects the right **Career Profile**
 (resume + cover letter + keywords + documents), and—when you enable it—applies on
 your behalf, pausing for you whenever a security checkpoint needs a human.
 
-> **Status: Alpha.** The core decision pipeline (discover → filter → score →
-> select profile → record) is implemented and tested. The live browser
-> automation (LinkedIn/Naukri form filling and submission) is **not** finished —
-> it requires completing selectors against a live logged-in session and has
-> never run against a real site. Run in `dry_run` mode only until you have
-> completed and verified the live-DOM work. See `docs/LIVE_TEST_READINESS.md`.
+> **Status: v4.0.0 production hardening.** The decision pipeline
+> (discover → filter → score → select profile → record) is hardened for
+> unattended dry-run operation. Live LinkedIn/Naukri form filling and
+> submission still require live-DOM completion and will **never** claim
+> `submitted=True` until that work is done. Keep `apply.mode: dry_run` and
+> `require_final_confirmation: true`. See `docs/PRODUCTION_READINESS_v4.md`.
 
 ## What it is — and isn't
 
@@ -26,7 +26,20 @@ your behalf, pausing for you whenever a security checkpoint needs a human.
   OTPs, or solve CAPTCHAs. (The Human Interaction framework itself is a planned
   phase — see Roadmap.)
 
-## Quick start
+## Quick start (Windows dedicated PC)
+
+```powershell
+git clone <repo-url> C:\CareerPilot
+cd C:\CareerPilot
+.\setup_windows.ps1 -ProductionConfig
+# edit .env + config\config.yaml + profiles\*\resume.pdf
+python doctor.py
+.\scripts\run_careerpilot.ps1
+```
+
+Full guide: [`docs/INSTALL_WINDOWS.md`](docs/INSTALL_WINDOWS.md).
+
+## Quick start (any platform)
 
 ```bash
 # 1. Install

@@ -54,14 +54,16 @@ STRONGLY PREFER (score high when the role is genuinely one of these):
 - End User Computing (EUC), Digital Workplace, Workplace Technology, Desktop
 - Service Delivery, IT Service Delivery, IT Operations, ITSM, IT Transformation
 - Internal/Regional/Global IT, Infrastructure Program Manager, Head IT
+- Managed Services, Enterprise IT, GCC / Global Capability Centre IT leadership
 
 SECONDARY (acceptable, score moderate): technology leadership, operations
-leadership, shared services, GCC, infrastructure consulting.
+leadership, shared services, infrastructure consulting.
 
 STRONG PENALTY (score LOW, <30, and do not apply) -- these are the WRONG domain
 even with a Director/Head title: AI Engineering, Machine Learning, LLMs, Data
 Science, Python/Java/Cloud Developer, Software Engineer/Architect, Full Stack,
-RTL, VLSI, Semiconductor, Embedded, QA/Testing.
+RTL, VLSI, Semiconductor, Embedded, QA/Testing, Marketing, Sales, Business
+Development.
 
 How to decide match_score (0-100), weigh ALL of these, not just the title:
 - Domain fit vs the lists above -- this is the most important factor.

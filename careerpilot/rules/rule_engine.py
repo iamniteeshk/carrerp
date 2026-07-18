@@ -83,6 +83,29 @@ GENERIC_TITLE_TERMS = {
     "leadership", "management", "strategy", "transformation", "operations",
 }
 
+# Weak / overloaded words that appear in many unrelated JDs. Alone they must NOT
+# rescue an off-domain title (e.g. "Cloud Developer", "Sales Cloud Director").
+WEAK_DOMAIN_KEYWORDS = {
+    "cloud", "technology", "technologies", "tech", "it", "information technology",
+    "digital", "enterprise", "global", "platform", "platforms", "systems",
+    "solution", "solutions", "delivery", "service", "services", "support",
+}
+
+# Hard IC / wrong-domain title terms that are NEVER rescued by a domain keyword.
+# "Cloud Developer" and "AI Infrastructure Engineer" must never become matches.
+HARD_IC_TERMS = {
+    "developer", "programmer", "software engineer", "software architect",
+    "full stack", "fullstack", "full-stack", "frontend", "front end", "front-end",
+    "backend", "back end", "back-end", "python developer", "java developer",
+    "cloud developer", "web developer", "mobile developer", "qa engineer",
+    "sdet", "test engineer", "automation tester", "data scientist",
+    "data science", "data analyst", "ml engineer", "ai engineer",
+    "prompt engineer", "machine learning", "deep learning", "generative ai",
+    "video editor", "graphic designer", "graphics designer", "content writer",
+    "copywriter", "ux designer", "ui designer", "coder", "tester",
+    "sales", "marketing", "business development", "presales",
+}
+
 
 @dataclass
 class RuleResult:
@@ -139,11 +162,17 @@ class RuleEngine:
                         job.job_title, job.company)
             return RuleResult(False, RejectionReason.INVALID_JOB_TITLE)
 
+        # Hard IC / sales / marketing titles are NEVER opened, even when a weak
+        # domain word like 'Cloud' is also present ("Cloud Developer").
+        if self._has_hard_ic_term(title):
+            logger.info("[prefilter] skip-open '%s' @ %s: hard IC/off-domain title",
+                        job.job_title, job.company)
+            return RuleResult(False, RejectionReason.DOMAIN_MISMATCH)
+
         # Clearly off-domain -> skip opening even if a generic leadership word
-        # (Director/Head) is present, UNLESS the title also carries one of the
-        # candidate's domain keywords (borderline -> open and let the AI judge).
-        # This is what stops 'Director - AI' from being opened and matched.
-        if not self._title_has_domain_keyword(title):
+        # (Director/Head) is present, UNLESS the title also carries a STRONG
+        # domain keyword (borderline -> open and let the AI judge).
+        if not self._title_has_strong_domain_keyword(title):
             for term in self._excluded_terms():
                 if re.search(rf"\b{re.escape(term)}\b", title):
                     logger.info("[prefilter] skip-open '%s' @ %s: off-domain "
@@ -154,13 +183,15 @@ class RuleEngine:
         if self._has_accepted_title(title):
             return RuleResult(accepted=True)
 
-        # Blacklisted company -> skip opening.
+        # Blacklisted company -> skip opening (substring-aware).
         company = (job.company or "").strip().lower()
-        if company and company in {c.strip().lower()
-                                   for c in self.cfg.blacklist_companies}:
-            logger.info("[prefilter] skip-open '%s' @ %s: blacklisted company",
-                        job.job_title, job.company)
-            return RuleResult(False, RejectionReason.BLACKLISTED_COMPANY)
+        if company:
+            for raw in self.cfg.blacklist_companies or []:
+                b = (raw or "").strip().lower()
+                if b and (b == company or b in company or company in b):
+                    logger.info("[prefilter] skip-open '%s' @ %s: blacklisted "
+                                "company", job.job_title, job.company)
+                    return RuleResult(False, RejectionReason.BLACKLISTED_COMPANY)
 
         # Configured rejected_titles (soft denylist) also skip opening.
         denylist = {t.lower() for t in self.cfg.rejected_titles}
@@ -252,14 +283,21 @@ class RuleEngine:
         data science, legal, medical, ...) is rejected REGARDLESS of a generic
         leadership word like 'Director'/'Head' -- that word alone must never
         rescue an off-domain role (the root cause of 'Director - AI' matching).
-        The one exception is a title that also carries one of the candidate's
-        own domain keywords (e.g. 'Director - AI Infrastructure'): that is
-        genuinely borderline, so it is passed through for the AI to judge.
+
+        Hard IC terms (developer, data scientist, ...) are NEVER rescued, even
+        by a strong domain keyword. Weak words like 'Cloud' alone also cannot
+        rescue an off-domain title. Only a STRONG domain keyword (Infrastructure,
+        Digital Workplace, EUC, Service Delivery, ...) may keep a borderline
+        title for the AI (e.g. 'Director - AI Infrastructure').
         """
         title = (job.job_title or "").lower().strip()
         if not title:
             return RuleResult(True)
-        if self._title_has_domain_keyword(title):
+        if self._has_hard_ic_term(title):
+            logger.info("Rejected '%s' @ %s: hard IC/off-domain title",
+                        job.job_title, job.company)
+            return RuleResult(False, RejectionReason.DOMAIN_MISMATCH)
+        if self._title_has_strong_domain_keyword(title):
             return RuleResult(True)
         for term in self._excluded_terms():
             if re.search(rf"\b{re.escape(term)}\b", title):
@@ -272,16 +310,36 @@ class RuleEngine:
         extra = getattr(self.cfg, "excluded_title_terms", None) or []
         return OFF_DOMAIN_TERMS | {t.lower().strip() for t in extra if t}
 
+    def _has_hard_ic_term(self, title_lower: str) -> bool:
+        for term in HARD_IC_TERMS:
+            if re.search(rf"\b{re.escape(term)}\b", title_lower):
+                return True
+        return False
+
     def _title_has_domain_keyword(self, title_lower: str) -> bool:
-        """True if the title carries one of the candidate's real DOMAIN keywords
-        (e.g. 'Infrastructure', 'EUC') -- used to keep borderline roles for the
-        AI instead of hard-rejecting them. Generic seniority words like
-        'Director'/'Head' do NOT count, so they cannot rescue an off-domain role.
+        """Backward-compatible alias for strong-domain rescue checks."""
+        return self._title_has_strong_domain_keyword(title_lower)
+
+    def _title_has_strong_domain_keyword(self, title_lower: str) -> bool:
+        """True if the title carries a STRONG domain keyword (Infrastructure,
+        Digital Workplace, EUC, ...). Generic seniority words and weak overloaded
+        words (Cloud, Technology, Operations) do NOT count.
         """
         for kw in getattr(self.cfg, "required_keywords", None) or []:
             kw = kw.lower().strip()
-            if not kw or kw in GENERIC_TITLE_TERMS:
+            if not kw or kw in GENERIC_TITLE_TERMS or kw in WEAK_DOMAIN_KEYWORDS:
                 continue
+            if re.search(rf"\b{re.escape(kw)}\b", title_lower):
+                return True
+        # Explicit strong phrases that must always count even if not in profile.
+        strong = {
+            "infrastructure", "digital workplace", "euc", "end user computing",
+            "it operations", "service delivery", "it service delivery",
+            "managed services", "global it", "enterprise it", "gcc",
+            "global capability", "workplace technology", "itsm",
+            "data center", "datacenter",
+        }
+        for kw in strong:
             if re.search(rf"\b{re.escape(kw)}\b", title_lower):
                 return True
         return False
@@ -305,9 +363,15 @@ class RuleEngine:
         return any(good.lower() in title_lower for good in self.cfg.accepted_titles)
 
     def _blacklist_rule(self, job: Job) -> RuleResult:
-        company = job.company.strip().lower()
-        if company and company in {c.strip().lower() for c in self.cfg.blacklist_companies}:
-            return RuleResult(False, RejectionReason.BLACKLISTED_COMPANY)
+        company = (job.company or "").strip().lower()
+        if not company:
+            return RuleResult(True)
+        for raw in self.cfg.blacklist_companies or []:
+            b = (raw or "").strip().lower()
+            if not b:
+                continue
+            if b == company or b in company or company in b:
+                return RuleResult(False, RejectionReason.BLACKLISTED_COMPANY)
         return RuleResult(True)
 
     def _keyword_rule(self, job: Job) -> RuleResult:

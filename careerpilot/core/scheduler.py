@@ -1,6 +1,7 @@
 """Scheduler (APScheduler).
 
-Runs the scan pipeline at the configured interval and sends a daily summary.
+Runs the scan pipeline at the configured interval, sends a daily summary, and
+runs retention maintenance so a 24x7 deployment does not grow without bound.
 Intervals are configurable (P003 §14). The scheduler catches pipeline errors
 so a single bad cycle never kills the schedule.
 """
@@ -24,7 +25,8 @@ logger = get_logger(__name__)
 class Scheduler:
     def __init__(self, pipeline: ScanPipeline, interval_hours: int,
                  telegram: TelegramService, job_service: JobService,
-                 reporter=None, backup_path: str = "", summary_hour: int = 20):
+                 reporter=None, backup_path: str = "", summary_hour: int = 20,
+                 maintenance_hour: int = 3, app_config=None):
         self.pipeline = pipeline
         self.interval_hours = interval_hours
         self.telegram = telegram
@@ -32,14 +34,18 @@ class Scheduler:
         self.reporter = reporter
         self.backup_path = backup_path
         self.summary_hour = summary_hour
+        self.maintenance_hour = maintenance_hour
+        self.app_config = app_config
         # ONE worker thread: Playwright sync objects are thread-bound, so every
         # scan (immediate and recurring) must run on the same thread.
         self._scheduler = BackgroundScheduler(
             daemon=True, executors={"default": ThreadPoolExecutor(max_workers=1)})
+        self._consecutive_failures = 0
 
     # Probability a recurring cycle is skipped, so the schedule is not perfectly
     # regular (humans do not search on a fixed clock / every single day).
     SKIP_CYCLE_PROBABILITY = 0.15
+    MAX_BACKOFF_SECONDS = 900  # 15 minutes cap after repeated scan crashes
 
     def start(self, run_immediately: bool = True) -> None:
         self._scheduler.add_job(
@@ -48,6 +54,9 @@ class Scheduler:
         self._scheduler.add_job(
             self._daily_summary, "cron", hour=self.summary_hour, minute=0,
             id="summary")
+        self._scheduler.add_job(
+            self._daily_maintenance, "cron", hour=self.maintenance_hour, minute=15,
+            id="maintenance")
         if run_immediately:
             # Run the first scan ON THE SCHEDULER'S WORKER THREAD (not the main
             # thread), so Playwright is created and reused on one thread. The
@@ -55,7 +64,8 @@ class Scheduler:
             self._scheduler.add_job(self._safe_scan, "date",
                                     run_date=datetime.now(), id="initial_scan")
         self._scheduler.start()
-        logger.info("Scheduler started (every %sh)", self.interval_hours)
+        logger.info("Scheduler started (every %sh, maintenance at %02d:15)",
+                    self.interval_hours, self.maintenance_hour)
 
     def _safe_scan(self, allow_skip: bool = False) -> None:
         # Recurring (unattended) cycles honour the human time-of-day session and
@@ -72,11 +82,37 @@ class Scheduler:
                             "cycle is used)")
                 return
         try:
+            from ..core.maintenance import write_health_heartbeat
+            write_health_heartbeat(status="scanning")
             self.pipeline.run_once()
+            write_health_heartbeat(status="ok")
+            self._consecutive_failures = 0
         except Exception as exc:  # noqa: BLE001
+            self._consecutive_failures = getattr(self, "_consecutive_failures", 0) + 1
             logger.exception("Scheduled scan crashed: %s", exc)
+            try:
+                from ..core.maintenance import write_health_heartbeat
+                write_health_heartbeat(status="error", extra={"error": str(exc)})
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                from ..core.win_events import EventKind, write_event
+                write_event(EventKind.SCHEDULER,
+                            f"Scan cycle crashed (#{self._consecutive_failures}): {exc}")
+                write_event(EventKind.RECOVERY,
+                            f"Will retry next interval; consecutive failures="
+                            f"{self._consecutive_failures}")
+            except Exception:  # noqa: BLE001
+                pass
             self.telegram.send(NotificationType.CRITICAL_ERROR,
                                f"Scan cycle crashed: {exc}")
+            # Exponential backoff sleep so a tight crash loop does not hammer
+            # the machine; APScheduler still owns the next interval.
+            import time
+            delay = min(2 ** self._consecutive_failures, self.MAX_BACKOFF_SECONDS)
+            logger.warning("Backing off %ss after scan failure #%s",
+                           delay, self._consecutive_failures)
+            time.sleep(delay)
 
     def _daily_summary(self) -> None:
         try:
@@ -90,8 +126,61 @@ class Scheduler:
             # Daily database backup alongside the summary.
             if self.backup_path:
                 self.pipeline.scans.db.backup(self.backup_path)
+            # Full dated backup tree (config/db/profiles/logs/reports).
+            try:
+                from ..core.backup_ops import create_backup
+                cfg = self.app_config
+                create_backup(
+                    database_path=getattr(cfg, "database_path",
+                                          "database/careerpilot.db") if cfg else
+                    "database/careerpilot.db",
+                    profiles_dir=getattr(cfg, "profiles_dir", "profiles")
+                    if cfg else "profiles",
+                    browser_profiles=getattr(cfg, "browser_profiles_path",
+                                             "profiles_browser") if cfg else
+                    "profiles_browser",
+                    logs_dir=getattr(cfg, "log_path", "logs") if cfg else "logs",
+                    reports_dir=getattr(cfg, "report_path", "reports")
+                    if cfg else "reports",
+                    include_chrome_profiles=False,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Full daily backup failed: %s", exc)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Daily summary/backup failed: %s", exc)
+
+    def _daily_maintenance(self) -> None:
+        """Retention cleanup so long-running installs do not grow forever."""
+        try:
+            from ..core.maintenance import RetentionConfig, run_maintenance
+            cfg = self.app_config
+            ret = getattr(cfg, "retention", None) if cfg is not None else None
+            retention = RetentionConfig(
+                cache_days=getattr(ret, "cache_days", 30),
+                report_days=getattr(ret, "report_days", 60),
+                screenshot_days=getattr(ret, "screenshot_days", 14),
+                evidence_days=getattr(ret, "evidence_days", 14),
+                backup_days=getattr(ret, "backup_days", 30),
+                human_interaction_days=getattr(ret, "human_interaction_days", 14),
+                session_history_max=getattr(ret, "session_history_max", 500),
+                good_jobs_max=getattr(ret, "good_jobs_max", 1000),
+                vacuum_db=getattr(ret, "vacuum_db", True),
+            ) if ret is not None else RetentionConfig()
+            result = run_maintenance(
+                cache_dir="cache/jobs",
+                report_dir=getattr(cfg, "report_path", "reports") if cfg else "reports",
+                screenshot_dir=(getattr(cfg, "screenshot_path", "screenshots")
+                                if cfg else "screenshots"),
+                evidence_dir=(getattr(getattr(cfg, "debug", None), "evidence_dir",
+                                      "debug") if cfg else "debug"),
+                backup_dir=getattr(cfg, "backup_path", "database/backups")
+                if cfg else "database/backups",
+                database_path=getattr(cfg, "database_path", "") if cfg else "",
+                config=retention,
+            )
+            logger.info("Daily maintenance: %s", result.as_dict())
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Daily maintenance failed: %s", exc)
 
     def shutdown(self) -> None:
         if self._scheduler.running:
