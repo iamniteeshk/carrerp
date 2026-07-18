@@ -85,37 +85,50 @@ def validate_all(config_path: str | Path = "config/config.yaml",
 def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
     path = Path(path)
     if not path.exists():
-        report.error(f"config file not found: {path}")
+        report.error(
+            f"config file not found: {path} — Fix: run "
+            f"`python -m careerpilot.main doctor --fix` or "
+            f"`.\\setup_windows.ps1 -ProductionConfig`")
         return None
     try:
         cfg = load_yaml_with_lines(path)
     except Exception as exc:  # noqa: BLE001
-        report.error(f"config.yaml could not be parsed: {exc}")
+        report.error(
+            f"config.yaml could not be parsed (invalid YAML): {exc} — "
+            f"Fix: open {path} in an editor and correct the syntax "
+            f"(indentation/colons); compare with config.example.yaml")
         return None
 
     fname = path.name
     # Required sections (accept either the new layout or the legacy one).
     if "database" not in cfg:
-        report.error(f"config.database is missing ({fname})")
+        report.error(f"config.database is missing ({fname}) — "
+                     f"Fix: add a database: section with path: and backups_path:")
     if "dashboard" not in cfg:
-        report.error(f"config.dashboard is missing ({fname})")
+        report.error(f"config.dashboard is missing ({fname}) — "
+                     f"Fix: add dashboard: with host/port")
     if "ai" not in cfg:
-        report.error(f"config.ai is missing ({fname})")
+        report.error(f"config.ai is missing ({fname}) — "
+                     f"Fix: copy ai: block from config.example.yaml")
     if "apply" not in cfg:
-        report.error(f"config.apply is missing ({fname})")
+        report.error(f"config.apply is missing ({fname}) — "
+                     f"Fix: add apply: with mode: dry_run and min_apply_score:")
     # Career profiles: new 'profiles.default' or legacy 'default_career_profile'.
     profiles_cfg = cfg.get("profiles", {}) or {}
     if not profiles_cfg.get("default"):
-        report.error(f"config.profiles.default is missing ({fname})")
+        report.error(f"config.profiles.default is missing ({fname}) — "
+                     f"Fix: set profiles.default to an existing folder under profiles/")
 
     apply_cfg = cfg.get("apply", {}) or {}
     score = apply_cfg.get("min_apply_score")
     if score is not None and not (0 <= float(score) <= 100):
-        report.error(_loc("config.apply.min_apply_score must be 0-100",
+        report.error(_loc("config.apply.min_apply_score must be 0-100 — "
+                          "Fix: set a number between 0 and 100",
                           fname, apply_cfg, "min_apply_score"))
     mode = apply_cfg.get("mode", "dry_run")
     if mode not in ("dry_run", "live"):
-        report.error(_loc("config.apply.mode must be 'dry_run' or 'live'",
+        report.error(_loc("config.apply.mode must be 'dry_run' or 'live' — "
+                          "Fix: use dry_run until live apply is validated",
                           fname, apply_cfg, "mode"))
 
     ct = profiles_cfg.get("confidence_threshold")
@@ -127,9 +140,40 @@ def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
     browser = cfg.get("browser", {}) or {}
     engine = str(browser.get("engine", "chromium")).lower()
     if engine not in ("chromium", "firefox", "webkit"):
-        report.error(_loc("config.browser.engine must be chromium/firefox/webkit",
+        report.error(_loc("config.browser.engine must be chromium/firefox/webkit — "
+                          "Fix: set browser.engine: chromium",
                           fname, browser, "engine"))
+
+    # Duplicate / colliding path detection.
+    _check_path_collisions(cfg, report)
     return cfg
+
+
+def _check_path_collisions(cfg: dict, report: ValidationReport) -> None:
+    """Warn when distinct roles share the same filesystem path."""
+    application = cfg.get("application", {}) or {}
+    db = cfg.get("database", {}) or {}
+    browser = cfg.get("browser", {}) or {}
+    logging_cfg = cfg.get("logging", {}) or {}
+    paths = {
+        "reports": application.get("reports_dir", "reports"),
+        "database": db.get("path", "database/careerpilot.db"),
+        "backups": db.get("backups_path", "database/backups"),
+        "screenshots": browser.get("screenshots_path", "screenshots"),
+        "browser_profiles": browser.get("profiles_path", "profiles_browser"),
+        "logs": logging_cfg.get("dir", "logs"),
+    }
+    seen: dict[str, str] = {}
+    for role, raw in paths.items():
+        if not raw:
+            continue
+        key = str(Path(raw).resolve()) if Path(raw).exists() else str(Path(raw))
+        if key in seen:
+            report.warn(
+                f"path collision: {role} and {seen[key]} both use '{raw}' — "
+                f"Fix: give each a unique directory in config.yaml")
+        else:
+            seen[key] = role
 
 
 def _validate_candidate_section(data: dict, fname: str,
@@ -138,11 +182,14 @@ def _validate_candidate_section(data: dict, fname: str,
     for key in _REQUIRED_CANDIDATE:
         value = data.get(key)
         if value is None:
-            report.error(f"candidate.{key} is missing ({fname})")
+            report.error(
+                f"candidate.{key} is missing ({fname}) — "
+                f"Fix: edit config/config.yaml candidate: section and set {key}")
         elif str(value).strip().lower() in _PLACEHOLDERS:
-            report.error(_loc(f"candidate.{key} still has a placeholder value",
-                              fname, data, key))
-
+            report.error(_loc(
+                f"candidate.{key} still has a placeholder value — "
+                f"Fix: replace it with your real {key}",
+                fname, data, key))
 
 
 
@@ -173,8 +220,10 @@ def _validate_profiles(profiles_dir: str | Path, default_profile: str,
     # Every profile must have an existing resume file.
     for name, profile in engine.profiles.items():
         if profile.resume_path is None or not profile.resume_path.exists():
-            report.error(f"{profile.resume_path or '(no resume configured)'} "
-                         f"not found (profile '{name}')")
+            report.error(
+                f"resume missing for profile '{name}' "
+                f"({profile.resume_path or 'no resume configured'}) — "
+                f"Fix: copy your PDF to profiles/{name}/resume.pdf")
         if profile.cover_letter_path is not None \
                 and not profile.cover_letter_path.exists():
             report.warn(f"cover letter missing for profile '{name}': "
@@ -185,8 +234,10 @@ def _validate_profiles(profiles_dir: str | Path, default_profile: str,
                             f"'{name}': {doc_path}")
 
     if default_profile and default_profile not in engine.profiles:
-        report.error(f"default_career_profile '{default_profile}' is not among "
-                     f"the loaded profiles: {sorted(engine.profiles)}")
+        report.error(
+            f"default_career_profile '{default_profile}' is not among "
+            f"the loaded profiles: {sorted(engine.profiles)} — "
+            f"Fix: set profiles.default to one of those names")
 
 
 def _validate_folders(cfg: dict, report: ValidationReport) -> None:
@@ -199,19 +250,29 @@ def _validate_folders(cfg: dict, report: ValidationReport) -> None:
         "screenshots": browser.get("screenshots_path"),
         "reports": application.get("reports_dir"),
         "backups": db.get("backups_path"),
+        "browser_profiles": browser.get("profiles_path"),
     }
     for name, path in folders.items():
         if not path:
             continue
         try:
             Path(path).mkdir(parents=True, exist_ok=True)
+            # Writable probe
+            probe = Path(path) / ".careerpilot_write_probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
         except OSError as exc:
-            report.error(f"cannot create '{name}' folder ({path}): {exc}")
+            report.error(
+                f"cannot create/write '{name}' folder ({path}): {exc} — "
+                f"Fix: choose a writable path in config.yaml or fix NTFS permissions")
 
 
 def _validate_env(cfg: dict, env_path: str | Path, report: ValidationReport) -> None:
     if not Path(env_path).exists():
-        report.warn(f".env not found at {env_path} (copy .env.example to .env)")
+        report.warn(
+            f".env not found at {env_path} — Fix: copy .env.example to .env "
+            f"and set GEMINI_API_KEY_1=...")
+        return
     ai = cfg.get("ai", {}) or {}
     gemini_vars = ai.get("gemini_key_env_vars", []) or []
     deepseek_var = ai.get("deepseek_key_env_var", "DEEPSEEK_API_KEY")
@@ -234,14 +295,13 @@ def _validate_env(cfg: dict, env_path: str | Path, report: ValidationReport) -> 
         if any(os.getenv(v, "").strip() for v in envs):
             has_provider = True
             break
-        # Keyless local providers (no api_key_env configured).
         if not envs and not p.get("requires_auth", False):
             has_provider = True
             break
     if not has_gemini and not has_deepseek and not has_provider:
-        report.error("no AI provider key set in environment "
-                     "(set a Gemini key or DeepSeek key in .env, or configure "
-                     "ai.providers.*.api_key_envs)")
+        report.error(
+            "no AI provider key set in environment — Fix: edit .env and set "
+            "GEMINI_API_KEY_1=your_key (or configure ai.providers.*.api_key_envs)")
 
 
 def _loc(message: str, fname: str, mapping: dict, key: str) -> str:

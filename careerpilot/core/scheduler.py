@@ -40,10 +40,12 @@ class Scheduler:
         # scan (immediate and recurring) must run on the same thread.
         self._scheduler = BackgroundScheduler(
             daemon=True, executors={"default": ThreadPoolExecutor(max_workers=1)})
+        self._consecutive_failures = 0
 
     # Probability a recurring cycle is skipped, so the schedule is not perfectly
     # regular (humans do not search on a fixed clock / every single day).
     SKIP_CYCLE_PROBABILITY = 0.15
+    MAX_BACKOFF_SECONDS = 900  # 15 minutes cap after repeated scan crashes
 
     def start(self, run_immediately: bool = True) -> None:
         self._scheduler.add_job(
@@ -84,15 +86,33 @@ class Scheduler:
             write_health_heartbeat(status="scanning")
             self.pipeline.run_once()
             write_health_heartbeat(status="ok")
+            self._consecutive_failures = 0
         except Exception as exc:  # noqa: BLE001
+            self._consecutive_failures = getattr(self, "_consecutive_failures", 0) + 1
             logger.exception("Scheduled scan crashed: %s", exc)
             try:
                 from ..core.maintenance import write_health_heartbeat
                 write_health_heartbeat(status="error", extra={"error": str(exc)})
             except Exception:  # noqa: BLE001
                 pass
+            try:
+                from ..core.win_events import EventKind, write_event
+                write_event(EventKind.SCHEDULER,
+                            f"Scan cycle crashed (#{self._consecutive_failures}): {exc}")
+                write_event(EventKind.RECOVERY,
+                            f"Will retry next interval; consecutive failures="
+                            f"{self._consecutive_failures}")
+            except Exception:  # noqa: BLE001
+                pass
             self.telegram.send(NotificationType.CRITICAL_ERROR,
                                f"Scan cycle crashed: {exc}")
+            # Exponential backoff sleep so a tight crash loop does not hammer
+            # the machine; APScheduler still owns the next interval.
+            import time
+            delay = min(2 ** self._consecutive_failures, self.MAX_BACKOFF_SECONDS)
+            logger.warning("Backing off %ss after scan failure #%s",
+                           delay, self._consecutive_failures)
+            time.sleep(delay)
 
     def _daily_summary(self) -> None:
         try:
@@ -106,6 +126,26 @@ class Scheduler:
             # Daily database backup alongside the summary.
             if self.backup_path:
                 self.pipeline.scans.db.backup(self.backup_path)
+            # Full dated backup tree (config/db/profiles/logs/reports).
+            try:
+                from ..core.backup_ops import create_backup
+                cfg = self.app_config
+                create_backup(
+                    database_path=getattr(cfg, "database_path",
+                                          "database/careerpilot.db") if cfg else
+                    "database/careerpilot.db",
+                    profiles_dir=getattr(cfg, "profiles_dir", "profiles")
+                    if cfg else "profiles",
+                    browser_profiles=getattr(cfg, "browser_profiles_path",
+                                             "profiles_browser") if cfg else
+                    "profiles_browser",
+                    logs_dir=getattr(cfg, "log_path", "logs") if cfg else "logs",
+                    reports_dir=getattr(cfg, "report_path", "reports")
+                    if cfg else "reports",
+                    include_chrome_profiles=False,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Full daily backup failed: %s", exc)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Daily summary/backup failed: %s", exc)
 

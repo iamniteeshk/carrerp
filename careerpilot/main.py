@@ -187,12 +187,14 @@ class CareerPilot:
                 "(PID file %s). Stop it first or remove a stale PID file.",
                 self._PID_FILE)
             sys.exit(4)
-        # NOTE: time-of-day session windows + portal scheduling are applied ONLY
-        # to the recurring (unattended) scheduled scans -- see Scheduler._safe_scan.
-        # The immediate first scan and the manual `scan` command run everything
-        # right away (no window gating), so `run` always opens Chrome and works
-        # for testing/debugging.
         from . import __version__
+        from .core.startup_banner import build_banner
+        from .core.win_events import EventKind, write_event
+        banner = build_banner(self.cfg)
+        self.logger.info("\n%s", banner)
+        print(banner, flush=True)
+        write_event(EventKind.STARTUP,
+                    f"CareerPilot v{__version__} started (mode={self.cfg.apply.mode})")
         self.logger.info("Starting CareerPilot v%s (mode: %s)",
                          __version__, self.cfg.apply.mode)
         self.telegram.send(NotificationType.SYSTEM_STARTUP,
@@ -204,6 +206,8 @@ class CareerPilot:
         if not self.ai.any_available():
             self.logger.warning("No AI provider is configured/available; jobs "
                                  "that pass the Rule Engine will be QUEUED.")
+            write_event(EventKind.AI, "No AI provider available at startup — "
+                        "jobs will be QUEUED until keys/network recover")
         dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
         threading.Thread(
             target=lambda: dashboard.run(
@@ -261,16 +265,32 @@ class CareerPilot:
             self.logger.warning("Could not remove PID file: %s", exc)
 
     def _install_signal_handlers(self) -> None:
+        import atexit
+
         def handler(signum, _frame):
             self.logger.info("Received signal %s; shutting down gracefully", signum)
             self.shutdown()
             sys.exit(0)
+
+        def _atexit():
+            # Windows logoff / process teardown — best-effort flush.
+            try:
+                self.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+
+        atexit.register(_atexit)
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 signal.signal(sig, handler)
             except (ValueError, OSError):
                 pass  # not on main thread / unsupported platform
-
+        # Windows console close (best-effort).
+        if hasattr(signal, "SIGBREAK"):
+            try:
+                signal.signal(signal.SIGBREAK, handler)
+            except (ValueError, OSError):
+                pass
     def _log_effective_config(self) -> None:
         from . import __version__ as _pkg_ver
         c = self.cfg
@@ -315,6 +335,10 @@ class CareerPilot:
                                 "before a production run.", open_path)
 
     def scan_once(self) -> dict[str, int]:
+        from .core.startup_banner import build_banner
+        banner = build_banner(self.cfg)
+        self.logger.info("\n%s", banner)
+        print(banner, flush=True)
         self._log_effective_config()
         return self.pipeline.run_once()
 
@@ -327,6 +351,11 @@ class CareerPilot:
             return
         self._shutting_down = True
         self.logger.info("Shutting down CareerPilot")
+        try:
+            from .core.win_events import EventKind, write_event
+            write_event(EventKind.SHUTDOWN, "Graceful shutdown started")
+        except Exception:  # noqa: BLE001
+            pass
         try:
             self.scheduler.shutdown()
         except Exception as exc:  # noqa: BLE001
@@ -344,8 +373,13 @@ class CareerPilot:
             self.telegram.send(NotificationType.SYSTEM_SHUTDOWN, "CareerPilot stopped")
         except Exception:  # noqa: BLE001
             pass
-        self.db.close()
+        # Flush DB (commit + close) before releasing the PID lock.
+        try:
+            self.db.close()
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("Database close error: %s", exc)
         self._remove_pid_file()
+        self.logger.info("Shutdown complete (browser closed, DB flushed, PID released)")
 
 
 def _ai_engine_for_cli():
@@ -907,10 +941,56 @@ def main(argv: list[str] | None = None) -> int:
         write_health_heartbeat(status="ok", extra=result.as_dict())
         print(f"Maintenance complete: {result.as_dict()}")
         return 0 if not result.errors else 1
+    elif command == "backup":
+        from .core.backup_ops import create_backup
+        include_chrome = "--chrome" in argv or "--include-chrome" in argv
+        result = create_backup(
+            config_path="config/config.yaml",
+            env_path=".env",
+            database_path=config.database_path,
+            profiles_dir=config.profiles_dir,
+            browser_profiles=config.browser_profiles_path,
+            logs_dir=config.log_path,
+            reports_dir=config.report_path,
+            include_chrome_profiles=include_chrome,
+        )
+        print(f"Backup -> {result.path}")
+        print(f"  copied: {result.copied}")
+        if result.skipped:
+            print(f"  skipped: {result.skipped}")
+        if result.errors:
+            print(f"  errors: {result.errors}")
+            return 1
+        return 0
+    elif command == "restore":
+        from .core.backup_ops import restore_backup
+        if len(argv) < 2:
+            print("usage: restore <backups/YYYY-MM-DD> [--force] [--chrome]",
+                  file=sys.stderr)
+            return 1
+        result = restore_backup(
+            argv[1], force="--force" in argv,
+            restore_chrome_profiles=("--chrome" in argv or "--include-chrome" in argv))
+        print(f"Restore from {result.path}")
+        print(f"  copied: {result.copied}")
+        print(f"  skipped: {result.skipped}")
+        if result.errors:
+            print(f"  errors: {result.errors}")
+            return 1
+        return 0
+    elif command == "health":
+        import json as _json
+        from .core.health_snapshot import collect_health, write_health_snapshot
+        snap = collect_health(config=config, db_path=config.database_path)
+        path = write_health_snapshot(config=config, db_path=config.database_path)
+        print(_json.dumps(snap, indent=2, default=str))
+        print(f"\nWrote {path}")
+        return 0
     else:
         print(f"Unknown command: {command}", file=sys.stderr)
         print("Commands: run | scan | dashboard | doctor | check | validate | "
-              "maintenance | models | ai-health | checklist | export",
+              "maintenance | backup | restore | health | models | ai-health | "
+              "checklist | export",
               file=sys.stderr)
         return 1
     return 0

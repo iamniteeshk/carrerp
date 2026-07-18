@@ -248,15 +248,17 @@ This registers a **current-user** logon task that runs:
 
 with restart-on-failure (3 attempts).
 
-### Doctor / maintenance
+### Update / backup / health (production ops)
 
 ```powershell
-python doctor.py
-python doctor.py --fix
-.\.venv\Scripts\python.exe -m careerpilot.main maintenance
+.\scripts\update_careerpilot.ps1   # git pull + deps + doctor (preserves config)
+.\scripts\backup.ps1               # -> backups\YYYY-MM-DD\
+.\scripts\backup.ps1 -IncludeChrome
+.\scripts\restore.ps1 -BackupDir backups\2026-07-18
+.\scripts\health.ps1               # CPU/RAM/DB/AI/last scan JSON
 ```
 
-Daily retention also runs from the in-process scheduler (`maintenance_hour` in config).
+Acceptance checklist: `docs/PRODUCTION_CHECKLIST.md`.
 
 ---
 
@@ -360,9 +362,8 @@ If any mandatory doctor check fails, **do not** call the box production-ready.
 
 ---
 
-## Related docs
+## Dependency lock
 
-- `docs/PRODUCTION_READINESS_v4.md` — hardening audit & live-apply limits  
-- `docs/DEPLOYMENT.md` — long-running behaviour  
-- `docs/TROUBLESHOOTING.md` — general issues  
-- `config.production.example.yaml` — production defaults  
+`requirements.lock` pins the exact tested package set (from `pip freeze`).
+`update_careerpilot.ps1` prefers the lock file when present, then falls back to
+`requirements.txt`.

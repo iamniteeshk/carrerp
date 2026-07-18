@@ -166,6 +166,14 @@ class BrowserManager:
         if self.is_healthy(portal):
             return self._pages[portal]
         logger.warning("Browser for %s unhealthy; restarting", portal)
+        try:
+            from ..core.win_events import EventKind, write_event
+            write_event(EventKind.BROWSER,
+                        f"Browser unhealthy for {portal}; restarting context")
+            write_event(EventKind.RECOVERY,
+                        f"Browser recovery triggered for {portal}")
+        except Exception:  # noqa: BLE001
+            pass
         self.close_portal(portal)
         return self.page(portal)
 
