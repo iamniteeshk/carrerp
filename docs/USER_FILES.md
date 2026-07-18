@@ -1,61 +1,101 @@
 # CareerPilot user files
 
-Inventory of every user-facing and runtime file under the **data root**.  
-Inferred from code (apply, profiles, doctor, backup) — not speculative.
+Inventory of every user-facing and runtime file under the **data root**, plus
+the **templates** shipped in Git under `app/data/`.
 
-Legend: **R** = required for production dry-run+, **O** = optional, **A** = auto-generated.
+Legend: **T** = template in Git · **R** = required (you create) · **O** = optional · **A** = auto-generated
+
+---
+
+## Templates shipped with the repository (`app/data/`)
+
+These use **fictional** John Doe / ExampleCorp values only.
+
+| Template | Copy / rename to (live data root) |
+|---|---|
+| `data/.env.example` | `.env` |
+| `data/config/config.example.yaml` | `config/config.yaml` |
+| `data/profiles/Sample_Candidate/profile.example.yaml` | `profiles/<Name>/profile.yaml` |
+| `data/profiles/Sample_Candidate/keywords.example.yaml` | `profiles/<Name>/keywords.yaml` |
+| `data/profiles/Sample_Candidate/preferred_locations.example.yaml` | `profiles/<Name>/preferred_locations.yaml` |
+| `data/profiles/Sample_Candidate/screening_answers.example.yaml` | `profiles/<Name>/screening_answers.yaml` |
+| `data/profiles/Sample_Candidate/cover_letter.example.md` | `profiles/<Name>/cover_letter.md` (optional) |
+| `data/profiles/Sample_Candidate/resume.pdf` | Replace with your real PDF |
+
+Also kept for backward compatibility: root `.env.example`, `config.example.yaml`,
+`profiles.example/`.
+
+### Migrate templates → production
+
+```powershell
+# Recommended live root
+$live = "C:\CareerPilot\data"
+$app  = "C:\CareerPilot\app"
+
+New-Item -ItemType Directory -Force -Path $live\config, $live\profiles | Out-Null
+Copy-Item $app\data\.env.example                    $live\.env
+Copy-Item $app\data\config\config.example.yaml      $live\config\config.yaml
+Copy-Item -Recurse $app\data\profiles\Sample_Candidate $live\profiles\Sample_Candidate
+
+cd $live\profiles\Sample_Candidate
+Rename-Item profile.example.yaml profile.yaml
+Rename-Item keywords.example.yaml keywords.yaml
+Rename-Item preferred_locations.example.yaml preferred_locations.yaml
+Rename-Item screening_answers.example.yaml screening_answers.yaml
+# Optional:
+# Rename-Item cover_letter.example.md cover_letter.md
+
+# Edit .env + config.yaml (replace John Doe), replace resume.pdf, then:
+cd $app
+py -m careerpilot.main doctor
+```
+
+`py -m careerpilot.main setup` / `doctor --fix` also materializes these
+templates into the resolved data root when live files are missing.
 
 ---
 
 ## Required (you supply)
 
-| Path | Ext | Purpose | Example |
-|---|---|---|---|
-| `config/config.yaml` | `.yaml` | **R** — candidate, AI providers, rules, apply mode, browser, scheduler, dashboard | Copy from `config.example.yaml` |
-| `.env` | — | **R** — API keys + secrets | `GEMINI_API_KEY_1=...` |
-| `profiles/<Name>/profile.yaml` | `.yaml` | **R** — profile metadata + resume filename | `name: Default` |
-| `profiles/<Name>/resume.pdf` | `.pdf` | **R** — uploaded on apply | `Resume_Main.pdf` via `resume:` key |
+| Path | Ext | Purpose |
+|---|---|---|
+| `.env` | — | **R** — API keys + secrets (from `.env.example`) |
+| `config/config.yaml` | `.yaml` | **R** — candidate, AI, rules, apply, browser, scheduler |
+| `profiles/<Name>/profile.yaml` | `.yaml` | **R** — specialization metadata + resume filename |
+| `profiles/<Name>/resume.pdf` | `.pdf` | **R** — uploaded on apply |
 
-Default profile name comes from `profiles.default` in config (usually `Default`).
-
-### `profile.yaml` keys that matter
+### `profile.yaml` keys CareerPilot loads
 
 ```yaml
-name: Default
-resume: resume.pdf          # required on disk
-cover_letter: cover.docx    # optional — preferred over AI letter
-documents:                  # optional map; loaded but not auto-uploaded today
+name: Sample_Candidate          # required
+description: "..."              # optional
+resume: resume.pdf              # required on disk
+cover_letter: cover_letter.md   # optional
+resume_version: v1              # optional
+salary_override: 2500000        # optional int or {amount: N}
+documents:                      # optional map of type → filename
   resume: resume.pdf
 ```
+
+Companion files (optional, same folder): `keywords.yaml`,
+`preferred_locations.yaml`, `screening_answers.yaml`.
+
+Personal identity (name, email, phone, LinkedIn, CTC, …) lives in
+`config.yaml` → `candidate:`, **not** in the profile folder.
 
 ---
 
 ## Optional (you supply)
 
-| Path | Ext | Purpose | Used by apply? |
-|---|---|---|---|
-| `profiles/<Name>/keywords.yaml` | `.yaml` | Extra required keywords (unioned into rules) | Yes (filtering) |
-| `profiles/<Name>/preferred_locations.yaml` | `.yaml` | Preferred locations | Yes (filtering) |
-| `profiles/<Name>/screening_answers.yaml` | `.yaml` | Cached screening Q&A | Yes (forms) |
-| `profiles/<Name>/<cover_letter file>` | `.docx`/`.pdf`/… | Static cover letter | Yes if declared |
-| `profiles/<Name>/<doc>` | any | Declared in `documents:` | Loaded; **not attached by AutoApply yet** |
-| `documents/photo.jpg` | `.jpg`/`.png` | Headshot | **No** (doctor optional check only) |
-| `documents/portfolio.pdf` | `.pdf` | Portfolio | **No** |
-| `certificates/**` | any | Certs / recommendation letters | **No** (backed up only) |
-| `.env` → `TELEGRAM_*` | — | Notifications | Optional |
-| `.env` → `DASHBOARD_PASSWORD` | — | Ops dashboard auth | Required for LAN |
-
-Suggested optional layout (not required by code):
-
-```
-documents/
-  photo.jpg
-  portfolio.pdf
-  linkedin_export.pdf
-certificates/
-  hackathon/
-  recommendation_letters/
-```
+| Path | Purpose | Used by apply? |
+|---|---|---|
+| `profiles/<Name>/keywords.yaml` | Extra required/preferred keywords | Yes (filtering) |
+| `profiles/<Name>/preferred_locations.yaml` | Preferred locations | Yes (filtering) |
+| `profiles/<Name>/screening_answers.yaml` | Cached screening Q&A | Yes (forms) |
+| `profiles/<Name>/cover_letter.*` | Static cover letter | Yes if declared |
+| `documents/photo.jpg` | Headshot | No (doctor optional) |
+| `certificates/**` | Certs / letters | No (backed up only) |
+| Telegram / dashboard vars in `.env` | Notifications / Mission Control | Optional / LAN |
 
 ---
 
@@ -64,21 +104,17 @@ certificates/
 | Path | Purpose |
 |---|---|
 | `database/careerpilot.db` | Applications, scans, notifications |
-| `database/backups/careerpilot_*.db` | Daily SQLite copies |
+| `database/backups/*.db` | Daily SQLite copies |
 | `database/good_jobs.json` | High-score learning set |
-| `database/session_history.json` | Mission Control / session history |
+| `database/session_history.json` | Session / Mission Control history |
 | `cache/jobs/*.json` | JD cache |
-| `logs/*.log` | Rotating domain logs |
-| `logs/health.json` | Scheduler heartbeat |
-| `logs/health_snapshot.json` | `health` CLI snapshot |
-| `reports/**/*.csv` | Found / applied / failed CSVs |
-| `reports/sessions/*` | Per-session summaries |
-| `reports/run_log_*.md` | Pipeline traces |
-| `reports/daily_summary_*.txt` | End-of-day text |
-| `screenshots/*` | Portal / human-interaction captures |
-| `debug/**` | Failure evidence, visual debug |
+| `logs/*` | Rotating logs + health heartbeat |
+| `reports/**` | CSV / session / run logs |
+| `screenshots/*` | Portal captures |
+| `debug/**` | Failure evidence |
+| `browser/{linkedin,naukri}/` | Playwright login sessions |
 | `careerpilot.pid` | Single-instance lock |
-| `{backups_root}/YYYY-MM-DD/` | Full backup trees |
+| `{backups_root}/YYYY-MM-DD/` | Full dated backups |
 
 ---
 
@@ -86,30 +122,18 @@ certificates/
 
 | File | Contents |
 |---|---|
-| `.env` | `GEMINI_API_KEY_*`, other provider keys, Telegram, dashboard password |
-| `browser/**` | Session cookies (treat like secrets) |
-| `config/config.yaml` | Personal PII (name, phone, salary) |
+| `.env` | API keys, Telegram, dashboard password |
+| `browser/**` | Session cookies |
+| `config/config.yaml` | Personal PII |
+| Real `profiles/*/resume.pdf` | Your CV |
 
----
-
-## Git ignore policy
-
-Repository ignores personal/runtime paths (see root `.gitignore`).  
-Shipped templates stay tracked: `config.example.yaml`, `.env.example`, `profiles.example/`.
+Git keeps `*.example*` and the Sample_Candidate placeholder PDF; live `.env`,
+`config.yaml`, and real `profile.yaml` stay ignored (see root `.gitignore`).
 
 ---
 
 ## Doctor expectations
 
-Doctor validates (among other things):
-
-- config + candidate section present
-- `.env` present; AI keys configured
-- default profile has `resume.pdf`
-- browser profile dirs exist / look used
-- optional photo / certificates (SKIP if empty — not mandatory)
-- writable logs, reports, database, backups
-- Playwright + Chromium
-- readiness score 0–100
-
-Photo and certificates are **optional** because CareerPilot does not upload them today. Keep them under `documents/` / `certificates/` for your own records and future features.
+Doctor checks config, `.env`, AI keys, resumes, browser dirs, writable folders,
+Playwright, and prints a **readiness score (0–100)**. Photo/certificates remain
+optional (not uploaded by apply today).

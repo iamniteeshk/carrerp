@@ -12,7 +12,9 @@ Resolution order for the data root:
 1. ``CAREERPILOT_DATA_ROOT`` environment variable
 2. ``CAREERPILOT_HOME/data`` when ``CAREERPILOT_HOME`` is set
 3. Sibling ``../data`` when the repo lives in ``.../app``
-4. ``./data`` if that directory already exists
+4. ``./data`` if it already looks like a *live* data root
+   (contains ``config/config.yaml``, ``.env``, or ``.careerpilot_data_root``).
+   A shipped templates-only ``data/`` tree does **not** count.
 5. Current working directory (legacy / single-folder mode)
 
 All relative paths from ``config.yaml`` are resolved against the data root.
@@ -179,6 +181,20 @@ def detect_app_root(start: Path | None = None) -> Path:
     return cur
 
 
+def _looks_like_live_data_root(path: Path) -> bool:
+    """True when ``path`` is a real data root, not the shipped templates tree.
+
+    The Git repo may contain ``data/`` with ``*.example`` files only. That must
+    NOT become CAREERPILOT_DATA_ROOT merely because the directory exists.
+    """
+    if (path / ".careerpilot_data_root").exists():
+        return True
+    if (path / "config" / "config.yaml").exists():
+        return True
+    if (path / ".env").exists():
+        return True
+    return False
+
 def resolve_data_root(app_root: Path | None = None,
                       explicit: str | Path | None = None) -> Path:
     """Pick the data root using env / sibling / legacy rules."""
@@ -200,7 +216,7 @@ def resolve_data_root(app_root: Path | None = None,
         return sibling.resolve()
 
     local = app / "data"
-    if local.is_dir():
+    if local.is_dir() and _looks_like_live_data_root(local):
         return local.resolve()
 
     # Legacy: data lives in the repo / cwd (gitignored paths).

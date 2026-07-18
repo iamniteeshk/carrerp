@@ -1,0 +1,10 @@
+# Preferred job locations for this specialization.
+# Rename to: preferred_locations.yaml
+#
+# Either a YAML list, or a mapping with `locations:`.
+
+locations:
+  - Chennai
+  - Bangalore
+  - Hyderabad
+  - Remote

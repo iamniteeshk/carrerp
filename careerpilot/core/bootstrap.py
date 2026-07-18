@@ -1,12 +1,15 @@
 """First-run bootstrap / scaffolding for the production data layout.
 
-The Git repository ships only examples (``config.example.yaml``,
-``profiles.example/``, ``.env.example``). Real user files live under the
-**data root** (see ``careerpilot.core.paths``):
+The Git repository ships templates under ``data/`` (``.env.example``,
+``data/config/config.example.yaml``, ``data/profiles/Sample_Candidate/``) plus
+legacy root copies (``config.example.yaml``, ``profiles.example/``,
+``.env.example``).
 
-* ``data/config/config.yaml``
-* ``data/.env``
-* ``data/profiles/``
+Real user files live under the **data root** (see ``careerpilot.core.paths``):
+
+* ``<data_root>/config/config.yaml``
+* ``<data_root>/.env``
+* ``<data_root>/profiles/``
 * runtime dirs (logs, database, browser, reports, …)
 
 Legacy single-folder mode (data root == app root) is still supported.
@@ -31,6 +34,69 @@ RUNTIME_DIRS = tuple(DATA_SUBDIRS) + (
     "profiles_browser/naukri",
 )
 
+# Example → production renames inside a Sample_Candidate template pack.
+_PROFILE_RENAMES = (
+    ("profile.example.yaml", "profile.yaml"),
+    ("keywords.example.yaml", "keywords.yaml"),
+    ("preferred_locations.example.yaml", "preferred_locations.yaml"),
+    ("screening_answers.example.yaml", "screening_answers.yaml"),
+    ("cover_letter.example.md", "cover_letter.md"),
+)
+
+
+def _first_existing(*candidates: Path) -> Path | None:
+    for p in candidates:
+        if p is not None and p.exists():
+            return p
+    return None
+
+
+def _materialize_sample_profile(src: Path, dest: Path) -> list[str]:
+    """Copy Sample_Candidate templates and rename *.example.* → live names."""
+    actions: list[str] = []
+    dest.mkdir(parents=True, exist_ok=True)
+    for child in src.iterdir():
+        if child.name == "README.md":
+            # Keep README as documentation inside the live folder.
+            target = dest / child.name
+            if not target.exists():
+                shutil.copy2(child, target)
+                actions.append(f"created {target}")
+            continue
+        if child.is_dir():
+            continue
+        # Skip example names here; handled via renames below.
+        if ".example." in child.name or child.name.endswith(".example"):
+            continue
+        # Non-example assets (e.g. resume.pdf)
+        target = dest / child.name
+        if not target.exists():
+            shutil.copy2(child, target)
+            actions.append(f"created {target}")
+
+    for src_name, dest_name in _PROFILE_RENAMES:
+        s = src / src_name
+        d = dest / dest_name
+        if s.exists() and not d.exists():
+            shutil.copy2(s, d)
+            actions.append(f"created {d} from {src_name}")
+    # Wire cover_letter into profile.yaml when the markdown letter was created
+    profile = dest / "profile.yaml"
+    cover = dest / "cover_letter.md"
+    if profile.exists() and cover.exists():
+        try:
+            text = profile.read_text(encoding="utf-8")
+            if "cover_letter: cover_letter.md" not in text:
+                text = text.replace(
+                    "# cover_letter: cover_letter.md",
+                    "cover_letter: cover_letter.md")
+                if "cover_letter:" not in text:
+                    text = text.rstrip() + "\ncover_letter: cover_letter.md\n"
+                profile.write_text(text, encoding="utf-8")
+        except OSError:
+            pass
+    return actions
+
 
 def ensure_scaffold(config_path: str | Path | None = None,
                     *, prefer_production: bool = False,
@@ -39,6 +105,7 @@ def ensure_scaffold(config_path: str | Path | None = None,
     actions: list[str] = []
     layout = get_layout()
     app = layout.app_root
+    templates = app / "data"  # shipped template tree inside the Git repo
 
     created = layout.ensure_dirs()
     for c in created:
@@ -63,12 +130,18 @@ def ensure_scaffold(config_path: str | Path | None = None,
             cfg_dest = legacy
 
     example = None
-    prod = app / "config.production.example.yaml"
-    default_ex = app / "config.example.yaml"
-    if prefer_production and prod.exists():
-        example = prod
-    elif default_ex.exists():
-        example = default_ex
+    if prefer_production:
+        example = _first_existing(
+            app / "config.production.example.yaml",
+            templates / "config" / "config.example.yaml",
+            app / "config.example.yaml",
+        )
+    else:
+        example = _first_existing(
+            templates / "config" / "config.example.yaml",
+            app / "config.example.yaml",
+            app / "config.production.example.yaml",
+        )
 
     if not cfg_dest.exists() and example is not None:
         cfg_dest.parent.mkdir(parents=True, exist_ok=True)
@@ -82,42 +155,55 @@ def ensure_scaffold(config_path: str | Path | None = None,
                 cfg_dest.write_text(text2, encoding="utf-8")
         except OSError:
             pass
-        actions.append(f"created {cfg_dest} from {example.name}")
+        actions.append(f"created {cfg_dest} from {example}")
     elif not cfg_dest.exists():
         logger.warning("No config example found to scaffold %s", cfg_dest)
 
-    # Profiles
+    # Profiles — prefer Sample_Candidate template pack, else profiles.example/
     profiles_dest = layout.profiles_dir
+    has_live = any(profiles_dest.glob("*/profile.yaml")) if profiles_dest.exists() else False
+    sample_src = templates / "profiles" / "Sample_Candidate"
     example_profiles = app / "profiles.example"
-    if not any(profiles_dest.glob("*/profile.yaml")) and example_profiles.exists():
-        if profiles_dest.exists() and not any(profiles_dest.iterdir()):
-            profiles_dest.rmdir()
-        if not profiles_dest.exists():
-            shutil.copytree(example_profiles, profiles_dest)
-            actions.append(f"created {profiles_dest}/ from profiles.example/")
-        else:
-            # Copy missing profile folders only
-            for child in example_profiles.iterdir():
-                dest = profiles_dest / child.name
-                if child.is_dir() and not dest.exists():
-                    shutil.copytree(child, dest)
-                    actions.append(f"created {dest}/")
+
+    if not has_live:
+        if sample_src.is_dir() and (sample_src / "profile.example.yaml").exists():
+            dest = profiles_dest / "Sample_Candidate"
+            if not (dest / "profile.yaml").exists():
+                actions.extend(_materialize_sample_profile(sample_src, dest))
+        elif example_profiles.exists():
+            if profiles_dest.exists() and not any(profiles_dest.iterdir()):
+                profiles_dest.rmdir()
+            if not profiles_dest.exists():
+                shutil.copytree(example_profiles, profiles_dest)
+                actions.append(f"created {profiles_dest}/ from profiles.example/")
+            else:
+                for child in example_profiles.iterdir():
+                    dest = profiles_dest / child.name
+                    if child.is_dir() and not dest.exists():
+                        shutil.copytree(child, dest)
+                        actions.append(f"created {dest}/")
 
     # .env
     env_dest = Path(env_path) if env_path else layout.env_file
-    example_env = app / ".env.example"
-    if not env_dest.exists() and example_env.exists():
+    example_env = _first_existing(
+        templates / ".env.example",
+        app / ".env.example",
+    )
+    if not env_dest.exists() and example_env is not None:
         shutil.copyfile(example_env, env_dest)
-        actions.append(f"created {env_dest} from .env.example (add your real keys)")
+        actions.append(f"created {env_dest} from {example_env.name} (add your real keys)")
 
-    # README marker inside data root
+    # README marker inside live data root (not the templates tree)
     readme = layout.data_root / "README.md"
-    if not readme.exists() and layout.data_root != layout.app_root:
+    if (not readme.exists() and layout.data_root != layout.app_root
+            and layout.data_root.resolve() != templates.resolve()):
         readme.write_text(
             "# CareerPilot data root\n\n"
             "This folder holds **all user-specific and runtime data**.\n"
             "The Git repository (`app/`) must never contain these files.\n\n"
-            "See `app/docs/DATA_STRUCTURE.md`.\n",
+            "Templates shipped with the app live in `app/data/` "
+            "(see that README).\n"
+            "Docs: `app/docs/DATA_STRUCTURE.md`, `app/docs/USER_FILES.md`.\n",
             encoding="utf-8")
         actions.append(f"created {readme}")
 

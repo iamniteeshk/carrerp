@@ -44,6 +44,23 @@ C:\CareerPilot\                         CAREERPILOT_HOME
     └── YYYY-MM-DD\                     full dated backups
 ```
 
+## Templates in the Git repo
+
+The repository ships a **template tree** at `app/data/` (examples only):
+
+```
+app/data/
+  .env.example
+  config/config.example.yaml
+  profiles/Sample_Candidate/…
+```
+
+Copy those into the live `CAREERPILOT_DATA_ROOT` (sibling `C:\CareerPilot\data`)
+and rename `*.example*` → production names. See [USER_FILES.md](USER_FILES.md).
+
+The shipped `app/data/` folder is **not** used as the live data root unless it
+contains a real `config/config.yaml` or `.env` (or `.careerpilot_data_root`).
+
 ## How the data root is resolved
 
 Order (`careerpilot.core.paths`):

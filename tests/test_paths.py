@@ -160,6 +160,39 @@ def test_backup_roundtrip_under_data_root():
             _restore(old)
 
 
+def test_templates_data_dir_is_not_live_data_root():
+    """Shipped app/data/ with only examples must not become CAREERPILOT_DATA_ROOT."""
+    with tempfile.TemporaryDirectory() as tmp:
+        app = _make_app(Path(tmp) / "repo")
+        templates = app / "data"
+        templates.mkdir()
+        (templates / ".env.example").write_text("GEMINI_API_KEY_1=x\n")
+        (templates / "README.md").write_text("# templates\n")
+        (templates / "config").mkdir()
+        (templates / "config" / "config.example.yaml").write_text("application: {}\n")
+        old = _isolate({})
+        try:
+            got = paths.resolve_data_root(app)
+            # Falls through to legacy app root — not the templates tree
+            assert got == app.resolve(), got
+            assert not paths._looks_like_live_data_root(templates)
+        finally:
+            _restore(old)
+
+
+def test_live_data_dir_with_config_is_used():
+    with tempfile.TemporaryDirectory() as tmp:
+        app = _make_app(Path(tmp) / "repo")
+        data = app / "data"
+        (data / "config").mkdir(parents=True)
+        (data / "config" / "config.yaml").write_text("application: {name: X}\n")
+        old = _isolate({})
+        try:
+            assert paths.resolve_data_root(app) == data.resolve()
+        finally:
+            _restore(old)
+
+
 def test_layout_resolve_relative():
     with tempfile.TemporaryDirectory() as tmp:
         data = Path(tmp) / "data"
