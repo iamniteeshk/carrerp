@@ -54,14 +54,16 @@ STRONGLY PREFER (score high when the role is genuinely one of these):
 - End User Computing (EUC), Digital Workplace, Workplace Technology, Desktop
 - Service Delivery, IT Service Delivery, IT Operations, ITSM, IT Transformation
 - Internal/Regional/Global IT, Infrastructure Program Manager, Head IT
+- Managed Services, Enterprise IT, GCC / Global Capability Centre IT leadership
 
 SECONDARY (acceptable, score moderate): technology leadership, operations
-leadership, shared services, GCC, infrastructure consulting.
+leadership, shared services, infrastructure consulting.
 
 STRONG PENALTY (score LOW, <30, and do not apply) -- these are the WRONG domain
 even with a Director/Head title: AI Engineering, Machine Learning, LLMs, Data
 Science, Python/Java/Cloud Developer, Software Engineer/Architect, Full Stack,
-RTL, VLSI, Semiconductor, Embedded, QA/Testing.
+RTL, VLSI, Semiconductor, Embedded, QA/Testing, Marketing, Sales, Business
+Development.
 
 How to decide match_score (0-100), weigh ALL of these, not just the title:
 - Domain fit vs the lists above -- this is the most important factor.
@@ -243,6 +245,29 @@ class AIEngine:
                            retry=attempt, tokens=tokens, reason=reason)
             except Exception:  # noqa: BLE001
                 pass
+        # Persist for ops dashboard + runtime counters.
+        try:
+            hist = getattr(self, "history_service", None)
+            if hist is not None:
+                hist.record(
+                    provider=provider, model=model or "", job_id=None,
+                    purpose="generate", tokens_used=int(tokens or 0),
+                    execution_time=float(elapsed),
+                    success=(status == "success"))
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from ..ops_dashboard.runtime import HUB
+            from ..ops_dashboard.activity import emit
+            HUB.note_ai(
+                success=(status == "success"), tokens=int(tokens or 0),
+                latency_ms=elapsed * 1000, retry=attempt,
+                cost=float(cost) if cost is not None else None)
+            if status != "success":
+                emit(f"AI unavailable / failed ({provider}): {reason}",
+                     level="error", category="ai")
+        except Exception:  # noqa: BLE001
+            pass
 
     # ---- developer tooling (models / health / benchmark) ----------------
 

@@ -62,8 +62,14 @@ python3 -m careerpilot.main scan      # one cycle
 python3 -m careerpilot.main run       # scheduler + dashboard
 ```
 
+```powershell
+# Windows production: use py (not the WindowsApps python stub)
+py -m careerpilot.main scan
+py -m careerpilot.main run
+```
+
 Open the dashboard at the host/port in `config.yaml` (default
-`http://127.0.0.1:5000`).
+`http://0.0.0.0:8006 (LAN) / http://127.0.0.1:8006`).
 
 ## 5. Before going live
 

@@ -5,10 +5,14 @@ Startup sequence (P004): load+validate config -> logging -> database+migrations
 validation fails fast before anything else starts.
 
 Usage:
-    python -m careerpilot.main run        # start scheduler + dashboard
-    python -m careerpilot.main scan        # run a single scan and exit
-    python -m careerpilot.main dashboard   # dashboard only
-    python -m careerpilot.main check        # validate config + init DB, exit
+    py -m careerpilot.main run          # start scheduler + dashboard
+    py -m careerpilot.main scan         # run a single scan and exit
+    py -m careerpilot.main dashboard    # dashboard only
+    py -m careerpilot.main check        # validate config + init DB, exit
+    py -m careerpilot.main doctor       # pre-flight PASS/WARN/FAIL report
+    py -m careerpilot.main doctor --fix  # repair safe issues, then report
+    py -m careerpilot.main maintenance  # retention cleanup
+    py -m careerpilot.main setup        # scaffold config/profiles/.env
 """
 
 from __future__ import annotations
@@ -39,6 +43,9 @@ from .core.logging_setup import get_logger, setup_logging
 from .core.pipeline import ScanPipeline
 from .core.scheduler import Scheduler
 from .dashboard.app import create_dashboard
+from .ops_dashboard import start_ops_dashboard_thread
+from .ops_dashboard.activity import FEED, emit
+from .ops_dashboard.runtime import HUB
 from .db.database import Database
 from .db.services import (AIHistoryService, ApplicationService, FailedJobService,
                           JobService, NotificationService, ScanService)
@@ -55,6 +62,9 @@ class CareerPilot:
         self.logger = get_logger("main")
         self._sessions: list[BrowserSession] = []
         self._shutting_down = False
+        from .paths import get_layout
+        self._layout = get_layout()
+        self._PID_FILE = self._layout.pid_file
 
         self.db = Database(config.database_path)
         self.db.initialize()
@@ -73,6 +83,7 @@ class CareerPilot:
             config.ai, candidate_profile=self._candidate_profile(),
             profile_names=config.profile_engine.names(),
             default_profile=config.default_career_profile)
+        self.ai.history_service = self.ai_history
 
         self.portals = self._build_portals()
         # Route AI request logs into the Diagnostics recorder (read-only use of
@@ -126,7 +137,16 @@ class CareerPilot:
             self.pipeline, config.scan_interval_hours, self.telegram,
             self.job_service, reporter=self.reporter,
             backup_path=config.backup_path,
-            summary_hour=config.daily_summary_hour)
+            summary_hour=config.daily_summary_hour,
+            maintenance_hour=getattr(config.retention, "maintenance_hour", 3),
+            app_config=config)
+
+        # Bind live runtime into the ops dashboard hub (read-only + controls).
+        HUB.bind(
+            config=config, db=self.db, scheduler=self.scheduler,
+            browser=self.browser, ai=self.ai, pipeline=self.pipeline,
+            diagnostics=self.diagnostics, telegram=self.telegram, app=self)
+        FEED.bind_db(self.db)
 
     def _candidate_profile(self) -> str:
         return self.cfg.candidate.summary()
@@ -175,13 +195,20 @@ class CareerPilot:
 
     def run(self) -> None:
         self._install_signal_handlers()
-        self._write_pid_file()
-        # NOTE: time-of-day session windows + portal scheduling are applied ONLY
-        # to the recurring (unattended) scheduled scans -- see Scheduler._safe_scan.
-        # The immediate first scan and the manual `scan` command run everything
-        # right away (no window gating), so `run` always opens Chrome and works
-        # for testing/debugging.
+        if not self._acquire_pid_lock():
+            self.logger.error(
+                "Another CareerPilot instance appears to be running "
+                "(PID file %s). Stop it first or remove a stale PID file.",
+                self._PID_FILE)
+            sys.exit(4)
         from . import __version__
+        from .core.startup_banner import build_banner
+        from .core.win_events import EventKind, write_event
+        banner = build_banner(self.cfg)
+        self.logger.info("\n%s", banner)
+        print(banner, flush=True)
+        write_event(EventKind.STARTUP,
+                    f"CareerPilot v{__version__} started (mode={self.cfg.apply.mode})")
         self.logger.info("Starting CareerPilot v%s (mode: %s)",
                          __version__, self.cfg.apply.mode)
         self.telegram.send(NotificationType.SYSTEM_STARTUP,
@@ -193,14 +220,25 @@ class CareerPilot:
         if not self.ai.any_available():
             self.logger.warning("No AI provider is configured/available; jobs "
                                  "that pass the Rule Engine will be QUEUED.")
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
-        threading.Thread(
-            target=lambda: dashboard.run(
-                host=self.cfg.dashboard_host, port=self.cfg.dashboard_port,
-                debug=False, use_reloader=False),
-            daemon=True).start()
-        self.logger.info("Dashboard at http://%s:%s",
+            write_event(EventKind.AI, "No AI provider available at startup — "
+                        "jobs will be QUEUED until keys/network recover")
+        # Ops Mission Control (FastAPI) — LAN-ready by default (0.0.0.0:8006).
+        start_ops_dashboard_thread(db=self.db, config=self.cfg)
+        emit("CareerPilot started — ops dashboard online",
+             level="success", category="system")
+        self.logger.info("Ops dashboard at http://%s:%s",
                          self.cfg.dashboard_host, self.cfg.dashboard_port)
+        # Optional legacy Flask read-only board on +1 port when explicitly enabled.
+        if getattr(self.cfg, "dashboard_legacy_flask", False):
+            legacy = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
+            legacy_port = int(self.cfg.dashboard_port) + 1
+            threading.Thread(
+                target=lambda: legacy.run(
+                    host="127.0.0.1", port=legacy_port,
+                    debug=False, use_reloader=False),
+                daemon=True).start()
+            self.logger.info("Legacy Flask dashboard at http://127.0.0.1:%s",
+                             legacy_port)
         self.scheduler.start(run_immediately=True)
         try:
             threading.Event().wait()  # keep main thread alive
@@ -209,30 +247,73 @@ class CareerPilot:
 
     _PID_FILE = Path("careerpilot.pid")
 
-    def _write_pid_file(self) -> None:
+    def _acquire_pid_lock(self) -> bool:
+        """Write PID file only if no other live process owns it."""
         try:
+            if self._PID_FILE.exists():
+                raw = self._PID_FILE.read_text(encoding="utf-8").strip()
+                try:
+                    old_pid = int(raw)
+                except ValueError:
+                    old_pid = -1
+                if old_pid > 0:
+                    try:
+                        os.kill(old_pid, 0)
+                        # Process exists — refuse to start a second instance.
+                        return False
+                    except OSError:
+                        # Stale PID file; replace it.
+                        self.logger.warning(
+                            "Removing stale PID file (process %s not running)",
+                            old_pid)
             self._PID_FILE.write_text(str(os.getpid()), encoding="utf-8")
+            return True
         except OSError as exc:
             self.logger.warning("Could not write PID file: %s", exc)
+            return True  # do not block startup on filesystem issues
+
+    def _write_pid_file(self) -> None:
+        self._acquire_pid_lock()
 
     def _remove_pid_file(self) -> None:
         try:
             if self._PID_FILE.exists():
-                self._PID_FILE.unlink()
+                # Only remove if it still points at us.
+                try:
+                    if int(self._PID_FILE.read_text(encoding="utf-8").strip()) == os.getpid():
+                        self._PID_FILE.unlink()
+                except (ValueError, OSError):
+                    self._PID_FILE.unlink(missing_ok=True)
         except OSError as exc:
             self.logger.warning("Could not remove PID file: %s", exc)
 
     def _install_signal_handlers(self) -> None:
+        import atexit
+
         def handler(signum, _frame):
             self.logger.info("Received signal %s; shutting down gracefully", signum)
             self.shutdown()
             sys.exit(0)
+
+        def _atexit():
+            # Windows logoff / process teardown — best-effort flush.
+            try:
+                self.shutdown()
+            except Exception:  # noqa: BLE001
+                pass
+
+        atexit.register(_atexit)
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 signal.signal(sig, handler)
             except (ValueError, OSError):
                 pass  # not on main thread / unsupported platform
-
+        # Windows console close (best-effort).
+        if hasattr(signal, "SIGBREAK"):
+            try:
+                signal.signal(signal.SIGBREAK, handler)
+            except (ValueError, OSError):
+                pass
     def _log_effective_config(self) -> None:
         from . import __version__ as _pkg_ver
         c = self.cfg
@@ -277,18 +358,37 @@ class CareerPilot:
                                 "before a production run.", open_path)
 
     def scan_once(self) -> dict[str, int]:
+        from .core.startup_banner import build_banner
+        banner = build_banner(self.cfg)
+        self.logger.info("\n%s", banner)
+        print(banner, flush=True)
         self._log_effective_config()
         return self.pipeline.run_once()
 
     def run_dashboard(self) -> None:
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
-        dashboard.run(host=self.cfg.dashboard_host, port=self.cfg.dashboard_port)
+        """Run the ops dashboard only (no scheduler). Blocks."""
+        import uvicorn
+        from .ops_dashboard.app import create_ops_dashboard
+        HUB.bind(
+            config=self.cfg, db=self.db, scheduler=self.scheduler,
+            browser=self.browser, ai=self.ai, pipeline=self.pipeline,
+            diagnostics=self.diagnostics, telegram=self.telegram, app=self)
+        FEED.bind_db(self.db)
+        app = create_ops_dashboard(db=self.db, config=self.cfg)
+        uvicorn.run(
+            app, host=app.state.bind_host, port=app.state.bind_port,
+            log_level="info")
 
     def shutdown(self) -> None:
         if self._shutting_down:
             return
         self._shutting_down = True
         self.logger.info("Shutting down CareerPilot")
+        try:
+            from .core.win_events import EventKind, write_event
+            write_event(EventKind.SHUTDOWN, "Graceful shutdown started")
+        except Exception:  # noqa: BLE001
+            pass
         try:
             self.scheduler.shutdown()
         except Exception as exc:  # noqa: BLE001
@@ -306,8 +406,13 @@ class CareerPilot:
             self.telegram.send(NotificationType.SYSTEM_SHUTDOWN, "CareerPilot stopped")
         except Exception:  # noqa: BLE001
             pass
-        self.db.close()
+        # Flush DB (commit + close) before releasing the PID lock.
+        try:
+            self.db.close()
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("Database close error: %s", exc)
         self._remove_pid_file()
+        self.logger.info("Shutdown complete (browser closed, DB flushed, PID released)")
 
 
 def _ai_engine_for_cli():
@@ -703,35 +808,25 @@ def _cmd_probe_open(pilot, argv: list[str]) -> int:
     return 0
 
 
-def _bootstrap_config() -> None:
-    """On a fresh install the ZIP ships NO runtime data and NO personal config,
-    only *.example templates. Create the real config + profiles from the examples
-    on first run so the app runs directly, and tell the user to review them."""
-    import shutil
-    # 1) config/config.yaml from config.example.yaml (includes candidate section)
-    target = os.path.join("config", "config.yaml")
-    if not os.path.exists(target):
-        example = None
-        for cand in ("config.example.yaml",
-                     os.path.join("config", "config.example.yaml")):
-            if os.path.exists(cand):
-                example = cand
-                break
-        if example:
-            os.makedirs("config", exist_ok=True)
-            shutil.copyfile(example, target)
-            print(f"[first-run] Created {target} from {example}. Review your "
-                  f"search_keywords, accepted_titles, locations and AI keys.")
-    # 2) profiles/ from profiles.example/ (career-profile templates)
-    if not os.path.isdir("profiles") and os.path.isdir("profiles.example"):
-        shutil.copytree("profiles.example", "profiles")
-        print("[first-run] Created profiles/ from profiles.example/. Edit these "
-              "with your real experience before a live run.")
-    # 3) .env from .env.example (AI keys) -- optional; app runs without it
-    if not os.path.exists(".env") and os.path.exists(".env.example"):
-        shutil.copyfile(".env.example", ".env")
-        print("[first-run] Created .env from .env.example. Add your AI API key "
-              "to enable matching.")
+def _bootstrap_config() -> list[str]:
+    """Scaffold the data root from shipped examples. Never overwrites user files.
+
+    Production layout puts real files under ``CAREERPILOT_DATA_ROOT`` (sibling
+    ``data/`` when the repo lives in ``app/``). Legacy single-folder mode still
+    works when data root == app root.
+    """
+    from .core.bootstrap import ensure_scaffold
+    from .core.paths import get_layout
+
+    actions = ensure_scaffold()
+    layout = get_layout()
+    if actions:
+        print(f"[first-run] data root = {layout.data_root}")
+        for a in actions:
+            print(f"[first-run] {a}")
+        print("[first-run] Review candidate details, resumes, and .env keys "
+              "before a live run. See docs/DATA_STRUCTURE.md.")
+    return actions
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -739,27 +834,31 @@ def main(argv: list[str] | None = None) -> int:
     command = argv[0] if argv else "run"
 
     from .core.bootstrap import ensure_scaffold
+    from .core.paths import get_layout
 
     # 'setup' explicitly scaffolds a fresh clone, then points the user onward.
     if command == "setup":
         actions = ensure_scaffold()
+        layout = get_layout()
         if actions:
             print("CareerPilot setup complete:")
             for a in actions:
                 print(f"  - {a}")
         else:
             print("Nothing to do -- already set up.")
+        print(f"\nData root: {layout.data_root}")
+        print(f"App root:  {layout.app_root}")
         print("\nNext steps:")
-        print("  1. Edit config/config.yaml -> set your real candidate details "
-              "(name, email, phone) and rules.")
-        print("  2. Put your resume.pdf in each profiles/<Name>/ folder.")
-        print("  3. Add API keys to .env")
-        print("  4. python -m careerpilot.main doctor")
+        print(f"  1. Edit {layout.config_yaml} -> candidate details + rules")
+        print(f"  2. Put resume.pdf in each {layout.profiles_dir}/<Name>/ folder")
+        print(f"  3. Add API keys to {layout.env_file}")
+        print("  4. py -m careerpilot.main doctor")
+        print("  See docs/DATA_STRUCTURE.md and docs/MIGRATION_GUIDE.md")
         return 0
 
     # Auto-bootstrap on first run so the project is clone-and-run even without
     # an explicit 'setup'. Never overwrites existing files.
-    ensure_scaffold()
+    _bootstrap_config()
 
     # 'models' connects to every enabled provider, lists their models with
     # metadata, and exports reports/models.json + reports/models.csv.
@@ -772,14 +871,14 @@ def main(argv: list[str] | None = None) -> int:
 
     # The doctor must run even when config is broken -- that's its job.
     if command == "doctor":
-        _bootstrap_config()   # a fresh install has only *.example templates
-        return 0 if run_doctor() else 3
+        fix = "--fix" in argv or "-f" in argv
+        production = "--production" in argv
+        return 0 if run_doctor(fix=fix, production=production) else 3
 
-    _bootstrap_config()
     try:
         config = load_config()
     except ConfigError as exc:
-        print(f"CONFIG ERROR: {exc}\nRun 'python -m careerpilot.main doctor' "
+        print(f"CONFIG ERROR: {exc}\nRun 'py -m careerpilot.main doctor' "
               f"for a full diagnostic.", file=sys.stderr)
         return 2
 
@@ -845,8 +944,82 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     elif command == "dashboard":
         pilot.run_dashboard()
+    elif command == "maintenance":
+        from .core.maintenance import RetentionConfig, run_maintenance, write_health_heartbeat
+        ret = config.retention
+        result = run_maintenance(
+            cache_dir="cache/jobs",
+            report_dir=config.report_path,
+            screenshot_dir=config.screenshot_path,
+            evidence_dir=getattr(config.debug, "evidence_dir", "debug"),
+            backup_dir=config.backup_path,
+            database_path=config.database_path,
+            config=RetentionConfig(
+                cache_days=ret.cache_days, report_days=ret.report_days,
+                screenshot_days=ret.screenshot_days,
+                evidence_days=ret.evidence_days, backup_days=ret.backup_days,
+                human_interaction_days=ret.human_interaction_days,
+                session_history_max=ret.session_history_max,
+                good_jobs_max=ret.good_jobs_max, vacuum_db=ret.vacuum_db,
+            ),
+        )
+        write_health_heartbeat(status="ok", extra=result.as_dict())
+        print(f"Maintenance complete: {result.as_dict()}")
+        return 0 if not result.errors else 1
+    elif command == "backup":
+        from .core.backup_ops import create_backup, verify_backup
+        include_chrome = "--chrome" in argv or "--include-chrome" in argv
+        compress = "--zip" in argv or "--compress" in argv
+        result = create_backup(
+            database_path=config.database_path,
+            profiles_dir=config.profiles_dir,
+            browser_profiles=config.browser_profiles_path,
+            logs_dir=config.log_path,
+            reports_dir=config.report_path,
+            include_chrome_profiles=include_chrome,
+            compress=compress,
+        )
+        print(f"Backup -> {result.path}")
+        print(f"  copied: {result.copied}")
+        if result.skipped:
+            print(f"  skipped: {result.skipped}")
+        if result.errors:
+            print(f"  errors: {result.errors}")
+            return 1
+        v = verify_backup(result.path)
+        print(f"  verify: {'OK' if v['ok'] else 'INCOMPLETE'} "
+              f"present={v['present']} missing={v['missing']}")
+        return 0 if v["ok"] else 1
+    elif command == "restore":
+        from .core.backup_ops import restore_backup
+        if len(argv) < 2:
+            print("usage: restore <backups/YYYY-MM-DD> [--force] [--chrome]",
+                  file=sys.stderr)
+            return 1
+        result = restore_backup(
+            argv[1], force="--force" in argv,
+            restore_chrome_profiles=("--chrome" in argv or "--include-chrome" in argv))
+        print(f"Restore from {result.path}")
+        print(f"  copied: {result.copied}")
+        print(f"  skipped: {result.skipped}")
+        if result.errors:
+            print(f"  errors: {result.errors}")
+            return 1
+        return 0
+    elif command == "health":
+        import json as _json
+        from .core.health_snapshot import collect_health, write_health_snapshot
+        snap = collect_health(config=config, db_path=config.database_path)
+        path = write_health_snapshot(config=config, db_path=config.database_path)
+        print(_json.dumps(snap, indent=2, default=str))
+        print(f"\nWrote {path}")
+        return 0
     else:
         print(f"Unknown command: {command}", file=sys.stderr)
+        print("Commands: run | scan | dashboard | doctor | check | validate | "
+              "maintenance | backup | restore | health | models | ai-health | "
+              "checklist | export",
+              file=sys.stderr)
         return 1
     return 0
 

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Scheduler · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="schedPage()" x-init="load(); setInterval(() => load(), 5000)">
+  <div class="topbar"><h1 class="h1">Scheduler</h1></div>
+  <div class="grid kpis">
+    <div class="card"><div class="kpi-val" x-text="data.running ? 'alive' : 'stopped'"></div><div class="kpi-label">Status</div></div>
+    <div class="card"><div class="kpi-val" style="font-size:1rem" x-text="data.next_scan || '—'"></div><div class="kpi-label">Next scan</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.interval_hours || '—'"></div><div class="kpi-label">Interval (h)</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.consecutive_failures || 0"></div><div class="kpi-label">Consecutive failures</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.queue_length ?? (data.jobs||[]).length"></div><div class="kpi-label">Jobs registered</div></div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>APScheduler jobs</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>ID</th><th>Name</th><th>Next run</th><th>Trigger</th></tr></thead>
+        <tbody>
+          <template x-for="j in data.jobs || []" :key="j.id">
+            <tr>
+              <td x-text="j.id"></td>
+              <td x-text="j.name"></td>
+              <td x-text="j.next_run_time || '—'"></td>
+              <td x-text="j.trigger"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function schedPage() {
+  return { data: {}, async load() { this.data = await fetch('/api/scheduler').then(r => r.json()); } };
+}
+</script>
+{% endblock %}

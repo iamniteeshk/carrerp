@@ -102,7 +102,9 @@ browser:
   viewport:
     width: 1366
     height: 900
-  profiles_path: profiles_browser # persistent per-portal login sessions
+  # Playwright user-data dirs (cookies/sessions). Prefer "browser" under the
+  # data root; "profiles_browser" still works for legacy installs.
+  profiles_path: browser
   screenshots_path: screenshots
   timeout_seconds: 30
   networkidle_timeout_ms: 8000   # max wait for SPA network to settle
@@ -110,9 +112,12 @@ browser:
   scroll_passes: 3               # natural scrolls to trigger lazy-loading
 
 dashboard:
-  host: 127.0.0.1
-  port: 5000
-  refresh_seconds: 30
+  host: 0.0.0.0                 # LAN access; set DASHBOARD_PASSWORD in .env
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false           # optional old Flask board on port+1 (loopback)
 
 database:
   path: database/careerpilot.db
@@ -163,6 +168,24 @@ apply:
   delay_between_applications_seconds: 180
   retry_limit: 3
   easy_apply_only: true           # external ATS -> manual review
+  # Production safety: always stop before final Submit and wait for explicit
+  # human confirmation. Set false only after sufficient live validation.
+  require_final_confirmation: true
+  # When true, refuse to apply if location is unknown or outside preferred list.
+  require_preferred_location: false
+
+# Long-running retention (24x7). Daily cleanup runs at maintenance_hour:15.
+maintenance:
+  cache_days: 30
+  report_days: 60
+  screenshot_days: 14
+  evidence_days: 14
+  backup_days: 30
+  human_interaction_days: 14
+  session_history_max: 500
+  good_jobs_max: 1000
+  vacuum_db: true
+  maintenance_hour: 3
 
 logging:
   dir: logs

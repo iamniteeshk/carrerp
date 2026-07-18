@@ -1,0 +1,251 @@
+# =============================================================================
+# CareerPilot — configuration template (FICTIONAL DATA ONLY)
+# =============================================================================
+# HOW TO USE
+#   1. Copy to:  config/config.yaml   (same folder)
+#   2. Replace John Doe / ExampleCorp with YOUR details
+#   3. Keep apply.mode: dry_run until you trust the machine
+#   4. Secrets stay in .env — never paste API keys here
+#
+# Relative paths are resolved against CAREERPILOT_DATA_ROOT (this data folder).
+# =============================================================================
+
+application:
+  name: CareerPilot
+  reports_dir: reports              # CSV / session / daily reports
+
+scheduler:
+  scan_interval_hours: 4            # how often the 24x7 loop starts a scan
+  daily_summary_hour: 20            # local 24h clock for end-of-day summary
+
+# ---- Candidate (ONE person per deployment) ----------------------------------
+# All form-fill facts live here. The AI must not invent these values.
+candidate:
+  full_name: "John Doe"             # REQUIRED — real name for applications
+  email: "john.doe@example.com"
+  phone: "+1 555 123 4567"
+  current_location: "Chennai, India"
+  total_experience: "10 years"
+  current_company: "ExampleCorp Technologies"
+  current_designation: "Senior Software Engineer"
+  current_ctc: "18 LPA"             # leave "" if you prefer not to store salary
+  expected_ctc: "Negotiable"
+  notice_period: "30 days"
+  work_authorization: "India"
+  linkedin_url: "https://www.linkedin.com/in/johndoe-example"
+  willing_to_relocate: true
+  remote_preference: "Hybrid"       # Onsite | Hybrid | Remote | Any
+  preferred_shift: "Any"
+  # Extra free-form keys are preserved (future use); examples:
+  # github_url: "https://github.com/johndoe-example"
+  # portfolio_url: "https://johndoe.example.dev"
+
+# ---- AI providers -----------------------------------------------------------
+ai:
+  active_provider: gemini           # tried first; others are fallbacks
+  request_timeout_seconds: 30
+  max_retries: 3
+  # Doctor also reads this list when present (legacy / dual config):
+  gemini_key_env_vars: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+
+  providers:
+    gemini:
+      enabled: true
+      kind: gemini
+      api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+      discover_models: true
+      preferred_model: ""           # empty = auto-discover compatible model
+    deepseek:
+      enabled: false
+      api_key_env: DEEPSEEK_API_KEY
+      base_url: https://api.deepseek.com/v1
+      discover_models: true
+      preferred_model: ""
+    glm:
+      enabled: false
+      api_key_env: GLM_API_KEY
+      base_url: https://open.bigmodel.cn/api/paas/v4
+      discover_models: true
+      preferred_model: ""
+    kimi:
+      enabled: false
+      api_key_env: KIMI_API_KEY
+      base_url: https://api.moonshot.ai/v1
+      discover_models: true
+      preferred_model: ""
+    minimax:
+      enabled: false
+      api_key_env: MINIMAX_API_KEY
+      base_url: https://api.minimax.chat/v1
+      discover_models: true
+      preferred_model: ""
+    # Example OpenAI-compatible provider (disabled). Uncomment + set OPENAI_API_KEY.
+    # openai:
+    #   enabled: false
+    #   api_key_env: OPENAI_API_KEY
+    #   base_url: https://api.openai.com/v1
+    #   discover_models: true
+    #   preferred_model: ""
+
+# ---- Browser (Playwright) ---------------------------------------------------
+browser:
+  open_jobs: true                   # open JD pages for full extraction
+  engine: chromium                  # chromium | firefox | webkit
+  channel: chrome                   # chrome | msedge | "" (= bundled Chromium)
+  headless: false                   # keep false for first login / dry-run review
+  viewport:
+    width: 1366
+    height: 900
+  profiles_path: browser            # data/browser/{linkedin,naukri}/
+  screenshots_path: screenshots
+  timeout_seconds: 30
+  networkidle_timeout_ms: 8000
+  render_settle_ms: 800
+  scroll_passes: 3
+
+# ---- Ops dashboard (Mission Control) ----------------------------------------
+dashboard:
+  host: 0.0.0.0                     # LAN; set DASHBOARD_PASSWORD in .env
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false
+
+database:
+  path: database/careerpilot.db
+  backups_path: database/backups    # daily SQLite snapshots
+
+telegram:
+  enabled: true
+  chat_id: ""                       # or set TELEGRAM_CHAT_ID in .env
+
+# ---- Career profiles (folders under profiles/) ------------------------------
+profiles:
+  dir: profiles
+  default: Sample_Candidate         # rename after you copy a real profile folder
+  confidence_threshold: 70          # below this → fall back to default profile
+
+# ---- Search / filter rules --------------------------------------------------
+rules:
+  minimum_salary:
+    amount: 0                       # 0 = disabled
+    currency: INR
+  minimum_experience: 5
+  accepted_employment_types: [Full Time, Permanent]
+  rejected_shifts: []
+  # Phrases combined with locations for portal search
+  search_keywords:
+    - Software Engineer
+    - Senior Software Engineer
+    - Senior Developer
+  accepted_titles:
+    - Software Engineer
+    - Senior Software Engineer
+    - Senior Developer
+    - Full Stack
+  rejected_titles:
+    - Intern
+    - Fresher
+    - L1
+    - Desktop Support
+  blacklist_companies:
+    - ExampleCorp Technologies      # e.g. your current employer
+  extra_required_keywords: []
+  extra_preferred_locations: []
+  nice_to_have_keywords:
+    - Python
+    - Cloud
+  excluded_title_terms: []
+  minimum_match_score: 60           # AI score below this → REJECTED
+  search_nationwide: false
+  search_include_recommended: false
+  search_locations: []              # empty → use union of profile locations
+
+# ---- Apply / automation safety ----------------------------------------------
+apply:
+  mode: dry_run                     # dry_run | live — START IN dry_run
+  min_apply_score: 90               # job-fit score required to apply
+  first_run_confirmations: 5
+  max_applications_per_day: 5
+  delay_between_applications_seconds: 180
+  retry_limit: 3
+  easy_apply_only: true
+  require_final_confirmation: true  # stop before final Submit
+  require_preferred_location: false
+
+# ---- Retention / nightly maintenance ----------------------------------------
+maintenance:
+  cache_days: 30
+  report_days: 60
+  screenshot_days: 14
+  evidence_days: 14
+  backup_days: 30                   # SQLite backup retention
+  human_interaction_days: 14
+  session_history_max: 500
+  good_jobs_max: 1000
+  vacuum_db: true
+  maintenance_hour: 3               # daily cleanup at HH:15
+
+logging:
+  dir: logs
+  level: INFO                       # DEBUG | INFO | WARNING | ERROR
+
+documents:
+  dir: documents                    # optional extras (photo, portfolio)
+
+# Reserved — Email Manager not implemented yet
+email:
+  enabled: false
+  address: "john.doe@example.com"
+  imap_host: ""
+  password_env_var: EMAIL_PASSWORD
+
+debug:
+  visual_mode: false
+  pause_after_navigation_seconds: 0
+  pause_before_scroll_seconds: 0
+  pause_after_scroll_seconds: 0
+  evidence_dir: debug
+  log_first_n_jobs: 5
+
+human:
+  enabled: true
+  words_per_minute: 350
+  scroll_step_min_px: 250
+  scroll_step_max_px: 650
+  scroll_pause_min_ms: 250
+  scroll_pause_max_ms: 900
+  upward_correction_chance: 0.15
+  mouse_moves: true
+  break_chance: 0.12
+  highlight_chance: 0.25
+  keyboard_scroll_chance: 0.30
+  wander_chance: 0.5
+
+# Per-portal DOM selectors (override after visual_mode inspection)
+portals:
+  naukri:
+    results_selector: "div.srp-jobtuple-wrapper, article.jobTuple"
+    fields:
+      title: "a.title"
+      company: "a.comp-name, a.subTitle"
+      location: "span.locWdth, span.loc"
+      salary: "span.sal-wrap span, span.sal"
+      experience: "span.expwdth, span.exp"
+      url: "a.title"
+  linkedin:
+    results_selector: "div.job-card-container, li.jobs-search-results__list-item, li.scaffold-layout__list-item, div.job-card-list"
+    fields:
+      title: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      company: ".artdeco-entity-lockup__subtitle, .job-card-container__primary-description, .job-card-container__company-name"
+      location: ".artdeco-entity-lockup__caption, .job-card-container__metadata-item, li.job-card-container__metadata-item"
+      url: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      easy_apply: ".job-card-container__footer-item, .job-card-list__footer-wrapper"
+    detail:
+      description: "#job-details, div.jobs-box__html-content, div.jobs-description__content"
+      title: "h1.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.t-24"
+      company: ".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__company-name"
+      location: ".job-details-jobs-unified-top-card__primary-description-container span.tvm__text, .job-details-jobs-unified-top-card__bullet"
+      skills: ".job-details-how-you-match__skills-item-subtitle, div.job-details-how-you-match__skills-item"
+      easy_apply: "button.jobs-apply-button, .jobs-apply-button--top-card button"

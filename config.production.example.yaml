@@ -1,0 +1,249 @@
+# ============================================================================
+# CareerPilot PRODUCTION profile (v4.0.0)
+# Copy to config/config.yaml on the dedicated Windows PC after editing
+# candidate details, profiles, and secrets in .env.
+#
+# Recommended install root (example — any path works; keep paths relative):
+#   C:\CareerPilot\
+#     config\config.yaml     ← this file
+#     profiles\              ← resumes
+#     profiles_browser\      ← dedicated Chrome profiles (LinkedIn/Naukri)
+#     database\  logs\  reports\  screenshots\  cache\
+#
+# One-command setup on a fresh Windows 11 box:
+#   .\setup_windows.ps1 -ProductionConfig
+#   py doctor.py --fix
+# See docs/INSTALL_WINDOWS.md
+#
+# Goals: 24x7 stability, match quality, human-like browsing, safe apply.
+# Speed is the lowest priority. Quality over quantity.
+# ============================================================================
+
+application:
+  name: CareerPilot
+  reports_dir: reports
+
+scheduler:
+  scan_interval_hours: 4          # recurring scans; human windows still apply
+  daily_summary_hour: 20          # local PC time
+
+candidate:
+  full_name: "Your Name"
+  email: "your_email"
+  phone: "+91-XXXXXXXXXX"
+  current_location: "Chennai, India"
+  total_experience: "20+ years"
+  current_company: "Your Company"
+  current_designation: "Your Title"
+  current_ctc: ""
+  expected_ctc: ""
+  notice_period: ""
+  work_authorization: "India"
+  linkedin_url: "your_profile"
+  willing_to_relocate: false      # production: stay Chennai-focused
+  remote_preference: "Hybrid"
+  preferred_shift: "Any"
+
+ai:
+  active_provider: gemini
+  request_timeout_seconds: 45
+  max_retries: 3
+  providers:
+    gemini:
+      enabled: true
+      kind: gemini
+      api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+      discover_models: true
+      preferred_model: ""
+    deepseek:
+      enabled: false
+      api_key_env: DEEPSEEK_API_KEY
+      base_url: https://api.deepseek.com/v1
+      discover_models: true
+      preferred_model: ""
+  # Doctor also reads this legacy list — keep in sync with providers.gemini.
+  gemini_key_env_vars: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+
+browser:
+  open_jobs: true
+  engine: chromium
+  channel: chrome                 # Windows production: use Chrome with your profile
+  headless: false                 # headed + unlocked desktop recommended
+  viewport:
+    width: 1366
+    height: 900
+  profiles_path: browser
+  screenshots_path: screenshots
+  timeout_seconds: 45
+  networkidle_timeout_ms: 10000
+  render_settle_ms: 1200
+  scroll_passes: 3
+
+dashboard:
+  host: 0.0.0.0                 # reach from your laptop on the LAN
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false
+
+database:
+  path: database/careerpilot.db
+  backups_path: database/backups
+
+telegram:
+  enabled: true
+  chat_id: ""                     # set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID in .env
+
+profiles:
+  dir: profiles
+  default: Default
+  confidence_threshold: 70
+
+rules:
+  minimum_salary:
+    amount: 0                     # raise when salary is reliably listed
+    currency: INR
+  minimum_experience: 15
+  accepted_employment_types: [Full Time, Permanent]
+  rejected_shifts: []
+  # Prefer Chennai first; Remote allowed. Add cities only if explicitly allowed.
+  search_locations: [Chennai, Remote]
+  search_nationwide: false
+  search_include_recommended: false
+  search_keywords:
+    - Head IT
+    - Director IT
+    - Head Digital Workplace
+    - Director Digital Workplace
+    - Head EUC
+    - Director EUC
+    - IT Infrastructure Director
+    - IT Service Delivery Head
+    - Head IT Operations
+    - Director IT Operations
+    - Global IT Director
+    - GCC IT Head
+    - Enterprise Technology Director
+    - Managed Services Head
+    - Enterprise IT Director
+  accepted_titles:
+    - Director
+    - Associate Director
+    - Head
+    - AVP
+    - VP
+    - SVP
+    - COO
+    - General Manager
+    - Infrastructure
+    - IT Infrastructure
+    - Digital Workplace
+    - EUC
+    - End User Computing
+    - GCC
+    - Global Capability
+    - Global IT
+    - IT Operations
+    - Technology Operations
+    - Service Delivery
+    - Managed Services
+    - Enterprise IT
+    - Cloud
+    - Data Center
+    - Datacenter
+    - Workplace
+    - Information Technology
+    - Technology
+    - Operations
+  rejected_titles: [Desktop Support, Technical Support, Engineer, Analyst, L1, L2]
+  blacklist_companies: []
+  extra_required_keywords: []
+  extra_preferred_locations: [Chennai]
+  nice_to_have_keywords: []
+  excluded_title_terms: []
+  minimum_match_score: 60
+
+apply:
+  mode: dry_run                   # stay dry_run until live apply is validated
+  min_apply_score: 90
+  first_run_confirmations: 10     # more conservative for production rollout
+  max_applications_per_day: 5
+  delay_between_applications_seconds: 240
+  retry_limit: 2
+  easy_apply_only: true
+  require_final_confirmation: true   # NEVER auto-submit without human OK
+  require_preferred_location: true   # block apply outside Chennai/preferred
+
+maintenance:
+  cache_days: 21
+  report_days: 45
+  screenshot_days: 10
+  evidence_days: 10
+  backup_days: 21
+  human_interaction_days: 10
+  session_history_max: 400
+  good_jobs_max: 800
+  vacuum_db: true
+  maintenance_hour: 3
+
+logging:
+  dir: logs
+  level: INFO
+
+documents:
+  dir: documents
+
+email:
+  enabled: false
+  address: ""
+  imap_host: ""
+  password_env_var: EMAIL_PASSWORD
+
+debug:
+  visual_mode: false
+  pause_after_navigation_seconds: 0
+  pause_before_scroll_seconds: 0
+  pause_after_scroll_seconds: 0
+  evidence_dir: debug
+  log_first_n_jobs: 5
+
+human:
+  enabled: true
+  words_per_minute: 280
+  scroll_step_min_px: 120
+  scroll_step_max_px: 380
+  scroll_pause_min_ms: 600
+  scroll_pause_max_ms: 1800
+  upward_correction_chance: 0.18
+  mouse_moves: true
+  break_chance: 0.15
+  highlight_chance: 0.22
+  keyboard_scroll_chance: 0.28
+  wander_chance: 0.55
+
+portals:
+  naukri:
+    results_selector: "div.srp-jobtuple-wrapper, article.jobTuple"
+    fields:
+      title: "a.title"
+      company: "a.comp-name, a.subTitle"
+      location: "span.locWdth, span.loc"
+      salary: "span.sal-wrap span, span.sal"
+      experience: "span.expwdth, span.exp"
+      url: "a.title"
+  linkedin:
+    results_selector: "div.job-card-container, li.jobs-search-results__list-item, li.scaffold-layout__list-item, div.job-card-list"
+    fields:
+      title: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      company: ".artdeco-entity-lockup__subtitle, .job-card-container__primary-description, .job-card-container__company-name"
+      location: ".artdeco-entity-lockup__caption, .job-card-container__metadata-item, li.job-card-container__metadata-item"
+      url: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      easy_apply: ".job-card-container__footer-item, .job-card-list__footer-wrapper"
+    detail:
+      description: "#job-details, div.jobs-box__html-content, div.jobs-description__content"
+      title: "h1.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.t-24"
+      company: ".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__company-name"
+      location: ".job-details-jobs-unified-top-card__primary-description-container span.tvm__text, .job-details-jobs-unified-top-card__bullet"
+      skills: ".job-details-how-you-match__skills-item-subtitle, div.job-details-how-you-match__skills-item"
+      easy_apply: "button.jobs-apply-button, .jobs-apply-button--top-card button"

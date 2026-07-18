@@ -93,6 +93,8 @@ class BrowserManager:
         self._pw: Any = None
         self._contexts: dict[str, Any] = {}
         self._pages: dict[str, Any] = {}
+        self._restart_count = 0
+        self._last_restart = ""
 
     # ---- internal -------------------------------------------------------
 
@@ -101,7 +103,7 @@ class BrowserManager:
             return
         if not _PLAYWRIGHT_AVAILABLE:
             raise RuntimeError(
-                "Playwright is not installed. Run: pip install playwright "
+                "Playwright is not installed. Run: py -m py -m pip install playwright "
                 "&& playwright install chromium")
         self._pw = sync_playwright().start()
 
@@ -166,6 +168,25 @@ class BrowserManager:
         if self.is_healthy(portal):
             return self._pages[portal]
         logger.warning("Browser for %s unhealthy; restarting", portal)
+        try:
+            from ..core.win_events import EventKind, write_event
+            write_event(EventKind.BROWSER,
+                        f"Browser unhealthy for {portal}; restarting context")
+            write_event(EventKind.RECOVERY,
+                        f"Browser recovery triggered for {portal}")
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            from ..ops_dashboard.activity import emit
+            from ..ops_dashboard.runtime import HUB
+            from datetime import datetime, timezone
+            self._restart_count += 1
+            self._last_restart = datetime.now(timezone.utc).isoformat()
+            HUB.note_browser_restart()
+            emit(f"Browser crashed / unhealthy — restarting {portal}",
+                 level="error", category="browser", portal=portal)
+        except Exception:  # noqa: BLE001
+            pass
         self.close_portal(portal)
         return self.page(portal)
 
@@ -187,6 +208,68 @@ class BrowserManager:
                 ctx.close()
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Error closing context for %s: %s", portal, exc)
+
+    def status_snapshot(self) -> dict:
+        """Read-only status. Never calls page() (would launch a browser)."""
+        portals: dict[str, Any] = {}
+        for portal, page in list(self._pages.items()):
+            url = ""
+            title = ""
+            healthy = False
+            try:
+                healthy = not page.is_closed()
+                if healthy:
+                    url = page.url or ""
+                    try:
+                        title = page.title() or ""
+                    except Exception:  # noqa: BLE001
+                        title = ""
+            except Exception:  # noqa: BLE001
+                healthy = False
+            portals[portal] = {
+                "open": portal in self._contexts,
+                "healthy": healthy,
+                "url": url,
+                "title": title,
+                "profile_dir": str(self.profile_dir(portal)),
+            }
+        return {
+            "playwright_started": self._pw is not None,
+            "channel": self.cfg.channel,
+            "headless": self.cfg.headless,
+            "profiles_path": self.cfg.profiles_path,
+            "restart_count": self._restart_count,
+            "last_restart": self._last_restart or None,
+            "portals": portals,
+        }
+
+    def capture_preview(self, portal: str, path: str | Path,
+                        step: str = "") -> str:
+        """Screenshot an already-open portal page for the ops dashboard."""
+        if portal not in self._pages or not self.is_healthy(portal):
+            return ""
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        page = self._pages[portal]
+        try:
+            page.screenshot(path=str(path), timeout=5000)
+            url = ""
+            title = ""
+            try:
+                url = page.url or ""
+                title = page.title() or ""
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                from ..ops_dashboard.runtime import HUB
+                HUB.set_preview(path=str(path), url=url, title=title,
+                                portal=portal, step=step)
+            except Exception:  # noqa: BLE001
+                pass
+            return str(path)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Preview screenshot failed: %s", exc)
+            return ""
 
     def close_all(self) -> None:
         """Close every context and stop Playwright -- no leaks, no orphans."""

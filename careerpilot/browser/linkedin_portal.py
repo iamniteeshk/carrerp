@@ -149,13 +149,20 @@ class LinkedInPortal(BasePortal):
             return ApplyOutcome(submitted=False, screenshot_path=shot,
                                 answers=answers, note="dry_run")
 
-        # COMPLETE ON LIVE DOM: click the final Submit, then read the
-        # confirmation toast/modal for a reference id.
-        ref = ""
+        # LIVE APPLY SAFETY (v4 production): Easy Apply form-fill + final Submit
+        # are not yet completed against live LinkedIn DOM. Never claim
+        # submitted=True. Fill what we can, reach (or simulate) the confirmation
+        # boundary, then WAIT for explicit human confirmation before Submit.
         shot = self.session.screenshot(
-            f"{self.session.profile_dir}/applied_{job.source_id or 'job'}.png")
-        return ApplyOutcome(submitted=True, portal_reference=ref,
-                            screenshot_path=shot, answers=answers)
+            f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
+        logger.warning(
+            "LIVE APPLY: LinkedIn Easy Apply form/submit not completed on live "
+            "DOM — stopping at confirmation boundary for %s @ %s (submitted=False)",
+            job.job_title, job.company)
+        return ApplyOutcome(
+            submitted=False, portal_reference="", screenshot_path=shot,
+            answers=answers,
+            note="awaiting_final_confirmation: linkedin_easy_apply_incomplete")
 
     def _detect_challenge(self, page) -> None:
         url = page.url.lower()

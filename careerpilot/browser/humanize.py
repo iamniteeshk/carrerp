@@ -164,11 +164,12 @@ class Humanizer:
     # ---- keyboard scrolling (sometimes instead of the wheel) ------------
 
     def keyboard_scroll(self, page) -> str | None:
-        """Occasionally scroll with the keyboard (PageDown/Space/ArrowDown) the
-        way many people do. Returns the key used, or None if not enabled/used."""
+        """Occasionally scroll with the keyboard (PageDown/ArrowDown).
+        Avoids Space, which can activate focused buttons/forms.
+        Returns the key used, or None if not enabled/used."""
         if not self.enabled:
             return None
-        key = self.rng.choice(["PageDown", "Space", "ArrowDown", "ArrowDown"])
+        key = self.rng.choice(["PageDown", "PageDown", "ArrowDown", "ArrowDown"])
         _safe(lambda: page.keyboard.press(key))
         self._pause(page, self.rng.randint(300, 900))
         return key
@@ -259,6 +260,13 @@ class Humanizer:
         Returns the number of drift moves performed (item 1)."""
         if not self.enabled or not self.cfg.mouse_moves:
             return 0
+        # Prefer live viewport when available (avoids hardcoded dimensions).
+        try:
+            vp = page.viewport_size or {}
+            width = int(vp.get("width") or width)
+            height = int(vp.get("height") or height)
+        except Exception:  # noqa: BLE001
+            pass
         moves = self.rng.randint(1, 3)
         bx = self._last_x if self._last_x is not None else self.rng.randint(300, 700)
         by = self._last_y if self._last_y is not None else self.rng.randint(300, 600)

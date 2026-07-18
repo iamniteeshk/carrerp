@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Health · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="healthPage()" x-init="load(); setInterval(() => load(), 6000)">
+  <div class="topbar">
+    <h1 class="h1">Health</h1>
+    <button class="btn" @click="CPOps.control('doctor')">Run Doctor</button>
+  </div>
+  <div class="grid kpis">
+    <div class="card"><div class="kpi-val" x-text="h.resources?.cpu_percent ?? '—'"></div><div class="kpi-label">CPU %</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.resources?.ram_percent ?? '—'"></div><div class="kpi-label">RAM %</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.disk?.used_percent ?? '—'"></div><div class="kpi-label">Disk %</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.disk?.free_gb ?? '—'"></div><div class="kpi-label">Free GB</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.process?.running ? 'yes' : 'no'"></div><div class="kpi-label">Process</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.ai?.any_available ? 'ok' : 'down'"></div><div class="kpi-label">Gemini / AI</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.telegram?.configured ? 'ok' : 'n/a'"></div><div class="kpi-label">Telegram</div></div>
+    <div class="card"><div class="kpi-val" x-text="h.database?.ok ? 'ok' : 'err'"></div><div class="kpi-label">Database</div></div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Full snapshot</h3>
+    <pre style="font-family:var(--mono);font-size:.78rem;white-space:pre-wrap;max-height:520px;overflow:auto" x-text="JSON.stringify(h, null, 2)"></pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function healthPage() {
+  return { h: {}, async load() { this.h = await fetch('/api/health').then(r => r.json()); } };
+}
+</script>
+{% endblock %}

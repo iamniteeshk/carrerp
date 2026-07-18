@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}CSV Explorer · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="csvPage('{{ selected }}')" x-init="init()">
+  <div class="topbar">
+    <h1 class="h1">CSV Explorer</h1>
+    <a class="btn" :href="selected ? ('/api/reports/csv/export?path=' + encodeURIComponent(selected)) : '#'" x-show="selected">Export selected</a>
+  </div>
+  <div class="grid two">
+    <div class="card">
+      <h3>Files under reports/</h3>
+      <div class="table-wrap" style="max-height:480px">
+        <table class="data">
+          <thead><tr><th>File</th><th>Size</th><th>Modified</th></tr></thead>
+          <tbody>
+            <template x-for="f in files" :key="f.name">
+              <tr @click="open(f.name)" style="cursor:pointer">
+                <td x-text="f.name"></td>
+                <td x-text="f.size"></td>
+                <td x-text="(f.mtime||'').slice(0,19)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3 x-text="selected || 'Select a CSV'"></h3>
+      <div class="filters">
+        <input type="search" placeholder="Filter rows…" x-model="filter" />
+      </div>
+      <div class="table-wrap" style="max-height:520px">
+        <table class="data">
+          <thead>
+            <tr><template x-for="h in headers" :key="h"><th x-text="h"></th></template></tr>
+          </thead>
+          <tbody>
+            <template x-for="(row,i) in filtered" :key="i">
+              <tr><template x-for="(cell,j) in row" :key="j"><td x-text="cell"></td></template></tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function csvPage(initial) {
+  return {
+    files: [], selected: initial || '', headers: [], rows: [], filter: '',
+    get filtered() {
+      const f = (this.filter || '').toLowerCase();
+      if (!f) return this.rows;
+      return this.rows.filter(r => r.join(' ').toLowerCase().includes(f));
+    },
+    async init() {
+      const d = await fetch('/api/reports/csv').then(r => r.json());
+      this.files = d.files || [];
+      if (this.selected) await this.open(this.selected);
+    },
+    async open(name) {
+      this.selected = name;
+      const d = await fetch('/api/reports/csv/preview?path=' + encodeURIComponent(name)).then(r => r.json());
+      this.headers = d.headers || [];
+      this.rows = d.rows || [];
+    }
+  };
+}
+</script>
+{% endblock %}

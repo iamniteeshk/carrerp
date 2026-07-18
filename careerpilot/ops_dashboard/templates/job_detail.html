@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Job {{ job_id }} · CareerPilot{% endblock %}
+{% block content %}
+{% if not data %}
+  <div class="card"><p>Job {{ job_id }} not found.</p><a href="/jobs">Back</a></div>
+{% else %}
+{% set j = data.job %}
+<div class="topbar">
+  <div>
+    <h1 class="h1">{{ j.company }} — {{ j.job_title }}</h1>
+    <div class="meta-row">
+      <span class="badge">{{ j.status }}</span>
+      <span>{{ j.portal }}</span>
+      <span>Score {{ j.match_score if j.match_score is not none else '—' }}</span>
+      <span>{{ j.location }}</span>
+      {% if j.job_url %}<a href="{{ j.job_url }}" target="_blank" rel="noopener">Open on portal</a>{% endif %}
+    </div>
+  </div>
+  <a class="btn" href="/jobs">Back to jobs</a>
+</div>
+<div class="grid two">
+  <div class="card">
+    <h3>Job description</h3>
+    <pre style="white-space:pre-wrap;font-family:var(--sans);font-size:.9rem;line-height:1.45;max-height:480px;overflow:auto">{{ j.job_description or '(empty)' }}</pre>
+  </div>
+  <div class="card">
+    <h3>Decision</h3>
+    <p><strong>Resume:</strong> {{ j.selected_resume or '—' }}</p>
+    <p><strong>Rejection / notes:</strong> {{ j.rejection_reason or '—' }}</p>
+    <p><strong>Salary:</strong> {{ j.salary or '—' }} · <strong>Experience:</strong> {{ j.experience or '—' }}</p>
+    <p><strong>Easy apply:</strong> {{ 'yes' if j.is_easy_apply else 'no' }}</p>
+    <p><strong>Discovered:</strong> {{ j.discovered_at }} · <strong>Updated:</strong> {{ j.updated_at }}</p>
+    <h3 style="margin-top:1rem">Applications</h3>
+    {% for a in data.applications %}
+      <div style="border-top:1px solid var(--line);padding:.5rem 0;font-size:.9rem">
+        {{ a.applied_at }} · {{ a.application_status }} · resume {{ a.resume_used }} · dry_run={{ a.dry_run }}
+        {% if a.screenshot %}<br/><a href="#" onclick="return false;">screenshot: {{ a.screenshot }}</a>{% endif %}
+        {% if a.portal_reference %}<br/>ref: {{ a.portal_reference }}{% endif %}
+      </div>
+    {% else %}
+      <p style="color:var(--muted)">No application rows.</p>
+    {% endfor %}
+    <h3 style="margin-top:1rem">Failures</h3>
+    {% for f in data.failures %}
+      <div style="border-top:1px solid var(--line);padding:.5rem 0;font-size:.9rem;color:var(--err)">
+        {{ f.last_attempt }} · retries {{ f.retry_count }} · {{ f.reason }}
+      </div>
+    {% else %}
+      <p style="color:var(--muted)">None</p>
+    {% endfor %}
+    <h3 style="margin-top:1rem">AI history</h3>
+    {% for a in data.ai_history %}
+      <div style="border-top:1px solid var(--line);padding:.5rem 0;font-size:.85rem;font-family:var(--mono)">
+        {{ a.created_at }} · {{ a.provider }}/{{ a.model }} · tokens {{ a.tokens_used }} · {{ a.execution_time }}s · {{ 'ok' if a.success else 'fail' }}
+      </div>
+    {% else %}
+      <p style="color:var(--muted)">No AI rows for this job.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

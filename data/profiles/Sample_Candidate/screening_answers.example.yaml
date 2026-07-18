@@ -1,0 +1,12 @@
+# Cached screening-question answers (case-insensitive match on the question).
+# Rename to: screening_answers.yaml
+#
+# Use factual answers that match config.yaml → candidate (never invent CTC).
+
+answers:
+  "How many years of experience do you have?": "10 years"
+  "Are you willing to relocate?": "Yes"
+  "What is your notice period?": "30 days"
+  "What is your current location?": "Chennai, India"
+  "Are you authorized to work in India?": "Yes"
+  "Expected CTC?": "Negotiable"

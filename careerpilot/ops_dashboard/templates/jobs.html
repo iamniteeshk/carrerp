@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Jobs · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="jobsPage()" x-init="load()">
+  <div class="topbar"><h1 class="h1">Job Explorer</h1></div>
+  <div class="filters">
+    <input type="search" placeholder="Search company / title" x-model="q" @keydown.enter="load()" />
+    <select x-model="portal" @change="load()">
+      <option value="">All portals</option>
+      <option>LinkedIn</option>
+      <option>Naukri</option>
+    </select>
+    <select x-model="status" @change="load()">
+      <option value="">All statuses</option>
+      <option>MATCHED</option>
+      <option>APPLIED</option>
+      <option>REJECTED</option>
+      <option>QUEUED</option>
+      <option>FAILED</option>
+      <option>APPLYING</option>
+      <option>FOUND</option>
+    </select>
+    <label><input type="checkbox" x-model="today" @change="load()" /> Today</label>
+    <input type="number" placeholder="Min score" x-model.number="minScore" style="width:110px" />
+    <input type="number" placeholder="Max score" x-model.number="maxScore" style="width:110px" />
+    <button class="btn primary" @click="load()">Filter</button>
+  </div>
+  <div class="table-wrap card" style="padding:0">
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Company</th><th>Position</th><th>Portal</th><th>Score</th><th>Status</th>
+          <th>Salary</th><th>Location</th><th>Resume</th><th>Reason</th><th>Discovered</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="j in jobs" :key="j.job_id">
+          <tr>
+            <td><a :href="'/jobs/' + j.job_id" x-text="j.company"></a></td>
+            <td x-text="j.job_title"></td>
+            <td x-text="j.portal"></td>
+            <td x-text="j.match_score ?? '—'"></td>
+            <td x-text="j.status"></td>
+            <td x-text="j.salary || '—'"></td>
+            <td x-text="j.location || '—'"></td>
+            <td x-text="j.selected_resume || '—'"></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" :title="j.rejection_reason" x-text="j.rejection_reason || '—'"></td>
+            <td x-text="(j.discovered_at||'').slice(0,16)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function jobsPage() {
+  return {
+    jobs: [], q: '', portal: '', status: '', today: false, minScore: null, maxScore: null,
+    async load() {
+      const p = new URLSearchParams();
+      if (this.q) p.set('q', this.q);
+      if (this.portal) p.set('portal', this.portal);
+      if (this.status) p.set('status', this.status);
+      if (this.today) p.set('today', 'true');
+      if (this.minScore != null && this.minScore !== '') p.set('min_score', this.minScore);
+      if (this.maxScore != null && this.maxScore !== '') p.set('max_score', this.maxScore);
+      const data = await fetch('/api/jobs?' + p).then(r => r.json());
+      this.jobs = data.jobs || [];
+    }
+  };
+}
+</script>
+{% endblock %}

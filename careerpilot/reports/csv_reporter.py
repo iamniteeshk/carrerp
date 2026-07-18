@@ -92,7 +92,8 @@ class CSVReporter:
                 "SELECT COUNT(*) FROM jobs WHERE portal=? AND status='MATCHED'",
                 (p,)))
             applied = int(scalar(
-                "SELECT COUNT(*) FROM applications WHERE portal=?", (p,)))
+                "SELECT COUNT(*) FROM applications WHERE portal=? AND dry_run=0 "
+                "AND application_status='APPLIED'", (p,)))
             failed = int(scalar(
                 "SELECT COUNT(*) FROM jobs WHERE portal=? AND "
                 "status IN ('FAILED','PARTIAL_DATA')", (p,)))
@@ -121,7 +122,8 @@ class CSVReporter:
         by_status = {r["status"]: r["c"] for r in conn.execute(
             "SELECT status, COUNT(*) c FROM jobs GROUP BY status").fetchall()}
         applied = conn.execute(
-            "SELECT COUNT(*) c FROM applications WHERE dry_run=0").fetchone()["c"]
+            "SELECT COUNT(*) c FROM applications WHERE dry_run=0 "
+            "AND application_status='APPLIED'").fetchone()["c"]
         failed = conn.execute("SELECT COUNT(*) c FROM failed_jobs").fetchone()["c"]
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         lines = [

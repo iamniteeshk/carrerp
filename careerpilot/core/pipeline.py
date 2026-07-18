@@ -177,7 +177,7 @@ class ScanPipeline:
         scan_id = self.scans.start()
         start = time.time()
         counts = {"found": 0, "rejected": 0, "matched": 0, "applied": 0,
-                  "skipped": 0, "partial": 0}
+                  "skipped": 0, "partial": 0, "failed": 0, "queued": 0}
         if not getattr(self.cfg.browser, "open_jobs", False):
             logger.warning("browser.open_jobs is OFF -- jobs will NOT be opened, "
                            "so every job will be marked Partial Data and no fit "
@@ -188,7 +188,26 @@ class ScanPipeline:
         self.state = state  # exposed for dashboard/diagnostics
         self._job_seq = 0
         self._found = 0
+        self._run_log = []   # reset per scan (prevents unbounded growth)
+        self._ai_calls = 0
+        self._errors = 0
+        self._recoveries = 0
+        self._ai_notified = False
         self._apply_session_plan()
+
+        # Automated skip-day / off-hours: record an empty completed scan, no portals.
+        plan = getattr(self, "session_plan", None)
+        if (self.honor_session_windows and plan is not None
+                and (getattr(plan, "skip_today", False)
+                     or not getattr(plan, "portals", None))):
+            logger.info("Session skipped (window=%s skip_today=%s portals=%s)",
+                        getattr(plan, "window", ""), getattr(plan, "skip_today", False),
+                        getattr(plan, "portals", []))
+            state.to(WorkflowState.COMPLETED, "session skipped")
+            self.scans.finish(scan_id, found=0, rejected=0, matched=0, applied=0,
+                              portals=0, duration=time.time() - start,
+                              status="SKIPPED")
+            return counts
 
         def _should_open(job) -> bool:
             # Stop opening new jobs once the human-like session budget is spent.
@@ -228,13 +247,34 @@ class ScanPipeline:
                           portals=len(self.collector.portals),
                           duration=duration)
         self._record_session_history(counts, duration)
-        # Automatic Session Summary (#7) -- the first doc to read after a run.
+        # Automatic Session Summary -- always written in production (not debug-only).
         if self.diagnostics is not None and self.diagnostics.enabled:
             try:
                 path = self.diagnostics.session_report(counts=counts)
                 logger.info("Session report: %s", path)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Session report failed: %s", exc)
+        try:
+            from ..reports.session_reports import write_session_reports
+            avg_score = None
+            try:
+                conn = self.jobs.db.connect()
+                row = conn.execute(
+                    "SELECT AVG(match_score) FROM jobs WHERE match_score IS NOT NULL"
+                ).fetchone()
+                avg_score = round(row[0], 1) if row and row[0] is not None else None
+            except Exception:  # noqa: BLE001
+                pass
+            portals = [getattr(p, "portal_name", "")
+                       for p in getattr(self.collector, "portals", [])]
+            write_session_reports(
+                self.reporter.report_dir, counts=counts, duration=duration,
+                portals=portals, ai_calls=getattr(self, "_ai_calls", 0),
+                avg_score=avg_score, errors=getattr(self, "_errors", 0),
+                recoveries=getattr(self, "_recoveries", 0),
+                run_log_lines=self._run_log)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Production session reports failed: %s", exc)
         self._write_run_log_md(counts, time.time() - start)
         logger.info("Scan complete: %s", counts)
         return counts
@@ -319,8 +359,9 @@ class ScanPipeline:
             out_dir.mkdir(parents=True, exist_ok=True)
             path = out_dir / f"run_log_{strftime('%Y%m%d-%H%M%S')}.md"
             found = counts.get("found", 0)
+            # Matched already includes jobs that later applied; do not double-count.
             terminal = (counts.get("rejected", 0) + counts.get("matched", 0)
-                        + counts.get("failed", 0))
+                        + counts.get("failed", 0) + counts.get("queued", 0))
             lines = [
                 f"# CareerPilot Run Log — {strftime('%Y-%m-%d %H:%M:%S')}", "",
                 f"Duration: {duration:.1f}s", "",
@@ -329,7 +370,8 @@ class ScanPipeline:
                 f"- Matched: {counts.get('matched', 0)}",
                 f"- Rejected: {counts.get('rejected', 0)}",
                 f"- Failed (incl. Partial Data): {counts.get('failed', 0)}",
-                f"- Applied (dry-run ready): {counts.get('applied', 0)}",
+                f"- Applied: {counts.get('applied', 0)}",
+                f"- Queued (awaiting confirmation/AI): {counts.get('queued', 0)}",
                 f"- Skipped (already processed): {counts.get('skipped', 0)}",
                 f"- Terminal coverage: {terminal}/{found} found jobs reached a "
                 f"final state"
@@ -360,6 +402,29 @@ class ScanPipeline:
         logger.info(line)
         self._run_log.append(line)
         self._status(job_number=n, stage=stage)
+        try:
+            from ..ops_dashboard.activity import emit
+            level = "info"
+            low = stage.lower()
+            if "reject" in low or "fail" in low:
+                level = "warn"
+            elif "accept" in low or "appl" in low or "submit" in low:
+                level = "success"
+            emit(f"{stage}" + (f" — {detail}" if detail else ""),
+                 level=level, category="scan", detail=f"job #{n}")
+        except Exception:  # noqa: BLE001
+            pass
+        # Best-effort live browser thumbnail for Mission Control (worker thread).
+        try:
+            from ..ops_dashboard.runtime import HUB
+            browser = HUB.browser
+            live = HUB.live_status()
+            portal = str(live.get("portal") or "").strip()
+            if browser is not None and portal:
+                browser.capture_preview(portal, "logs/browser_preview.png",
+                                        step=stage)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _process_job(self, job: Job, counts: dict[str, int], dry_run: bool) -> None:
         """Run ONE job through the entire pipeline immediately (streaming).
@@ -382,23 +447,41 @@ class ScanPipeline:
         n = self._job_seq
         tag = f"{job.portal}:{job.job_title}".strip()
         try:
-            # Crash recovery: a job already in the DB (this or a previous run) is
-            # skipped, so a restart continues where it left off.
-            if self.jobs.exists(job):
+            # Crash recovery / AI-retry: terminal rows are skipped; retriable
+            # statuses (QUEUED, PARTIAL_DATA, APPLYING, FOUND) are resumed.
+            find = getattr(self.jobs, "find_existing", None)
+            existing = find(job) if callable(find) else None
+            if existing is None and self.jobs.exists(job):
+                # Legacy / test doubles without find_existing.
                 counts["skipped"] += 1
-                logger.info("Job #%s SKIPPED (duplicate -- same job already seen "
-                            "this run or in the database from a prior run) | %s",
-                            n, tag)
+                logger.info("Job #%s SKIPPED (duplicate -- already in database) "
+                            "| %s", n, tag)
                 return
-
-            self._stage(n, "CARD_DETECTED", tag)
-            job.job_id = self.jobs.insert(job)          # INSERT + commit
-            counts["found"] += 1
-            self._found = counts["found"]
-            self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
-            self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
-            self.stream.found(job)                       # -> FoundJobs.csv (live)
-            self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
+            if existing is not None:
+                status = (existing.get("status") or "").upper()
+                from ..db.services import RETRIABLE_STATUSES
+                if status not in RETRIABLE_STATUSES:
+                    counts["skipped"] += 1
+                    logger.info("Job #%s SKIPPED (duplicate -- terminal status "
+                                "%s already in database) | %s", n, status, tag)
+                    return
+                # Retriable: reuse the existing row and continue the pipeline.
+                job.job_id = existing["job_id"]
+                counts["found"] += 1
+                self._found = counts["found"]
+                self._recoveries = getattr(self, "_recoveries", 0) + 1
+                self._stage(n, "RETRY_RESUMED",
+                            f"id={job.job_id} prior_status={status}")
+                logger.info("Job #%s RETRY (prior status=%s) | %s", n, status, tag)
+            else:
+                self._stage(n, "CARD_DETECTED", tag)
+                job.job_id = self.jobs.insert(job)          # INSERT + commit
+                counts["found"] += 1
+                self._found = counts["found"]
+                self._metric("jobs_parsed"); self._metric("db_updates"); self._metric("csv_updates")
+                self._status(portal=job.portal, job_number=n, job_title=job.job_title, db_status="inserted", csv_status="FoundJobs")
+                self.stream.found(job)                       # -> FoundJobs.csv (live)
+                self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
 
             rs = getattr(job, "read_status", "UNREAD")
 
@@ -470,18 +553,18 @@ class ScanPipeline:
 
             try:
                 evaluation = self.ai.evaluate_job(job)
+                self._ai_calls = getattr(self, "_ai_calls", 0) + 1
             except AIUnavailable:
                 self.jobs.update_status(job.job_id, JobStatus.QUEUED)
-                # Terminal record so the job isn't stranded; QUEUED status still
-                # lets a future run retry it.
+                # Retriable: QUEUED status lets a future run resume this job.
                 self.failed_jobs.record(job.job_id, "AI unavailable (queued for "
                                         "retry)", retry_count=1)
                 self.stream.failed(job, "AI unavailable (queued for retry)")
-                counts["failed"] = counts.get("failed", 0) + 1
+                counts["queued"] = counts.get("queued", 0) + 1
                 self._metric("jobs_queued"); self._metric("ai_failures")
                 self._stage(n, "AI_COMPLETED", "SKIPPED: provider unavailable")
-                self._stage(n, "JOB_FINISHED", "FAILED (AI unavailable)")
-                logger.warning("Job #%s AI UNAVAILABLE -> QUEUED + failed_jobs.csv "
+                self._stage(n, "JOB_FINISHED", "QUEUED (AI unavailable — will retry)")
+                logger.warning("Job #%s AI UNAVAILABLE -> QUEUED "
                                "(will retry next run)", n)
                 # Notify once per scan, then keep scanning -- never stop.
                 if self.notifier and not self._ai_notified:
@@ -492,7 +575,7 @@ class ScanPipeline:
                             NotificationType.APPROVAL_REQUEST,
                             "AI provider unavailable -- jobs are being queued and "
                             "the scan is continuing. Check the Gemini model with "
-                            "`python -m careerpilot.main models`.")
+                            "`py -m careerpilot.main models`.")
                     except Exception as exc:  # noqa: BLE001
                         logger.debug("AI-unavailable notify failed: %s", exc)
                 return
@@ -550,9 +633,22 @@ class ScanPipeline:
                 self.stream.applied(job, dry_run)            # -> AppliedJobs.csv
                 logger.info("Job #%s %s | AppliedJobs.csv", n,
                             "DRY-RUN ready" if dry_run else "APPLIED")
-            self._stage(n, "JOB_FINISHED", "MATCHED" + (" + APPLIED"
-                        if result.success and not dry_run else
-                        " (dry-run)" if dry_run else ""))
+            else:
+                status = getattr(result, "status", None)
+                if status == JobStatus.QUEUED:
+                    counts["queued"] = counts.get("queued", 0) + 1
+                elif status == JobStatus.FAILED:
+                    counts["failed"] = counts.get("failed", 0) + 1
+                elif status == JobStatus.SKIPPED:
+                    counts["skipped"] = counts.get("skipped", 0) + 1
+            fin = "MATCHED"
+            if result.success and not dry_run:
+                fin = "MATCHED + APPLIED"
+            elif dry_run:
+                fin = "MATCHED (dry-run)"
+            elif getattr(result, "status", None) is not None:
+                fin = f"MATCHED ({getattr(result.status, 'value', result.status)})"
+            self._stage(n, "JOB_FINISHED", fin)
 
             time.sleep(self.cfg.apply.delay_between_applications_seconds
                        if not dry_run else 0)
@@ -560,6 +656,7 @@ class ScanPipeline:
         except Exception as exc:  # noqa: BLE001 - isolate per-job failures
             reason = f"BROWSER_EXCEPTION: {type(exc).__name__}: {exc}"
             logger.warning("Job #%s FAILED (%s): %s", n, job.job_title, exc)
+            self._errors = getattr(self, "_errors", 0) + 1
             if getattr(job, "job_id", None):
                 self.jobs.update_status(job.job_id, JobStatus.PARTIAL_DATA,
                                         rejection_reason=reason)

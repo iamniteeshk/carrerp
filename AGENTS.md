@@ -3,27 +3,31 @@
 ## Cursor Cloud specific instructions
 
 CareerPilot is a single-process Python app (module `careerpilot`, entrypoint
-`python -m careerpilot.main`). It discovers → filters → scores → records job
-applications; the Flask dashboard runs in-process. There is no separate backend
+`python -m careerpilot.main` on Linux/macOS, **`py -m careerpilot.main` on
+Windows**). It discovers → filters → scores → records job
+applications; the Flask/FastAPI dashboard runs in-process. There is no separate backend
 service and no external DB server (SQLite is embedded, file-based, auto-migrated
 on startup).
 
 ### Environment
 - Dependencies live in a virtualenv at `.venv` (created by the startup update
-  script). **Always run via `.venv/bin/python`** (e.g. `.venv/bin/python -m
-  careerpilot.main doctor`) — the system Python does not have the deps.
+ script). **On Linux/Cloud: always run via `.venv/bin/python`**. **On Windows
+ production: prefer the `py` launcher** (or `.venv\Scripts\python.exe` after
+ `setup_windows.ps1`) — do not rely on the WindowsApps `python` stub.
+ See `careerpilot/core/python_launcher.py` (`py` → `python3` → `python` →
+ `sys.executable`).
 - Playwright Chromium and its system libraries are pre-installed in the VM
-  snapshot. The update script only refreshes the Python deps + browser binary.
+ snapshot. The update script only refreshes the Python deps + browser binary.
 
 ### Running / testing (see README.md and `scripts/` for the full list)
 - Tests are plain scripts (no pytest): each `tests/test_*.py` prints
-  `N passed, M failed` and exits non-zero on failure. Run them directly, e.g.
-  `.venv/bin/python tests/test_core.py`. Run the whole suite by looping over
-  `tests/test_*.py`.
+ `N passed, M failed` and exits non-zero on failure. Run them directly, e.g.
+ `.venv/bin/python tests/test_core.py`. Run the whole suite by looping over
+ `tests/test_*.py`.
 - Preflight: `.venv/bin/python -m careerpilot.main doctor` (config/DB/profiles/
-  keys/browser). Schema-only: `... check`.
+ keys/browser). Schema-only: `... check`.
 - App: `... run` (scheduler + dashboard) or `... dashboard` (UI only) on
-  `http://127.0.0.1:5000`. A single scan cycle: `... scan`.
+ `http://127.0.0.1:8006` (ops Mission Control; configurable). A single scan cycle: `... scan`.
 
 ### Non-obvious gotchas
 - On a fresh clone `bootstrap.py` scaffolds `config/config.yaml`, `.env`,
