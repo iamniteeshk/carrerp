@@ -56,11 +56,26 @@ class RuleConfig:
     blacklist_companies: list[str]
     required_keywords: list[str]
     nice_to_have_keywords: list[str]
+    # Minimum AI match score (0-100) for a job to be MATCHED. A scored job below
+    # this becomes REJECTED instead of appearing in MatchedJobs -- so the Rule
+    # Engine and the AI agree on the final decision. 0 disables the gate.
+    minimum_match_score: float = 0.0
+    # Extra hard off-domain title terms (merged with the built-in denylist). A
+    # title containing one of these is rejected before the AI is called, UNLESS
+    # the title also carries one of the candidate's own domain keywords (then it
+    # is borderline and the AI decides).
+    excluded_title_terms: list[str] = field(default_factory=list)
     # Focused list of phrases to SEARCH on each portal (point 6 priority titles).
     # Distinct from accepted_titles, which is the broader "is this a relevant
     # role" allowlist used for matching. If empty, search falls back to
     # accepted_titles (backward compatible).
     search_keywords: list[str] = field(default_factory=list)
+    # Quality-first search: when false, skip the nationwide keyword sweep.
+    search_nationwide: bool = False
+    # When false, skip the logged-in recommended-jobs feed (fewer duplicates).
+    search_include_recommended: bool = False
+    # When set, ONLY these cities are searched (overrides profile location union).
+    search_locations: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -71,7 +86,27 @@ class ApplyConfig:
     delay_between_applications_seconds: int
     retry_limit: int
     easy_apply_only: bool
+    # Production safety: always stop at the final confirmation page and require
+    # an explicit human approval before Submit. After sufficient live validation
+    # this can be set false; default True so we never accidentally submit.
+    require_final_confirmation: bool = True
+    # When True, unknown location cannot proceed to apply.
+    require_preferred_location: bool = False
 
+
+@dataclass
+class RetentionSettings:
+    """Long-running retention limits (days / max items)."""
+    cache_days: int = 30
+    report_days: int = 60
+    screenshot_days: int = 14
+    evidence_days: int = 14
+    backup_days: int = 30
+    human_interaction_days: int = 14
+    session_history_max: int = 500
+    good_jobs_max: int = 1000
+    vacuum_db: bool = True
+    maintenance_hour: int = 3  # local hour for daily cleanup
 
 @dataclass
 class EmailConfig:
@@ -113,6 +148,13 @@ class AppConfig:
     telegram_token: str = ""
     telegram_chat_id: str = ""
     source_path: str = ""    # absolute path of the loaded config file
+    retention: RetentionSettings = field(default_factory=RetentionSettings)
+    data_root: str = ""      # CAREERPILOT_DATA_ROOT (absolute)
+    app_root: str = ""       # Git / application root
+    backups_root: str = ""   # dated full backups root
+    dashboard_password_env: str = "DASHBOARD_PASSWORD"
+    dashboard_session_hours: int = 12
+    dashboard_legacy_flask: bool = False
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     # Convenience accessors kept for the rest of the codebase.
@@ -131,16 +173,52 @@ class AppConfig:
 
 
 
-def load_config(config_path: str | Path = "config/config.yaml",
-                env_path: str | Path = ".env") -> AppConfig:
-    """Load and validate configuration. Raises ConfigError on any problem."""
+def load_config(config_path: str | Path | None = None,
+                env_path: str | Path | None = None) -> AppConfig:
+    """Load and validate configuration. Raises ConfigError on any problem.
+
+    Relative paths in config.yaml are resolved against the data root
+    (``CAREERPILOT_DATA_ROOT`` / sibling ``data/`` / legacy cwd). See
+    ``careerpilot.core.paths``.
+    """
+    from .paths import get_layout
+
+    layout = get_layout()
+    if config_path is None:
+        legacy = layout.app_root / "config" / "config.yaml"
+        if layout.config_yaml.exists():
+            config_path = layout.config_yaml
+        elif legacy.exists():
+            config_path = legacy
+        else:
+            config_path = layout.config_yaml
+    else:
+        config_path = Path(config_path)
+
+    if env_path is None:
+        legacy_env = layout.app_root / ".env"
+        if layout.env_file.exists():
+            env_path = layout.env_file
+        elif legacy_env.exists():
+            env_path = legacy_env
+        else:
+            env_path = layout.env_file
+    else:
+        env_path = Path(env_path)
+
     config_path = Path(config_path)
     if not config_path.exists():
-        raise ConfigError(f"Config file not found: {config_path}")
+        raise ConfigError(
+            f"Config file not found: {config_path}\n"
+            f"  data root = {layout.data_root}\n"
+            f"  Expected: {layout.config_yaml}")
     if Path(env_path).exists():
         load_dotenv(env_path)
 
     raw = strip_line_meta(load_yaml(config_path))
+
+    def _abs(rel: str) -> str:
+        return str(layout.resolve(rel))
 
     # Sections (new layout). Each falls back to old top-level keys below.
     application = raw.get("application", {}) or {}
@@ -186,8 +264,8 @@ def load_config(config_path: str | Path = "config/config.yaml",
         providers=provider_specs,
     )
 
-    # ---- career profiles (modern 'profiles:' section only) ----
-    profiles_dir = profiles_cfg.get("dir", "profiles")
+    # ---- career profiles (resolved under data root) ----
+    profiles_dir = _abs(profiles_cfg.get("dir", "profiles"))
     default_profile = profiles_cfg.get("default")
     if not default_profile:
         raise ConfigError("config.yaml must set 'profiles.default'")
@@ -207,19 +285,30 @@ def load_config(config_path: str | Path = "config/config.yaml",
     union_locations = engine.all_preferred_locations()
     extra_keywords = rules.get("extra_required_keywords", []) or []
     extra_locations = rules.get("extra_preferred_locations", []) or []
+    search_locs = rules.get("search_locations", []) or []
+    if search_locs:
+        search_locations = _dedupe(search_locs)
+    else:
+        search_locations = _dedupe(union_locations + extra_locations)
     rule_cfg = RuleConfig(
         minimum_salary=int((rules.get("minimum_salary", {}) or {}).get("amount", 0)),
         salary_currency=(rules.get("minimum_salary", {}) or {}).get("currency", "INR"),
         minimum_experience=int(rules.get("minimum_experience", 15)),
         accepted_employment_types=rules.get("accepted_employment_types", ["Full Time"]),
         rejected_shifts=rules.get("rejected_shifts", []) or [],
-        preferred_locations=_dedupe(union_locations + extra_locations),
+        preferred_locations=search_locations,
         accepted_titles=rules.get("accepted_titles", []),
         rejected_titles=rules.get("rejected_titles", []),
         blacklist_companies=rules.get("blacklist_companies", []),
         required_keywords=_dedupe(union_keywords + extra_keywords),
         nice_to_have_keywords=rules.get("nice_to_have_keywords", []),
+        minimum_match_score=float(rules.get("minimum_match_score", 0) or 0),
+        excluded_title_terms=rules.get("excluded_title_terms", []) or [],
         search_keywords=rules.get("search_keywords", []) or [],
+        search_nationwide=bool(rules.get("search_nationwide", False)),
+        search_include_recommended=bool(rules.get("search_include_recommended",
+                                                   False)),
+        search_locations=search_locs,
     )
 
     apply_obj = ApplyConfig(
@@ -230,9 +319,28 @@ def load_config(config_path: str | Path = "config/config.yaml",
             apply_cfg.get("delay_between_applications_seconds", 120)),
         retry_limit=int(apply_cfg.get("retry_limit", 2)),
         easy_apply_only=bool(apply_cfg.get("easy_apply_only", True)),
+        require_final_confirmation=bool(
+            apply_cfg.get("require_final_confirmation", True)),
+        require_preferred_location=bool(
+            apply_cfg.get("require_preferred_location", False)),
     )
     if apply_obj.mode not in ("dry_run", "live"):
         raise ConfigError(f"apply.mode must be 'dry_run' or 'live', got '{apply_obj.mode}'")
+
+    # ---- retention / long-running maintenance ----
+    maint_cfg = raw.get("maintenance", {}) or {}
+    retention = RetentionSettings(
+        cache_days=int(maint_cfg.get("cache_days", 30)),
+        report_days=int(maint_cfg.get("report_days", 60)),
+        screenshot_days=int(maint_cfg.get("screenshot_days", 14)),
+        evidence_days=int(maint_cfg.get("evidence_days", 14)),
+        backup_days=int(maint_cfg.get("backup_days", 30)),
+        human_interaction_days=int(maint_cfg.get("human_interaction_days", 14)),
+        session_history_max=int(maint_cfg.get("session_history_max", 500)),
+        good_jobs_max=int(maint_cfg.get("good_jobs_max", 1000)),
+        vacuum_db=bool(maint_cfg.get("vacuum_db", True)),
+        maintenance_hour=int(maint_cfg.get("maintenance_hour", 3)),
+    )
 
     # ---- browser (config-driven engine/channel/viewport) ----
     viewport = browser.get("viewport", {}) or {}
@@ -242,21 +350,21 @@ def load_config(config_path: str | Path = "config/config.yaml",
         headless=bool(browser.get("headless", False)),
         viewport_width=int(viewport.get("width", 1366)),
         viewport_height=int(viewport.get("height", 900)),
-        profiles_path=browser.get("profiles_path", "profiles_browser"),
+        profiles_path=_abs(browser.get("profiles_path") or "browser"),
         timeout_seconds=int(browser.get("timeout_seconds", 30)),
         networkidle_timeout_ms=int(browser.get("networkidle_timeout_ms", 8000)),
         render_settle_ms=int(browser.get("render_settle_ms", 800)),
         scroll_passes=int(browser.get("scroll_passes", 3)),
-        open_jobs=bool(browser.get("open_jobs", False)),
+        open_jobs=bool(browser.get("open_jobs", True)),
     )
 
-    # ---- paths (modern sections only) ----
-    database_path = db.get("path", "database/careerpilot.db")
-    backup_path = db.get("backups_path", "database/backups")
-    screenshot_path = browser.get("screenshots_path", "screenshots")
-    log_path = logging_cfg.get("dir", "logs")
-    report_path = application.get("reports_dir", "reports")
-    documents_dir = documents_cfg.get("dir", "documents")
+    # ---- paths (absolute under data root) ----
+    database_path = _abs(db.get("path", "database/careerpilot.db"))
+    backup_path = _abs(db.get("backups_path", "database/backups"))
+    screenshot_path = _abs(browser.get("screenshots_path", "screenshots"))
+    log_path = _abs(logging_cfg.get("dir", "logs"))
+    report_path = _abs(application.get("reports_dir", "reports"))
+    documents_dir = _abs(documents_cfg.get("dir", "documents"))
 
     email = EmailConfig(
         enabled=bool(email_cfg.get("enabled", False)),
@@ -275,9 +383,12 @@ def load_config(config_path: str | Path = "config/config.yaml",
         log_path=log_path,
         log_level=str(logging_cfg.get("level", "INFO")).upper(),
         report_path=report_path,
-        dashboard_host=dash.get("host", "127.0.0.1"),
-        dashboard_port=int(dash.get("port", 5000)),
-        dashboard_refresh_seconds=int(dash.get("refresh_seconds", 30)),
+        dashboard_host=dash.get("host", "0.0.0.0"),
+        dashboard_port=int(dash.get("port", 8006)),
+        dashboard_refresh_seconds=int(dash.get("refresh_seconds", 5)),
+        dashboard_password_env=str(dash.get("password_env", "DASHBOARD_PASSWORD")),
+        dashboard_session_hours=int(dash.get("session_hours", 12)),
+        dashboard_legacy_flask=bool(dash.get("legacy_flask", False)),
         profiles_dir=profiles_dir,
         default_career_profile=default_profile,
         profile_confidence_threshold=confidence_threshold,
@@ -295,12 +406,22 @@ def load_config(config_path: str | Path = "config/config.yaml",
         telegram_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
         telegram_chat_id=(telegram_cfg.get("chat_id")
                           or os.getenv("TELEGRAM_CHAT_ID", "")),
+        retention=retention,
+        data_root=str(layout.data_root),
+        app_root=str(layout.app_root),
+        backups_root=str(layout.backups_root),
         _raw=raw,
     )
     try:
         cfg.source_path = str(config_path.resolve())
     except Exception:  # noqa: BLE001
         cfg.source_path = str(config_path)
+    # Ensure debug evidence dir is under the data root.
+    try:
+        ev = getattr(cfg.debug, "evidence_dir", "debug") or "debug"
+        cfg.debug.evidence_dir = _abs(ev)
+    except Exception:  # noqa: BLE001
+        pass
     _validate_semantics(cfg)
     return cfg
 
@@ -316,6 +437,10 @@ def _build_human(d: dict) -> HumanConfig:
         upward_correction_chance=float(d.get("upward_correction_chance", 0.15)),
         mouse_moves=bool(d.get("mouse_moves", True)),
         seed=d.get("seed"),
+        break_chance=float(d.get("break_chance", 0.12)),
+        highlight_chance=float(d.get("highlight_chance", 0.25)),
+        keyboard_scroll_chance=float(d.get("keyboard_scroll_chance", 0.30)),
+        wander_chance=float(d.get("wander_chance", 0.5)),
     )
 
 

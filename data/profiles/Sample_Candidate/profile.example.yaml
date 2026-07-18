@@ -1,0 +1,47 @@
+# =============================================================================
+# Career Profile template — Sample_Candidate (FICTIONAL)
+# =============================================================================
+# HOW TO USE
+#   1. Rename this file to:  profile.yaml
+#   2. Replace resume.pdf with YOUR PDF (keep the filename or change `resume:`)
+#   3. Optionally rename cover_letter.example.md → cover_letter.md and set below
+#   4. Copy companion *.example.yaml files to their non-example names
+#
+# Personal identity (name, email, phone, LinkedIn URL, salary facts) lives in
+# config/config.yaml under `candidate:` — NOT in this file.
+#
+# Fields below are every key CareerPilot loads from profile.yaml today.
+# =============================================================================
+
+# Profile id (must match folder intent; AI returns this name when selecting)
+name: Sample_Candidate
+
+# Short description shown in logs / Mission Control
+description: >
+  Fictional sample profile for a mid-level software engineer.
+  Replace with your specialization (e.g. Infrastructure, Digital Workplace).
+
+# Resume file in THIS folder (REQUIRED on disk before live/dry-run apply)
+resume: resume.pdf
+
+# Optional static cover letter (preferred over AI-generated text when set).
+# After renaming cover_letter.example.md → cover_letter.md, uncomment:
+# cover_letter: cover_letter.md
+
+# Bump when you replace the PDF so reports can distinguish versions
+resume_version: v1
+
+# Optional salary override for this specialization only (integer amount).
+# Omit to use candidate.expected_ctc / rules.minimum_salary instead.
+# salary_override: 2500000
+# Or:
+# salary_override:
+#   amount: 2500000
+
+# Supporting documents declared by type → filename in this folder.
+# Loaded into CareerProfile.documents; AutoApply currently uploads resume
+# (+ cover letter if set), not every map entry.
+documents:
+  resume: resume.pdf
+  # portfolio: portfolio.pdf
+  # recommendation: recommendation_letter.pdf

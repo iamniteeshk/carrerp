@@ -1,0 +1,8 @@
+# Specialization: Contact_Centre
+name: Contact_Centre
+description: Contact Centre specialization
+enabled: true
+resume: Murahari_M_Resume_ContactCentre.pdf
+resume_version: v1
+documents:
+  resume: Murahari_M_Resume_ContactCentre.pdf

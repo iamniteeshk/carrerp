@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Settings · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="settingsPage()" x-init="load()">
+  <div class="topbar">
+    <h1 class="h1">Settings</h1>
+    <span class="badge">Read-only · v1 freeze</span>
+  </div>
+  <div class="card">
+    <p style="color:var(--muted)" x-text="data.note || 'Edit config.yaml / .env on disk, then restart.'"></p>
+    <p class="muted">Operator console grouping: <strong>General</strong> · <strong>Advanced</strong> · <strong>Developer</strong>. Writable settings are deferred post-freeze.</p>
+  </div>
+
+  <template x-for="group in ['General','Advanced','Developer']" :key="group">
+    <div class="card" style="margin-top:1rem" x-show="data.groups && data.groups[group]">
+      <h3 x-text="group"></h3>
+      <div class="table-wrap">
+        <table class="data">
+          <tbody>
+            <template x-for="[k,v] in Object.entries(data.groups[group]||{})" :key="k">
+              <tr>
+                <td style="width:40%" x-text="k"></td>
+                <td><code x-text="typeof v === 'object' ? JSON.stringify(v) : String(v)"></code></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </template>
+
+  <div class="card" style="margin-top:1rem">
+    <label><input type="checkbox" x-model="unlocked" /> Show raw JSON</label>
+    <pre x-show="unlocked" style="font-family:var(--mono);font-size:.8rem;white-space:pre-wrap;background:#0f1720;color:#d7e0ea;padding:1rem;border-radius:12px;margin-top:.75rem" x-text="JSON.stringify(data, null, 2)"></pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function settingsPage() {
+  return { data: { groups: {} }, unlocked: false,
+    async load() { this.data = await fetch('/api/settings').then(r => r.json()); } };
+}
+</script>
+{% endblock %}

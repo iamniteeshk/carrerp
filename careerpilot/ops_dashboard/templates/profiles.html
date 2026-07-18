@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Profiles · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="profilesPage()" x-init="load()" class="page">
+  <header class="page-head">
+    <h1>Profiles</h1>
+    <p class="muted">
+      Specializations under <code>profiles/&lt;Owner&gt;/&lt;Name&gt;/</code>.
+      Default: <strong x-text="data.default||'—'"></strong>
+      · Current: <strong x-text="data.current||data.default||'—'"></strong>
+    </p>
+    <button class="btn" @click="load()">Refresh</button>
+  </header>
+
+  <template x-if="error"><p class="warn" x-text="error"></p></template>
+
+  <section class="panel">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Profile</th>
+          <th>Owner</th>
+          <th>Enabled</th>
+          <th>Resume</th>
+          <th>Keywords</th>
+          <th>Locations</th>
+          <th>Screening</th>
+          <th>Apps</th>
+          <th>Avg score</th>
+        </tr>
+      </thead>
+      <tbody>
+        <template x-for="p in (data.profiles||[])" :key="p.key">
+          <tr>
+            <td>
+              <strong x-text="p.name"></strong>
+              <span class="pill" x-show="p.is_default">default</span>
+              <div class="muted" x-text="p.description"></div>
+            </td>
+            <td class="mono" x-text="p.owner||'—'"></td>
+            <td x-text="p.enabled ? 'yes' : 'no'"></td>
+            <td>
+              <span :class="p.resume_ok ? 'ok' : 'bad'" x-text="p.resume_ok ? 'OK' : 'MISSING'"></span>
+            </td>
+            <td x-text="p.keyword_count"></td>
+            <td x-text="p.location_count"></td>
+            <td x-text="p.screening_count"></td>
+            <td x-text="p.stats?.applications ?? 0"></td>
+            <td x-text="p.stats?.avg_score ?? '—'"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+</div>
+<style>
+.ok { color: #6dffa8; font-weight:600; }
+.bad { color: #ff8a8a; font-weight:600; }
+.pill { margin-left:.4rem; font-size:.7rem; background:#333; padding:.1rem .4rem; border-radius:3px; }
+</style>
+<script>
+function profilesPage() {
+  return {
+    data: { profiles: [] }, error: '',
+    async load() {
+      try {
+        const r = await fetch('/api/profiles');
+        if (!r.ok) { this.error = await r.text(); return; }
+        this.data = await r.json(); this.error = '';
+      } catch (e) { this.error = String(e); }
+    }
+  };
+}
+</script>
+{% endblock %}

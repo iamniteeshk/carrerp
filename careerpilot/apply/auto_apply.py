@@ -1,9 +1,12 @@
 """Auto Apply engine -- the execution layer (P010).
 
-Coordinates: confidence gate -> resume selection -> cover letter / answers ->
-portal.apply() -> record result -> notify. It contains no portal-specific or
-AI-specific logic of its own; it orchestrates the other modules. Supports
-dry-run (stop before submit) and live (submit) via config.
+Coordinates: safety gate -> confidence gate -> resume selection -> cover letter
+/ answers -> portal.apply() -> record result -> notify. It contains no
+portal-specific or AI-specific logic of its own; it orchestrates the other
+modules. Supports dry-run (stop before submit) and live (submit) via config.
+
+Production rule: never claim APPLIED unless the portal truly submitted AND
+(when require_final_confirmation) a human approved the final Submit.
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ from ..core.models import AIEvaluation, ApplicationResult, Job
 from ..db.services import (ApplicationService, FailedJobService, JobService)
 from ..notify.telegram_service import TelegramService
 from .confidence_gate import ConfidenceGate, GateDecision
+from .safety_gate import ApplySafetyGate
 
 logger = get_logger(__name__)
 
@@ -41,6 +45,12 @@ class AutoApplyEngine:
         self.profile_engine = profile_engine or config.profile_engine
         from ..core.document_manager import DocumentManager
         self.documents = document_manager or DocumentManager(self.profile_engine)
+        self.safety = ApplySafetyGate(
+            config.rules,
+            require_preferred_location=bool(
+                getattr(config.apply, "require_preferred_location", False)),
+            chennai_priority=True,
+        )
 
     def apply_to_job(self, job: Job, evaluation: AIEvaluation) -> ApplicationResult:
         """Attempt one application, honoring the confidence gate and mode."""
@@ -55,6 +65,17 @@ class AutoApplyEngine:
             self.jobs.update_status(job.job_id, JobStatus.SKIPPED)
             return self._result(job, evaluation, profile, success=False,
                                 status=JobStatus.SKIPPED)
+
+        # Deterministic safety gate (blacklist, domain, location, salary, ...).
+        safety = self.safety.check(job, evaluation)
+        if not safety.allowed:
+            logger.info("Safety gate blocked %s: %s", job.job_title, safety.reason)
+            if job.job_id:
+                self.jobs.update_status(job.job_id, JobStatus.SKIPPED,
+                                        rejection_reason=safety.reason)
+            return self._result(job, evaluation, profile, success=False,
+                                status=JobStatus.SKIPPED,
+                                failure_reason=safety.reason)
 
         gate = ConfidenceGate(self.cfg.apply, self.cfg.ai.min_apply_score,
                               self._lifetime_applied())
@@ -83,6 +104,15 @@ class AutoApplyEngine:
         portal = self.portals.get(job.portal)
         if portal is None:
             return self._fail(job, evaluation, profile, "no portal handler")
+        safety = self.safety.check(job, evaluation)
+        if not safety.allowed:
+            logger.info("Dry-run safety blocked %s: %s", job.job_title, safety.reason)
+            if job.job_id:
+                self.jobs.update_status(job.job_id, JobStatus.SKIPPED,
+                                        rejection_reason=safety.reason)
+            return self._result(job, evaluation, profile, success=False,
+                                status=JobStatus.SKIPPED,
+                                failure_reason=safety.reason, dry_run=True)
         return self._execute(portal, job, evaluation, dry_run=True)
 
     # ---- internal --------------------------------------------------------
@@ -94,26 +124,46 @@ class AutoApplyEngine:
         # Resolve the Career Profile (confidence-gated default fallback).
         profile = self.profile_engine.select(
             evaluation.career_profile, evaluation.confidence)
+        try:
+            from ..ops_dashboard.runtime import HUB
+            HUB.note_profile(profile.name)
+        except Exception:  # noqa: BLE001
+            pass
         resume_path = self.documents.resume_for(profile)
         cover_letter = self._maybe_cover_letter(job, profile)
         answer_fn = self._make_answer_fn(profile, job)
 
         attempts = 0
         last_error = ""
+        submitted_once = False
         while attempts <= self.cfg.apply.retry_limit:
             attempts += 1
             try:
+                # Never retry after a successful submit (duplicate prevention).
+                if submitted_once:
+                    break
                 outcome = portal.apply(
                     job, resume_path, cover_letter,
                     answer_fn=answer_fn, dry_run=dry_run,
                 )
-                status = JobStatus.APPLIED if outcome.submitted else (
+                # Live mode must never claim APPLIED unless the portal truly
+                # submitted. Incomplete portal flows return submitted=False.
+                if outcome.submitted and not dry_run:
+                    submitted_once = True
+                status = JobStatus.APPLIED if (outcome.submitted and not dry_run) else (
                     JobStatus.MATCHED if dry_run else JobStatus.QUEUED)
+                # Incomplete live apply (forms filled / confirmation pending)
+                # stays MATCHED or QUEUED — never APPLIED.
+                if (not dry_run and not outcome.submitted
+                        and "confirmation" in (outcome.note or "").lower()):
+                    status = JobStatus.QUEUED
                 result = self._result(
-                    job, evaluation, profile, success=outcome.submitted,
+                    job, evaluation, profile,
+                    success=bool(outcome.submitted and not dry_run),
                     status=status, portal_reference=outcome.portal_reference,
                     screenshot=outcome.screenshot_path,
                     cover_letter=cover_letter, dry_run=dry_run,
+                    failure_reason=outcome.note or "",
                 )
                 self.apps.record(result)
                 if job.job_id:
@@ -174,10 +224,12 @@ class AutoApplyEngine:
             return ""
 
     def _lifetime_applied(self) -> int:
-        # Distinct live applications recorded ever (for first-run window).
+        # Distinct SUCCESSFUL live applications only (for first-run window).
         conn = self.apps.db.connect()
         row = conn.execute(
-            "SELECT COUNT(*) AS c FROM applications WHERE dry_run=0").fetchone()
+            "SELECT COUNT(*) AS c FROM applications "
+            "WHERE dry_run=0 AND application_status='APPLIED'"
+        ).fetchone()
         return row["c"] if row else 0
 
     def _request_approval(self, job: Job, evaluation: AIEvaluation, profile,

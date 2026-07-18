@@ -102,7 +102,9 @@ browser:
   viewport:
     width: 1366
     height: 900
-  profiles_path: profiles_browser # persistent per-portal login sessions
+  # Playwright user-data dirs (cookies/sessions). Prefer "browser" under the
+  # data root; "profiles_browser" still works for legacy installs.
+  profiles_path: browser
   screenshots_path: screenshots
   timeout_seconds: 30
   networkidle_timeout_ms: 8000   # max wait for SPA network to settle
@@ -110,9 +112,12 @@ browser:
   scroll_passes: 3               # natural scrolls to trigger lazy-loading
 
 dashboard:
-  host: 127.0.0.1
-  port: 5000
-  refresh_seconds: 30
+  host: 0.0.0.0                 # LAN access; set DASHBOARD_PASSWORD in .env
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false           # optional old Flask board on port+1 (loopback)
 
 database:
   path: database/careerpilot.db
@@ -135,13 +140,25 @@ rules:
   minimum_experience: 15
   accepted_employment_types: [Full Time, Permanent]
   rejected_shifts: []
-  search_keywords: [Director IT Infrastructure, Associate Director, Head IT, IT Infrastructure Director, Digital Workplace, Infrastructure, EUC, Global IT, GCC, IT Operations]   # focused list to SEARCH (point 6)
+  # Senior-intent SEARCH phrases (combined with each location). Use full
+  # leadership phrases -- never bare generic words like "GCC"/"EUC"/"IT", which
+  # return junior/irrelevant results.
+  search_keywords: [Head IT, Director IT, Head Digital Workplace, Director Digital Workplace, Head EUC, Director EUC, IT Infrastructure Director, IT Service Delivery Head, Head IT Operations, Director IT Operations, Global IT Director, GCC IT Head, Enterprise Technology Director]
   accepted_titles: [Director, Associate Director, Head, AVP, VP, SVP, COO, General Manager, Infrastructure, IT Infrastructure, Digital Workplace, EUC, End User Computing, GCC, Global Capability, Global IT, IT Operations, Technology Operations, Service Delivery, Cloud, Data Center, Datacenter, Workplace, Information Technology, Technology, Operations]
   rejected_titles: [Desktop Support, Technical Support, Engineer, Analyst, L1, L2]
   blacklist_companies: []         # e.g. your current employer
   extra_required_keywords: []     # added on top of profile keywords
   extra_preferred_locations: []   # added on top of profile locations
   nice_to_have_keywords: []
+  # Hard off-domain title terms rejected BEFORE the AI is called (merged with a
+  # built-in denylist that already covers finance/sales/legal/medical AND
+  # AI/ML/data-science). A title carrying one of your own domain keywords is
+  # treated as borderline and still sent to the AI.
+  excluded_title_terms: []
+  # Minimum AI match score (0-100) for a job to be MATCHED. A scored job below
+  # this becomes REJECTED instead of appearing in MatchedJobs, so a weak
+  # off-domain fit (e.g. an AI/ML role scored 15-20) is never matched. 0 = off.
+  minimum_match_score: 60
 
 apply:
   mode: dry_run                   # dry_run | live  -- START IN DRY RUN
@@ -151,6 +168,24 @@ apply:
   delay_between_applications_seconds: 180
   retry_limit: 3
   easy_apply_only: true           # external ATS -> manual review
+  # Production safety: always stop before final Submit and wait for explicit
+  # human confirmation. Set false only after sufficient live validation.
+  require_final_confirmation: true
+  # When true, refuse to apply if location is unknown or outside preferred list.
+  require_preferred_location: false
+
+# Long-running retention (24x7). Daily cleanup runs at maintenance_hour:15.
+maintenance:
+  cache_days: 30
+  report_days: 60
+  screenshot_days: 14
+  evidence_days: 14
+  backup_days: 30
+  human_interaction_days: 14
+  session_history_max: 500
+  good_jobs_max: 1000
+  vacuum_db: true
+  maintenance_hour: 3
 
 logging:
   dir: logs
@@ -192,6 +227,11 @@ human:
   upward_correction_chance: 0.15
   mouse_moves: true
   # seed: 42        # set for reproducible behaviour
+  # v3.1.0 human-behaviour tuning (all optional; sensible defaults in code):
+  break_chance: 0.12            # chance of a "checked my phone" break after a job
+  highlight_chance: 0.25        # 20-30%: occasionally drag-select the title etc.
+  keyboard_scroll_chance: 0.30  # sometimes PageDown/Space/ArrowDown, not the wheel
+  wander_chance: 0.5            # drift the mouse to whitespace/logo/scrollbar
 
 # Per-portal card selectors (config-driven extraction). The defaults in code are
 # UNVERIFIED best-known selectors -- turn on debug.visual_mode, run a search, and
@@ -207,9 +247,19 @@ portals:
       experience: "span.expwdth, span.exp"
       url: "a.title"
   linkedin:
-    results_selector: "div.job-card-container"
+    results_selector: "div.job-card-container, li.jobs-search-results__list-item, li.scaffold-layout__list-item, div.job-card-list"
     fields:
-      title: "a.job-card-list__title, a.job-card-container__link"
-      company: ".job-card-container__primary-description"
-      location: "li.job-card-container__metadata-item"
-      url: "a.job-card-list__title, a.job-card-container__link"
+      title: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      company: ".artdeco-entity-lockup__subtitle, .job-card-container__primary-description, .job-card-container__company-name"
+      location: ".artdeco-entity-lockup__caption, .job-card-container__metadata-item, li.job-card-container__metadata-item"
+      url: "a.job-card-container__link, a.job-card-list__title, a.job-card-list__title--link, .artdeco-entity-lockup__title a"
+      easy_apply: ".job-card-container__footer-item, .job-card-list__footer-wrapper"
+    # Detail-page selectors (used after opening a job URL). Override any that
+    # come back empty in debug.visual_mode; code ships broader fallbacks too.
+    detail:
+      description: "#job-details, div.jobs-box__html-content, div.jobs-description__content"
+      title: "h1.job-details-jobs-unified-top-card__job-title, .jobs-unified-top-card__job-title, h1.t-24"
+      company: ".job-details-jobs-unified-top-card__company-name a, .job-details-jobs-unified-top-card__company-name"
+      location: ".job-details-jobs-unified-top-card__primary-description-container span.tvm__text, .job-details-jobs-unified-top-card__bullet"
+      skills: ".job-details-how-you-match__skills-item-subtitle, div.job-details-how-you-match__skills-item"
+      easy_apply: "button.jobs-apply-button, .jobs-apply-button--top-card button"

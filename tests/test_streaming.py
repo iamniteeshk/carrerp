@@ -103,6 +103,8 @@ def test_pipeline_skips_already_processed_jobs():
     # Minimal stand-ins; we only exercise _process_job's skip path.
     class Jobs:
         def exists(self, job): return True   # already in DB (prior run)
+        def find_existing(self, job):
+            return {"job_id": 1, "status": "REJECTED"}  # terminal
     pipe = ScanPipeline.__new__(ScanPipeline)
     pipe.jobs = Jobs()
     pipe._job_seq = 0

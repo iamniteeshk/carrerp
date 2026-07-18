@@ -5,17 +5,73 @@ config/config.yaml
 config.yaml
 
 # Per-user career profiles (real resumes, answers, documents).
-profiles/
-documents/
-resumes/
+# Root-level runtime copies (legacy layout).
+/profiles/
+/documents/
+/resumes/
+/certificates/
 
-# Runtime artifacts.
+# Production / runtime artifacts (legacy root layout + production names).
 careerpilot.pid
-database/
-logs/
-screenshots/
-reports/
-profiles_browser/
+/database/
+/logs/
+/screenshots/
+# Runtime artifacts (root-level only -- not careerpilot/reports Python package).
+/reports/
+/profiles_browser/
+/browser/
+/cache/
+/debug/
+/health/
+/temp/
+/exports/
+/human_interactions/
+/backups/
+
+# -----------------------------------------------------------------------------
+# data/ — ship TEMPLATES in Git; ignore live secrets / real profiles / runtime
+# -----------------------------------------------------------------------------
+# Ignore everything under data/ by default…
+/data/**
+# …then re-include the directory scaffolding and committed templates only.
+!/data/
+!/data/README.md
+!/data/.env.example
+!/data/config/
+!/data/config/config.example.yaml
+!/data/profiles/
+!/data/profiles/Sample_Candidate/
+!/data/profiles/Sample_Candidate/**
+!/data/profiles/Murahari_M/
+!/data/profiles/Murahari_M/**
+
+# Still never commit live secrets if someone copies them into app/data/
+/data/.env
+/data/config/config.yaml
+/data/profiles/*/profile.yaml
+/data/profiles/*/keywords.yaml
+/data/profiles/*/preferred_locations.yaml
+/data/profiles/*/screening_answers.yaml
+/data/profiles/*/cover_letter.md
+/data/profiles/*/cover_letter.docx
+# Real resumes people may drop in (keep the sample PDF under Sample_Candidate)
+/data/profiles/*/Resume*.pdf
+/data/**/database/
+/data/**/logs/
+/data/**/browser/
+/data/**/cache/
+/data/**/reports/
+/data/**/screenshots/
+/data/**/debug/
+/data/**/temp/
+/data/**/exports/
+/data/**/health/
+/data/**/certificates/
+/data/**/documents/
+/data/**/careerpilot.pid
+
+# Generated Task Scheduler wrapper (created by Register-CareerPilotStartup.ps1).
+scripts/run_careerpilot_task.cmd
 
 # Python.
 __pycache__/

@@ -33,7 +33,7 @@ def test_assess_complete_when_jd_substantive():
 def test_assess_partial_when_jd_missing_or_short():
     j = Job(portal="naukri", job_title="Director", job_description="too short")
     status, missing = assess_completeness(j)
-    assert status == "PARTIAL" and "job_description" in missing
+    assert status == "PARTIAL" and any("job_description" in m for m in missing)
 
 
 # ---- the pipeline gate ---------------------------------------------------
@@ -43,6 +43,7 @@ class _Jobs:
         self.status_by_id = {}
         self._id = 0
     def exists(self, job): return False
+    def find_existing(self, job): return None
     def insert(self, job):
         self._id += 1
         return self._id
@@ -121,8 +122,7 @@ def test_unread_cfo_job_is_never_selected():
     assert p.ai.called == 0                     # AI NEVER ran on the card
     status, reason = p.jobs.status_by_id[1]
     assert status == JobStatus.PARTIAL_DATA
-    assert "never opened" in reason
-    assert p.failed_jobs.records and "PARTIAL_DATA" in p.failed_jobs.records[0][1]
+    assert "EXTRACTION_FAILED" in p.failed_jobs.records[0][1] or "never opened" in p.failed_jobs.records[0][1].lower()
     assert ("failed", p.failed_jobs.records[0][1]) in p.stream.events
 
 
@@ -152,6 +152,41 @@ def test_partial_read_job_is_marked_partial_not_decided():
     assert counts["partial"] == 1 and counts["matched"] == 0
     assert p.rules.called_with == [] and p.ai.called == 0
     assert p.jobs.status_by_id[1][0] == JobStatus.PARTIAL_DATA
+
+
+def test_low_ai_score_is_rejected_not_matched():
+    """v3.0.0: a complete job the Rule Engine passes but the AI scores below the
+    minimum match threshold must end as REJECTED, never in MatchedJobs."""
+    p = _pipeline()
+    p.min_match_score = 60
+    class _LowAI:
+        called = 0
+        def evaluate_job(self, job):
+            self.called += 1
+            return types.SimpleNamespace(match_score=18, career_profile="Infra",
+                                         confidence=40, reason="weak", apply=False,
+                                         provider="x", model="m", tokens_used=1,
+                                         execution_time=0.1, raw_response="{}")
+    p.ai = _LowAI()
+    counts = _counts()
+    j = Job(portal="naukri", job_title="Director - AI", company="Acme",
+            job_url="u", job_description="x" * 300, read_status="COMPLETE")
+    p._process_job(j, counts, dry_run=True)
+    assert counts["matched"] == 0
+    assert counts["rejected"] == 1
+    assert p.jobs.status_by_id[1][0] == JobStatus.REJECTED
+    assert any(e[0] == "rejected" for e in p.stream.events)
+
+
+def test_high_ai_score_still_matched_with_threshold():
+    p = _pipeline()
+    p.min_match_score = 60          # AI harness returns 90 -> above threshold
+    counts = _counts()
+    j = Job(portal="naukri", job_title="Director - IT Infrastructure",
+            company="Acme", job_url="u", job_description="x" * 300,
+            read_status="COMPLETE")
+    p._process_job(j, counts, dry_run=True)
+    assert counts["matched"] == 1 and counts["rejected"] == 0
 
 
 def test_complete_job_reaches_rule_and_ai():

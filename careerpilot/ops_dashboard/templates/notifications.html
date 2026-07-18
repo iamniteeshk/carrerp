@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Alerts · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="notifPage()" x-init="load(); setInterval(() => load(), 5000)">
+  <div class="topbar"><h1 class="h1">Notifications & Alerts</h1></div>
+  <div class="grid two">
+    <div class="card">
+      <h3>Live alerts</h3>
+      <div class="feed">
+        <template x-for="(a,i) in alerts" :key="i">
+          <div class="ev">
+            <span class="ts" x-text="(a.ts||'').slice(11,19)"></span>
+            <span class="lvl-alert" x-text="a.message"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Telegram / DB notifications</h3>
+      <div class="table-wrap" style="max-height:480px">
+        <table class="data">
+          <thead><tr><th>When</th><th>Type</th><th>Message</th><th>Sent</th></tr></thead>
+          <tbody>
+            <template x-for="n in notes" :key="n.notification_id">
+              <tr>
+                <td x-text="(n.sent_at||'').slice(0,19)"></td>
+                <td x-text="n.notification_type"></td>
+                <td x-text="n.message"></td>
+                <td x-text="n.sent"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function notifPage() {
+  return {
+    alerts: [], notes: [],
+    async load() {
+      const d = await fetch('/api/notifications').then(r => r.json());
+      this.alerts = d.alerts || [];
+      this.notes = d.notifications || [];
+    }
+  };
+}
+</script>
+{% endblock %}

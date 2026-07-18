@@ -100,6 +100,8 @@ def test_navigate_goes_when_url_differs():
 def test_linkedin_plan_recommended_first_then_preferred_then_all():
     page = FakePage(start="https://www.linkedin.com/feed/")
     portal = LinkedInPortal(FakeSession(page), candidate=None, easy_apply_only=True)
+    portal.search_include_recommended = True
+    portal.search_nationwide = True
     portal.search(["Director", "Head"], ["Chennai", "Bangalore"])
     gotos = page.gotos
     # 1) recommended jobs is FIRST
@@ -117,6 +119,8 @@ def test_linkedin_plan_recommended_first_then_preferred_then_all():
 def test_linkedin_plan_dedupes_identical_pairs():
     page = FakePage(start="https://www.linkedin.com/feed/")
     portal = LinkedInPortal(FakeSession(page), candidate=None, easy_apply_only=False)
+    portal.search_include_recommended = True
+    portal.search_nationwide = True
     portal.search(["Director", "Director"], ["Chennai"])
     # recommended + Director/Chennai + Director/all = 3 distinct, no repeats.
     assert len(page.gotos) == len(set(page.gotos)) == 3, page.gotos
@@ -127,6 +131,8 @@ def test_linkedin_plan_dedupes_identical_pairs():
 def test_naukri_search_does_not_reload_same_page():
     page = FakePage(start="https://www.naukri.com/mnjuser/homepage")
     portal = NaukriPortal(FakeSession(page), candidate=None)
+    portal.search_include_recommended = True
+    portal.search_nationwide = True
     portal.search(["Director"], ["Chennai", "Bangalore"])
     # recommended + 2 preferred-location searches + 1 all-locations = 4 distinct.
     assert len(page.gotos) == len(set(page.gotos)) == 4, page.gotos
@@ -137,7 +143,15 @@ def test_naukri_search_does_not_reload_same_page():
     assert any("jobs-in-chennai" in u for u in page.gotos)
 
 
-def test_naukri_search_url_slugifies():
+def test_naukri_chennai_only_quality_search_plan():
+    """v2.9.4: default is quality-first -- no recommended feed, no nationwide."""
+    page = FakePage(start="https://www.naukri.com/mnjuser/homepage")
+    portal = NaukriPortal(FakeSession(page), candidate=None)
+    portal.search(["Director", "Head"], ["Chennai"])
+    gotos = page.gotos
+    assert len(gotos) == 2
+    assert all("jobs-in-chennai" in u for u in gotos)
+    assert not any("recommendedjobs" in u for u in gotos)
     portal = NaukriPortal(FakeSession(FakePage()), candidate=None)
     url = portal._search_url("Contact Centre Head", "New Delhi")
     # Slug is unchanged; an experience filter is appended to narrow the search.

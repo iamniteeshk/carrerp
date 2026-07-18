@@ -1,0 +1,15 @@
+# Domain keywords for this specialization (unioned into Rule Engine filters).
+# Rename to: keywords.yaml
+#
+# required  → must appear for a strong match signal
+# preferred → nice-to-have boost (informational for AI context)
+
+required:
+  - Software Engineer
+  - Python
+  - Backend
+preferred:
+  - Cloud
+  - AWS
+  - REST
+  - Microservices

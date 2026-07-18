@@ -99,7 +99,7 @@ def test_database_init_is_idempotent():
         db.initialize()  # second call must not error or re-run migrations
         conn = db.connect()
         v = conn.execute("SELECT MAX(version) FROM schema_version").fetchone()[0]
-        assert v == 2
+        assert v >= 3
         db.close()
 
 

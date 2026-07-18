@@ -40,14 +40,24 @@ class LinkedInPortal(BasePortal):
     # UNVERIFIED best-known selectors -- confirm with Visual Debug Mode and
     # override in config.yaml -> portals.linkedin. LinkedIn serves per-user
     # A/B markup, so these especially must be checked against your own account.
-    DEFAULT_RESULTS_SELECTOR = "div.job-card-container"
+    DEFAULT_RESULTS_SELECTOR = ("div.job-card-container, "
+                                "li.jobs-search-results__list-item, "
+                                "li.scaffold-layout__list-item, div.job-card-list")
     FIELD_SELECTORS = {
-        "title": "a.job-card-list__title, a.job-card-container__link",
-        "company": ".job-card-container__primary-description, "
-                   ".job-card-container__company-name",
-        "location": "li.job-card-container__metadata-item",
-        "url": "a.job-card-list__title, a.job-card-container__link",
-        "easy_apply": "li.job-card-container__footer-item",
+        "title": ("a.job-card-container__link, a.job-card-list__title, "
+                  "a.job-card-list__title--link, "
+                  ".artdeco-entity-lockup__title a, "
+                  ".job-card-list__entity-lockup a"),
+        "company": (".artdeco-entity-lockup__subtitle, "
+                    ".job-card-container__primary-description, "
+                    ".job-card-container__company-name"),
+        "location": (".artdeco-entity-lockup__caption, "
+                     ".job-card-container__metadata-item, "
+                     "li.job-card-container__metadata-item"),
+        "url": ("a.job-card-container__link, a.job-card-list__title, "
+                "a.job-card-list__title--link, .artdeco-entity-lockup__title a"),
+        "easy_apply": (".job-card-container__footer-item, "
+                       ".job-card-list__footer-wrapper"),
     }
 
     def __init__(self, session: BrowserSession, candidate: Candidate,
@@ -110,10 +120,9 @@ class LinkedInPortal(BasePortal):
         return f"{JOBS_URL}?{urlencode(parts)}"
 
     def search(self, keywords: list[str], locations: list[str],
-               on_job=None) -> list[Job]:
-        # Recommended jobs (requires login) -> preferred locations -> all.
+               on_job=None, should_open=None) -> list[Job]:
         plan = self._build_search_plan(keywords, locations)
-        return self._browse_plan(plan, on_job=on_job)
+        return self._browse_plan(plan, on_job=on_job, should_open=should_open)
 
     def apply(self, job: Job, resume_path: str, cover_letter: str,
               answer_fn, dry_run: bool) -> ApplyOutcome:
@@ -140,13 +149,20 @@ class LinkedInPortal(BasePortal):
             return ApplyOutcome(submitted=False, screenshot_path=shot,
                                 answers=answers, note="dry_run")
 
-        # COMPLETE ON LIVE DOM: click the final Submit, then read the
-        # confirmation toast/modal for a reference id.
-        ref = ""
+        # LIVE APPLY SAFETY (v4 production): Easy Apply form-fill + final Submit
+        # are not yet completed against live LinkedIn DOM. Never claim
+        # submitted=True. Fill what we can, reach (or simulate) the confirmation
+        # boundary, then WAIT for explicit human confirmation before Submit.
         shot = self.session.screenshot(
-            f"{self.session.profile_dir}/applied_{job.source_id or 'job'}.png")
-        return ApplyOutcome(submitted=True, portal_reference=ref,
-                            screenshot_path=shot, answers=answers)
+            f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
+        logger.warning(
+            "LIVE APPLY: LinkedIn Easy Apply form/submit not completed on live "
+            "DOM — stopping at confirmation boundary for %s @ %s (submitted=False)",
+            job.job_title, job.company)
+        return ApplyOutcome(
+            submitted=False, portal_reference="", screenshot_path=shot,
+            answers=answers,
+            note="awaiting_final_confirmation: linkedin_easy_apply_incomplete")
 
     def _detect_challenge(self, page) -> None:
         url = page.url.lower()

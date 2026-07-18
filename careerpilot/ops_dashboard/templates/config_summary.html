@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Config Summary · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="configSummary()" x-init="load()" class="page">
+  <header class="page-head">
+    <h1>Configuration Summary</h1>
+    <p class="muted">Effective runtime configuration (read-only). Secrets show status only.</p>
+    <button class="btn" @click="load()">Refresh</button>
+  </header>
+
+  <template x-if="error"><p class="warn" x-text="error"></p></template>
+
+  <div class="grid-2" x-show="data">
+    <section class="panel">
+      <h2>Candidate</h2>
+      <dl class="kv">
+        <dt>Name</dt><dd x-text="data.candidate?.full_name"></dd>
+        <dt>Email</dt><dd x-text="data.candidate?.email"></dd>
+        <dt>Location</dt><dd x-text="data.candidate?.current_location"></dd>
+        <dt>Remote</dt><dd x-text="data.candidate?.remote_preference"></dd>
+        <dt>Role</dt><dd x-text="(data.candidate?.current_designation||'') + ' @ ' + (data.candidate?.current_company||'')"></dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Profiles</h2>
+      <dl class="kv">
+        <dt>Default</dt><dd x-text="data.profiles?.default"></dd>
+        <dt>Current</dt><dd x-text="data.profiles?.current"></dd>
+        <dt>Enabled</dt><dd x-text="(data.profiles?.enabled_count||0) + ' / ' + (data.profiles?.count||0)"></dd>
+        <dt>Dir</dt><dd class="mono" x-text="data.profiles?.dir"></dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>AI</h2>
+      <dl class="kv">
+        <dt>Active provider</dt><dd x-text="data.ai?.active_provider"></dd>
+        <dt>Timeout / retries</dt><dd x-text="(data.ai?.timeout||'-') + 's / ' + (data.ai?.max_retries||'-')"></dd>
+        <dt>Gemini keys</dt><dd x-text="data.ai?.gemini_keys_status?.status"></dd>
+      </dl>
+      <ul class="list">
+        <template x-for="p in (data.ai?.providers||[])" :key="p.name">
+          <li>
+            <span x-text="p.name"></span>
+            <span class="muted" x-text="(p.enabled?'on':'off') + ' · ' + (p.preferred_model||'auto') + ' · keys=' + (p.has_keys?'yes':'no')"></span>
+          </li>
+        </template>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>Apply</h2>
+      <dl class="kv">
+        <dt>Mode</dt><dd><strong x-text="data.apply?.mode"></strong></dd>
+        <dt>Final confirmation</dt><dd x-text="data.apply?.require_final_confirmation"></dd>
+        <dt>Daily cap</dt><dd x-text="data.apply?.max_applications_per_day"></dd>
+        <dt>Min score</dt><dd x-text="data.apply?.min_apply_score"></dd>
+        <dt>Easy Apply only</dt><dd x-text="data.apply?.easy_apply_only"></dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Browser / Scheduler</h2>
+      <dl class="kv">
+        <dt>Channel</dt><dd x-text="data.browser?.channel"></dd>
+        <dt>Headless</dt><dd x-text="data.browser?.headless"></dd>
+        <dt>LinkedIn</dt><dd x-text="data.browser?.sessions?.portals?.linkedin"></dd>
+        <dt>Naukri</dt><dd x-text="data.browser?.sessions?.portals?.naukri"></dd>
+        <dt>Scan interval</dt><dd x-text="data.scheduler?.scan_interval_hours + 'h'"></dd>
+        <dt>Paused</dt><dd x-text="data.scheduler?.paused"></dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Runtime</h2>
+      <dl class="kv">
+        <dt>Data root</dt><dd class="mono" x-text="data.runtime?.data_root"></dd>
+        <dt>App root</dt><dd class="mono" x-text="data.runtime?.app_root"></dd>
+        <dt>Database</dt><dd class="mono" x-text="data.database?.path"></dd>
+        <dt>Phase</dt><dd x-text="data.runtime?.phase"></dd>
+        <dt>Uptime</dt><dd x-text="data.runtime?.uptime_seconds + 's'"></dd>
+        <dt>Config file</dt><dd class="mono" x-text="data.reload?.source_path"></dd>
+        <dt>Config mtime</dt><dd x-text="data.reload?.source_mtime"></dd>
+      </dl>
+      <p class="muted" x-text="data.reload?.note"></p>
+    </section>
+  </div>
+</div>
+<script>
+function configSummary() {
+  return {
+    data: null, error: '',
+    async load() {
+      try {
+        const r = await fetch('/api/config/summary');
+        if (!r.ok) { this.error = await r.text(); return; }
+        this.data = await r.json(); this.error = '';
+      } catch (e) { this.error = String(e); }
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -33,6 +33,16 @@ class HumanConfig:
     upward_correction_chance: float = 0.15
     mouse_moves: bool = True
     seed: int | None = None          # set for reproducible behaviour/tests
+    # v3.1.0 human-behaviour tuning.
+    break_chance: float = 0.12               # chance of a "checked my phone" break
+    break_durations_sec: tuple = (30, 60, 120, 180)
+    highlight_chance: float = 0.25           # 20-30%: drag-select the title etc.
+    keyboard_scroll_chance: float = 0.30     # sometimes PageDown/Space/ArrowDown
+    wander_chance: float = 0.5               # drift the mouse to whitespace/logo
+    # Per-JD total reading budget bands (seconds) by JD length (v3.1.2 tuning).
+    read_tiny_sec: tuple = (10, 20)          # short JD  (< ~120 words)
+    read_medium_sec: tuple = (20, 45)        # medium JD (~120-500 words)
+    read_large_sec: tuple = (45, 90)         # long senior roles (> ~500 words)
 
 
 class Humanizer:
@@ -65,7 +75,8 @@ class Humanizer:
         while moved < target:
             step = self.rng.randint(self.cfg.scroll_step_min_px,
                                     self.cfg.scroll_step_max_px)
-            _safe(lambda s=step: page.evaluate(f"window.scrollBy(0, {s})"))
+            # Mouse wheel scroll reads more naturally than instant scrollBy.
+            _safe(lambda s=step: page.mouse.wheel(0, s))
             moved += step
             steps += 1
             self._pause(page, self.rng.randint(self.cfg.scroll_pause_min_ms,
@@ -118,7 +129,13 @@ class Humanizer:
         if status_sink is not None:
             _safe(lambda: status_sink.set(reading_section="top section"))
         for i in range(passes):
-            self.scroll_one_screen(page)
+            # Sometimes scroll with the keyboard, sometimes the wheel.
+            if self.rng.random() < self.cfg.keyboard_scroll_chance:
+                self.keyboard_scroll(page)
+            else:
+                self.scroll_one_screen(page)
+            # Idle human mouse drift so the cursor is never perfectly still.
+            self.human_idle(page)
             seg = (text or "")[600 + i * 600: 600 + (i + 1) * 600] or "(continued)"
             ms = self.read(page, seg, label=f"section {i + 2}")
             total += ms
@@ -131,6 +148,146 @@ class Humanizer:
         logger.info("[human] incremental read: %s passes, ~%sms total (%s words)",
                     passes + 1, total, words)
         return {"passes": passes + 1, "total_ms": total, "timeline": timeline}
+
+    def jd_reading_seconds(self, text: str) -> int:
+        """Total human reading budget for a whole JD, banded by length so a tiny
+        JD takes ~15-20s, a medium one ~30-50s and a large one ~60-120s."""
+        words = len((text or "").split())
+        if words < 120:
+            lo, hi = self.cfg.read_tiny_sec
+        elif words <= 500:
+            lo, hi = self.cfg.read_medium_sec
+        else:
+            lo, hi = self.cfg.read_large_sec
+        return self.rng.randint(lo, hi)
+
+    # ---- keyboard scrolling (sometimes instead of the wheel) ------------
+
+    def keyboard_scroll(self, page) -> str | None:
+        """Occasionally scroll with the keyboard (PageDown/ArrowDown).
+        Avoids Space, which can activate focused buttons/forms.
+        Returns the key used, or None if not enabled/used."""
+        if not self.enabled:
+            return None
+        key = self.rng.choice(["PageDown", "PageDown", "ArrowDown", "ArrowDown"])
+        _safe(lambda: page.keyboard.press(key))
+        self._pause(page, self.rng.randint(300, 900))
+        return key
+
+    # ---- random breaks ("checked my phone") -----------------------------
+
+    def maybe_break(self, page) -> int:
+        """With a small probability, take a longer break as a person would.
+        Returns the break length in ms (0 if no break)."""
+        if not self.enabled:
+            return 0
+        if self.rng.random() >= self.cfg.break_chance:
+            return 0
+        secs = self.rng.choice(list(self.cfg.break_durations_sec))
+        logger.info("[human] taking a %ss break (stepped away / checked phone)",
+                    secs)
+        self._pause(page, secs * 1000)
+        return secs * 1000
+
+    # ---- text highlighting (drag-select) --------------------------------
+
+    def highlight(self, page, x1: float, y1: float, x2: float, y2: float) -> None:
+        """Drag-select from (x1,y1) to (x2,y2): move, press, drag, pause, release
+        -- like a reader highlighting a phrase. Best-effort and never crashes."""
+        if not self.enabled:
+            return
+        self.move_mouse(page, x1, y1)
+        _safe(lambda: page.mouse.down())
+        self.move_mouse(page, x2, y2, steps=self.rng.randint(6, 14))
+        self._pause(page, self.rng.randint(200, 700))
+        _safe(lambda: page.mouse.up())
+        self._last_x, self._last_y = x2, y2
+
+    def maybe_highlight(self, page, box: dict | None) -> bool:
+        """Occasionally (20-30%) highlight an element given its bounding box
+        ({x,y,width,height}). Returns True if a highlight was performed."""
+        if not self.enabled or not box:
+            return False
+        if self.rng.random() >= self.cfg.highlight_chance:
+            return False
+        try:
+            x = float(box.get("x", 0)); y = float(box.get("y", 0))
+            w = float(box.get("width", 0)); h = float(box.get("height", 0))
+        except (TypeError, ValueError):
+            return False
+        if w <= 0 or h <= 0:
+            return False
+        cy = y + h / 2
+        self.highlight(page, x + 2, cy, x + w - 2, cy)
+        # Read the highlighted phrase, then click empty space to deselect -- what
+        # a person does after highlighting (item 2).
+        self._pause(page, self.rng.randint(1000, 5000))
+        self._deselect(page)
+        return True
+
+    def _deselect(self, page) -> None:
+        """Move to an empty area and click, clearing any text selection."""
+        x = self.rng.randint(60, 400)
+        y = self.rng.randint(120, 300)
+        self.move_mouse(page, x, y)
+        _safe(lambda: page.mouse.click(x, y))
+        self._last_x, self._last_y = x, y
+
+    # ---- idle mouse wandering (whitespace / logo / scrollbar) -----------
+
+    def wander(self, page, width: int = 1280, height: int = 800) -> None:
+        """Drift the mouse to a plausible non-clicking spot (whitespace, near the
+        logo top-left, or near the scrollbar on the right), then stop."""
+        if not self.enabled or not self.cfg.mouse_moves:
+            return
+        if self.rng.random() >= self.cfg.wander_chance:
+            return
+        spot = self.rng.choice(["whitespace", "logo", "scrollbar", "top"])
+        if spot == "logo":
+            x, y = self.rng.randint(20, 120), self.rng.randint(15, 70)
+        elif spot == "scrollbar":
+            x, y = width - self.rng.randint(6, 20), self.rng.randint(120, height)
+        elif spot == "top":
+            x, y = self.rng.randint(200, width - 200), self.rng.randint(5, 40)
+        else:
+            x, y = self.rng.randint(60, width - 60), self.rng.randint(120, height - 120)
+        self.move_mouse(page, x, y)
+
+    def human_idle(self, page, width: int = 1280, height: int = 800) -> int:
+        """Idle human mouse behaviour: a short sequence of small curved drifts
+        (diagonal, left/right, toward whitespace/scrollbar/toolbar) with tiny
+        hesitation pauses, so the cursor is never perfectly still while reading.
+        Returns the number of drift moves performed (item 1)."""
+        if not self.enabled or not self.cfg.mouse_moves:
+            return 0
+        # Prefer live viewport when available (avoids hardcoded dimensions).
+        try:
+            vp = page.viewport_size or {}
+            width = int(vp.get("width") or width)
+            height = int(vp.get("height") or height)
+        except Exception:  # noqa: BLE001
+            pass
+        moves = self.rng.randint(1, 3)
+        bx = self._last_x if self._last_x is not None else self.rng.randint(300, 700)
+        by = self._last_y if self._last_y is not None else self.rng.randint(300, 600)
+        for _ in range(moves):
+            kind = self.rng.choice(
+                ["diagonal", "horizontal", "whitespace", "scrollbar", "toolbar"])
+            if kind == "diagonal":
+                bx += self.rng.randint(-140, 140); by += self.rng.randint(-120, 120)
+            elif kind == "horizontal":
+                bx += self.rng.randint(-200, 200)
+            elif kind == "scrollbar":
+                bx = width - self.rng.randint(6, 24)
+            elif kind == "toolbar":
+                bx, by = self.rng.randint(150, width - 150), self.rng.randint(2, 36)
+            else:
+                bx = self.rng.randint(60, width - 60)
+                by = self.rng.randint(120, height - 120)
+            bx = max(2, min(width - 2, bx)); by = max(2, min(height - 2, by))
+            self.move_mouse(page, bx, by)
+            self._pause(page, self.rng.randint(150, 700))     # hesitation
+        return moves
 
     # ---- eased, curved mouse movement -----------------------------------
 

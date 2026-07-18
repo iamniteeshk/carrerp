@@ -116,10 +116,11 @@ def click_job_card(page, job, title_selector: str, humanizer=None,
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
         pre_url = page.url
         if humanizer is not None and humanizer.enabled:
-            humanizer.move_mouse(page, cx, cy)      # curved, human-like path
-            page.wait_for_timeout(150)
+            humanizer.move_mouse(page, cx, cy)
+            page.wait_for_timeout(humanizer.rng.randint(120, 350))
         target.hover(timeout=timeout_ms)
-        page.wait_for_timeout(150)
+        page.wait_for_timeout(humanizer.rng.randint(150, 400) if humanizer
+                              and humanizer.enabled else 150)
         _nav_logger.info("CLICK card '%s' at (%.0f, %.0f)", title, cx, cy)
         try:
             target.click(timeout=timeout_ms)
@@ -482,8 +483,8 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                     detail_fn(j)                  # opens in SAME tab, reads, extracts
                 except Exception as exc:  # noqa: BLE001 - never stop the scan
                     j.read_status = "PARTIAL"
-                    if not getattr(j, "missing_fields", None):
-                        j.missing_fields = [f"open failed: {exc}"]
+                    j.missing_fields = [
+                        f"NAVIGATION_FAILED: open failed: {type(exc).__name__}: {exc}"]
                     _nav_logger.warning("Job %s/%s open failed: %s",
                                         idx, len(collected), exc)
                 # GO BACK to the results listing so the NEXT job's card can
@@ -508,7 +509,10 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                     _nav_logger.warning("Return-to-results failed after job "
                                         "%s/%s: %s", idx, len(collected), exc)
             elif open_it and detail_fn is None:
-                # open_jobs is off or no reader wired: make the reason explicit.
+                j.read_status = "UNREAD"
+                j.missing_fields = [
+                    "EXTRACTION_FAILED: job-open path inactive "
+                    "(browser.open_jobs off or no detail reader wired)"]
                 _nav_logger.warning("Job %s/%s NOT opened: job-open path is not "
                                     "active (browser.open_jobs off or no reader)",
                                     idx, len(collected))
@@ -516,6 +520,12 @@ def collect_incrementally(page, parse_fn, *, scroll_passes: int = 5,
                 on_job(j)
             except Exception as exc:  # noqa: BLE001 - one job never stops browse
                 _nav_logger.warning("on_job callback failed: %s", exc)
+            # Human-like break after a job (occasionally "stepped away").
+            if human_on:
+                try:
+                    humanizer.maybe_break(page)
+                except Exception as exc:  # noqa: BLE001 - never stop the scan
+                    _nav_logger.debug("maybe_break failed: %s", exc)
 
     return collected
 
@@ -575,6 +585,8 @@ class BasePortal(abc.ABC):
     debugger = None                    # VisualDebugger | None
     humanizer = None                  # Humanizer | None
     detail_extractor = None           # JobDetailExtractor | None
+    search_nationwide: bool = False
+    search_include_recommended: bool = False
 
     def _debug_selectors(self) -> dict:
         return {"job_card": self._results_selector(),
@@ -585,12 +597,10 @@ class BasePortal(abc.ABC):
 
     def _build_search_plan(self, keywords: list[str],
                            locations: list[str]) -> list[tuple]:
-        """Ordered plan: recommended jobs first, then LOCATION-MAJOR so the
-        first preferred location (e.g. Chennai) is fully searched across every
-        keyword before moving to the next city; nationwide is the very last
-        broad fallback. De-duplicated by URL.
+        """Ordered plan: optional recommended feed, then LOCATION-MAJOR searches.
 
-        Returns list of (label, url, search, location).
+        Nationwide sweep is OFF by default (quality-first). Enable via
+        ``search_nationwide: true`` in config rules.
         """
         plan: list[tuple] = []
         seen: set[str] = set()
@@ -600,17 +610,17 @@ class BasePortal(abc.ABC):
                 seen.add(url)
                 plan.append((label, url, search, loc))
 
-        if self.RECOMMENDED_URL:
+        if self.RECOMMENDED_URL and getattr(self, "search_include_recommended",
+                                            False):
             add("recommended jobs", self.RECOMMENDED_URL, "recommended", "")
-        # Location-major: finish the highest-priority location (Chennai) across
-        # ALL keywords before starting the next city. This keeps the search in
-        # Chennai first instead of going nationwide early.
+        # Location-major: finish each preferred city across ALL keywords first.
         for loc in (locations or []):
             for kw in keywords:
                 add(f"{kw} in {loc}", self._search_url(kw, loc), kw, loc)
-        # Nationwide sweep LAST, only after every preferred location is exhausted.
-        for kw in keywords:
-            add(f"{kw} (all locations)", self._search_url(kw, ""), kw, "all")
+        # Nationwide sweep only when explicitly enabled.
+        if getattr(self, "search_nationwide", False):
+            for kw in keywords:
+                add(f"{kw} (all locations)", self._search_url(kw, ""), kw, "all")
         return plan
 
     def _search_url(self, keyword: str, location: str) -> str:  # pragma: no cover

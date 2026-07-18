@@ -130,7 +130,16 @@ class NaukriPortal(BasePortal):
             return ApplyOutcome(submitted=False, screenshot_path=shot,
                                 answers=answers, note="dry_run")
 
-        # COMPLETE ON LIVE DOM: confirm the "applied" state and capture ref.
+        # LIVE APPLY SAFETY (v4 production): Naukri Apply / chatbot form-fill +
+        # final Submit are not yet completed against live DOM. Never claim
+        # submitted=True. Stop at the confirmation boundary and wait for an
+        # explicit human confirmation before any real submit.
         shot = self.session.screenshot(
-            f"{self.session.profile_dir}/applied_{job.source_id or 'job'}.png")
-        return ApplyOutcome(submitted=True, screenshot_path=shot, answers=answers)
+            f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
+        logger.warning(
+            "LIVE APPLY: Naukri apply form/submit not completed on live DOM — "
+            "stopping at confirmation boundary for %s @ %s (submitted=False)",
+            job.job_title, job.company)
+        return ApplyOutcome(
+            submitted=False, screenshot_path=shot, answers=answers,
+            note="awaiting_final_confirmation: naukri_apply_incomplete")

@@ -35,6 +35,40 @@ def _make_profile(root: Path, name: str, *, with_resume: bool = True,
 
 # ---- Career Profile Engine ----------------------------------------------
 
+def test_engine_loads_nested_owner_layout():
+    """Production layout: profiles/Murahari_M/<Specialization>/profile.yaml"""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "profiles"
+        owner = root / "Murahari_M"
+        for name in ("General", "Leadership", "GCC"):
+            _make_profile(owner, name, required=(name,), locations=("Chennai",))
+        eng = CareerProfileEngine(root, "General", 70)
+        eng.load()
+        assert set(eng.names()) == {"General", "Leadership", "GCC"}
+        assert eng.get("General").owner == "Murahari_M"
+        assert eng.get("General").relative_key() == "Murahari_M/General"
+        assert eng.select("Leadership", 90).name == "Leadership"
+        assert eng.select("Ghost", 99).name == "General"
+
+
+def test_engine_respects_enabled_flag():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "profiles"
+        _make_profile(root, "General")
+        _make_profile(root, "GCC", required=("GCC",))
+        # Disable GCC
+        p = root / "GCC" / "profile.yaml"
+        text = p.read_text()
+        p.write_text(text + "enabled: false\n")
+        eng = CareerProfileEngine(root, "General", 70)
+        eng.load()
+        assert eng.get("GCC").enabled is False
+        assert "GCC" not in eng.all_required_keywords()
+        assert eng.select("GCC", 99).name == "General"  # disabled → default
+        rows = eng.summary_rows()
+        assert any(r["name"] == "GCC" and not r["enabled"] for r in rows)
+
+
 def test_engine_loads_and_unions():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "profiles"

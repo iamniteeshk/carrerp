@@ -91,6 +91,71 @@ def test_rejects_location_mismatch():
     assert not r.accepted and r.reason == RejectionReason.LOCATION_MISMATCH
 
 
+def test_rejects_ai_role_despite_director_title():
+    # v3.0.0: the exact reported bug -- an AI role must NOT be rescued by the
+    # generic 'Director' leadership word. It is rejected before the AI runs.
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Director - AI",
+                             job_description="Lead AI research and ML teams"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_rejects_ml_role_despite_director_title():
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Director - AI/ML",
+                             job_description="Machine learning platform leadership"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_rejects_data_scientist_lead():
+    engine = RuleEngine(_rule_config())
+    r = engine.evaluate(_job(job_title="Head of Data Science",
+                             job_description="Build data science and analytics"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_ai_infrastructure_role_is_borderline_not_hard_rejected():
+    # A title carrying the candidate's own domain keyword ('Infrastructure') is
+    # borderline, so it is NOT hard-rejected -- the AI is allowed to judge it.
+    engine = RuleEngine(_rule_config())
+    assert engine.evaluate(_job(
+        job_title="Director - AI Infrastructure",
+        job_description="Own cloud and infrastructure platform for AI")).accepted
+
+
+def test_excluded_title_terms_are_config_extensible():
+    engine = RuleEngine(_rule_config(excluded_title_terms=["blockchain"]))
+    r = engine.evaluate(_job(job_title="Director - Blockchain",
+                             job_description="Lead blockchain platform"))
+    assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH
+
+
+def test_rejects_creative_and_media_roles():
+    # v3.1.1 (items 1,15): LinkedIn surfaces these for infra searches. They must
+    # be skipped at the CARD stage (prefilter) so they are never opened, and also
+    # rejected by the full evaluate().
+    engine = RuleEngine(_rule_config())
+    for title in ("Social Media Manager", "Video Editor",
+                  "Senior Graphic Designer", "Content Writer"):
+        pre = engine.prefilter(_job(job_title=title))
+        assert not pre.accepted and pre.reason == RejectionReason.DOMAIN_MISMATCH, title
+        assert not engine.evaluate(_job(job_title=title,
+                                        job_description="creative role")).accepted
+
+
+def test_rejects_software_and_hardware_ic_roles():
+    # v3.1.0: hands-on software/hardware IC roles are the wrong domain even with
+    # a leadership word, and must be rejected before the AI is called.
+    engine = RuleEngine(_rule_config())
+    for title in ("Director - Software Engineer", "Head - Full Stack Developer",
+                  "Director - RTL Design", "VP - VLSI / Semiconductor",
+                  "Head of QA Engineer", "Director - Embedded Systems",
+                  "Head - Data Scientist"):
+        r = engine.evaluate(_job(job_title=title,
+                                 job_description="individual contributor role"))
+        assert not r.accepted and r.reason == RejectionReason.DOMAIN_MISMATCH, title
+
+
 def test_missing_salary_allowed():
     engine = RuleEngine(_rule_config())
     assert engine.evaluate(_job(salary="")).accepted

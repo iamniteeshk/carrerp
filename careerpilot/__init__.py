@@ -1,2 +1,2 @@
 """CareerPilot package."""
-__version__ = "2.9.3.1"
+__version__ = "4.0.0"

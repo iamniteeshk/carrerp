@@ -153,6 +153,22 @@ MIGRATIONS: list[tuple[int, str]] = [
     CREATE INDEX IF NOT EXISTS idx_apps_applied ON applications(applied_at);
     CREATE INDEX IF NOT EXISTS idx_apps_company ON applications(company);
     """),
+    (3, """
+    ALTER TABLE jobs ADD COLUMN reading_ms INTEGER DEFAULT 0;
+    """),
+    (4, """
+    CREATE TABLE IF NOT EXISTS activity_events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts         TEXT NOT NULL,
+        level      TEXT NOT NULL,
+        category   TEXT NOT NULL,
+        message    TEXT NOT NULL,
+        detail     TEXT,
+        job_id     INTEGER,
+        portal     TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_activity_ts ON activity_events(ts);
+    """),
 ]
 
 

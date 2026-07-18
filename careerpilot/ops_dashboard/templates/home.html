@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Overview · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="home()" x-init="load()" hx-get="/api/summary" hx-trigger="every 5s" hx-swap="none" @htmx:after-request="onPoll($event)">
+  <div class="topbar">
+    <h1 class="h1">Operations Overview</h1>
+    <span class="badge dot" :class="'phase-' + phase" x-text="phase"></span>
+  </div>
+  <div class="grid kpis">
+    <template x-for="k in kpis" :key="k.label">
+      <div class="card"><div class="kpi-val" x-text="k.value"></div><div class="kpi-label" x-text="k.label"></div></div>
+    </template>
+  </div>
+  <div class="grid two" style="margin-top:1rem">
+    <div class="card">
+      <h3>Live activity</h3>
+      <div class="feed" hx-get="/partials/feed" hx-trigger="every 4s" hx-swap="innerHTML"></div>
+    </div>
+    <div class="card">
+      <h3>System</h3>
+      <div class="meta-row">
+        <span>Scheduler <code x-text="sched.running ? 'running' : 'stopped'"></code></span>
+        <span>Browser <code x-text="browserOk"></code></span>
+        <span>Last run <code x-text="lastRun"></code></span>
+        <span>Uptime <code x-text="uptime"></code></span>
+      </div>
+      <pre style="font-family:var(--mono);font-size:.78rem;white-space:pre-wrap;color:var(--muted)" x-text="JSON.stringify(health, null, 2).slice(0,1800)"></pre>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function home() {
+  return {
+    phase: 'Idle', kpis: [], sched: {}, health: {}, browserOk: '—', lastRun: '—', uptime: '—',
+    async load() {
+      const sum = await fetch('/api/summary').then(r => r.json());
+      this.apply(sum);
+    },
+    onPoll(ev) {
+      try { this.apply(JSON.parse(ev.detail.xhr.responseText)); } catch (_) {}
+    },
+    apply(sum) {
+      this.phase = sum.phase;
+      this.uptime = CPOps.fmtUptime(sum.uptime_seconds);
+      this.sched = sum.scheduler || {};
+      this.health = sum.health || {};
+      const c = sum.cards || {};
+      const r = (sum.health || {}).resources || {};
+      const d = (sum.health || {}).disk || {};
+      this.lastRun = (c.last_scan || {}).finished_at || '—';
+      const b = sum.browser || {};
+      this.browserOk = Object.keys(b.portals || {}).length ? 'active' : (b.detail || 'idle');
+      this.kpis = [
+        {label:'Status', value: sum.phase},
+        {label:'Found today', value: c.jobs_found_today},
+        {label:'Scored', value: c.jobs_scored_today},
+        {label:'Applied', value: c.jobs_applied_today},
+        {label:'Rejected', value: c.jobs_rejected_today},
+        {label:'Pending', value: c.jobs_pending},
+        {label:'Failed', value: c.failed_jobs},
+        {label:'AI', value: c.ai_requests_today},
+        {label:'CPU', value: r.cpu_percent},
+        {label:'RAM', value: r.ram_percent},
+        {label:'Disk', value: d.used_percent},
+        {label:'Uptime', value: this.uptime},
+      ];
+    }
+  };
+}
+</script>
+{% endblock %}
