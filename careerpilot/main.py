@@ -5,10 +5,14 @@ Startup sequence (P004): load+validate config -> logging -> database+migrations
 validation fails fast before anything else starts.
 
 Usage:
-    python -m careerpilot.main run        # start scheduler + dashboard
-    python -m careerpilot.main scan        # run a single scan and exit
-    python -m careerpilot.main dashboard   # dashboard only
+    python -m careerpilot.main run          # start scheduler + dashboard
+    python -m careerpilot.main scan         # run a single scan and exit
+    python -m careerpilot.main dashboard    # dashboard only
     python -m careerpilot.main check        # validate config + init DB, exit
+    python -m careerpilot.main doctor       # pre-flight PASS/WARN/FAIL report
+    python -m careerpilot.main doctor --fix  # repair safe issues, then report
+    python -m careerpilot.main maintenance  # retention cleanup
+    python -m careerpilot.main setup        # scaffold config/profiles/.env
 """
 
 from __future__ import annotations
@@ -807,7 +811,9 @@ def main(argv: list[str] | None = None) -> int:
     # The doctor must run even when config is broken -- that's its job.
     if command == "doctor":
         _bootstrap_config()   # a fresh install has only *.example templates
-        return 0 if run_doctor() else 3
+        fix = "--fix" in argv or "-f" in argv
+        production = "--production" in argv
+        return 0 if run_doctor(fix=fix, production=production) else 3
 
     _bootstrap_config()
     try:

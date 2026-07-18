@@ -26,7 +26,20 @@ your behalf, pausing for you whenever a security checkpoint needs a human.
   OTPs, or solve CAPTCHAs. (The Human Interaction framework itself is a planned
   phase — see Roadmap.)
 
-## Quick start
+## Quick start (Windows dedicated PC)
+
+```powershell
+git clone <repo-url> C:\CareerPilot
+cd C:\CareerPilot
+.\setup_windows.ps1 -ProductionConfig
+# edit .env + config\config.yaml + profiles\*\resume.pdf
+python doctor.py
+.\scripts\run_careerpilot.ps1
+```
+
+Full guide: [`docs/INSTALL_WINDOWS.md`](docs/INSTALL_WINDOWS.md).
+
+## Quick start (any platform)
 
 ```bash
 # 1. Install

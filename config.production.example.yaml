@@ -3,6 +3,18 @@
 # Copy to config/config.yaml on the dedicated Windows PC after editing
 # candidate details, profiles, and secrets in .env.
 #
+# Recommended install root (example — any path works; keep paths relative):
+#   C:\CareerPilot\
+#     config\config.yaml     ← this file
+#     profiles\              ← resumes
+#     profiles_browser\      ← dedicated Chrome profiles (LinkedIn/Naukri)
+#     database\  logs\  reports\  screenshots\  cache\
+#
+# One-command setup on a fresh Windows 11 box:
+#   .\setup_windows.ps1 -ProductionConfig
+#   python doctor.py --fix
+# See docs/INSTALL_WINDOWS.md
+#
 # Goals: 24x7 stability, match quality, human-like browsing, safe apply.
 # Speed is the lowest priority. Quality over quantity.
 # ============================================================================

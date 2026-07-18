@@ -28,23 +28,34 @@ PROFILES_DIR = Path("profiles")
 EXAMPLE_PROFILES = Path("profiles.example")
 ENV_FILE = Path(".env")
 EXAMPLE_ENV = Path(".env.example")
-RUNTIME_DIRS = ("logs", "database", "screenshots", "reports", "profiles_browser")
+RUNTIME_DIRS = (
+    "logs", "database", "database/backups", "screenshots", "reports",
+    "profiles_browser", "profiles_browser/linkedin", "profiles_browser/naukri",
+    "cache", "cache/jobs", "documents", "debug",
+)
 
 
-def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG) -> list[str]:
+def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
+                    *, prefer_production: bool = False) -> list[str]:
     """Create missing runtime files/dirs from shipped examples. Idempotent."""
     actions: list[str] = []
     config_path = Path(config_path)
 
-    # 1. config/config.yaml  <-  config.example.yaml
+    # 1. config/config.yaml  <-  production or default example
     if not config_path.exists():
-        if EXAMPLE_CONFIG.exists():
+        example = None
+        prod = Path("config.production.example.yaml")
+        if prefer_production and prod.exists():
+            example = prod
+        elif EXAMPLE_CONFIG.exists():
+            example = EXAMPLE_CONFIG
+        if example is not None:
             config_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(EXAMPLE_CONFIG, config_path)
-            actions.append(f"created {config_path} from {EXAMPLE_CONFIG}")
+            shutil.copyfile(example, config_path)
+            actions.append(f"created {config_path} from {example}")
         else:
-            logger.warning("No %s and no %s to copy from",
-                           config_path, EXAMPLE_CONFIG)
+            logger.warning("No %s and no example config to copy from",
+                           config_path)
 
     # 2. profiles/  <-  profiles.example/
     if not PROFILES_DIR.exists():
