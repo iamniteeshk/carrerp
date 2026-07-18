@@ -234,19 +234,47 @@ If login is lost after a Windows update, delete the affected folder under
 
 ### Scheduled Task (24×7)
 
+**First few days (recommended — easier to debug):**
+
 ```powershell
 .\scripts\Register-CareerPilotStartup.ps1
-# Remove later:
+# same as:
+.\scripts\Register-CareerPilotStartup.ps1 -Mode LogOn
+```
+
+Starts **At LogOn** for the current user. Restart on failure: every **1 minute**, up to **3** times.
+
+**After the machine is stable (true unattended recovery after power outage):**
+
+```powershell
+# Run PowerShell as Administrator
+.\scripts\Register-CareerPilotStartup.ps1 -Mode Startup
+```
+
+Starts **At Startup**, runs **whether the user is logged on or not** (SYSTEM). Same 1‑minute / 3‑retry restart policy.
+
+```powershell
 .\scripts\Register-CareerPilotStartup.ps1 -Remove
 ```
 
-This registers a **current-user** logon task that runs:
+This registers a task that runs:
 
 ```text
 .venv\Scripts\python.exe -m careerpilot.main run
 ```
 
-with restart-on-failure (3 attempts).
+Alternative for LogOn-only boxes: enable Windows **auto-login** for the CareerPilot user so AtLogOn still fires after a power restore.
+
+### Dashboard LAN firewall (required for 0.0.0.0:8006)
+
+Bind on all interfaces is fine on a dedicated LAN PC. Restrict who can connect:
+
+```powershell
+# Run PowerShell as Administrator
+.\scripts\Allow-DashboardLan.ps1
+```
+
+Creates an inbound rule: **TCP 8006**, remote address **LocalSubnet** only (Private/Domain profiles). Never port-forward 8006 to the internet. Always set a strong `DASHBOARD_PASSWORD` in `.env`.
 
 ### Update / backup / health (production ops)
 

@@ -96,8 +96,14 @@ def test_scripts_exist():
     root = Path(__file__).resolve().parents[1]
     for name in ("scripts/update_careerpilot.ps1", "scripts/backup.ps1",
                  "scripts/restore.ps1", "scripts/health.ps1",
+                 "scripts/Allow-DashboardLan.ps1",
+                 "scripts/Register-CareerPilotStartup.ps1",
                  "docs/PRODUCTION_CHECKLIST.md", "requirements.lock"):
         check(name, (root / name).exists())
+    reg = (root / "scripts/Register-CareerPilotStartup.ps1").read_text(
+        encoding="utf-8")
+    check("startup LogOn+Startup modes", "LogOn" in reg and "Startup" in reg)
+    check("startup restart every 1 min", "Minutes 1" in reg)
 
 
 if __name__ == "__main__":

@@ -57,9 +57,10 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 
 ## 24×7 ops
 
-- [ ] Ops dashboard reachable on LAN (`http://<geekom-ip>:8006`) with `DASHBOARD_PASSWORD`
+- [ ] Ops dashboard reachable on LAN (`http://<geekom-ip>:8006`) with strong `DASHBOARD_PASSWORD`
 - [ ] Mission Control shows live KPIs / activity after `run`
-- [ ] Startup task registered (`.\scripts\Register-CareerPilotStartup.ps1`)
+- [ ] Firewall: TCP 8006 LocalSubnet only (`.\scripts\Allow-DashboardLan.ps1`) — **not** port-forwarded
+- [ ] Startup task registered (`.\scripts\Register-CareerPilotStartup.ps1` — LogOn first; `-Mode Startup` after stable)
 - [ ] PID lock prevents double start
 - [ ] Graceful stop via `scripts\stop_careerpilot.bat` leaves DB intact
 - [ ] Daily backup appears under `backups\` and/or `database\backups\`

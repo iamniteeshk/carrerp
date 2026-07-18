@@ -134,11 +134,19 @@ AI calls are now persisted into `ai_history` from `AIEngine._log_ai`.
 
 ## Security
 
+- Bind: `0.0.0.0:8006` (LAN-reachable) ✔️
+- **Windows Firewall:** allow TCP 8006 from **LocalSubnet only**
+
+  ```powershell
+  # Admin PowerShell
+  .\scripts\Allow-DashboardLan.ps1
+  ```
+
+- Strong `DASHBOARD_PASSWORD` in `.env` (required for non-loopback binds)
 - Session cookie (`cp_ops_session`) with configurable TTL
 - CSRF token on control POSTs (`csrf_token` form field or `X-CSRF-Token`)
-- Password from `DASHBOARD_PASSWORD`
-- No internet exposure by default — bind is LAN-only; do not port-forward 8006
 - Settings page is read-only (no remote config writes)
+- **Never port-forward 8006** on the router / never expose to the public internet
 
 ---
 
@@ -153,11 +161,18 @@ AI calls are now persisted into `ai_history` from `AIEngine._log_ai`.
 
 ## Manual steps on the GEEKOM
 
-1. Set `DASHBOARD_PASSWORD` in `.env`
+1. Set a **strong** `DASHBOARD_PASSWORD` in `.env`
 2. Ensure `dashboard.host: 0.0.0.0` and `port: 8006`
-3. Allow inbound TCP 8006 on the Windows firewall for your LAN only
-4. Open `http://<geekom-ip>:8006` from your laptop and sign in
-5. Confirm Mission Control shows Idle/Searching after `run`
+3. Restrict the port to your LAN subnet:
+
+   ```powershell
+   # Admin PowerShell
+   .\scripts\Allow-DashboardLan.ps1
+   ```
+
+4. Do **not** port-forward 8006 on the router
+5. Open `http://<geekom-ip>:8006` from your laptop and sign in
+6. Confirm Mission Control shows Idle/Searching after `run`
 
 Do **not** treat live apply as verified until confirmation detection and
 multi-day unattended operation pass on this machine.
