@@ -12,7 +12,19 @@ Reach it from any device on your LAN — no monitor required on the GEEKOM.
 
 ---
 
-## Architecture
+## Pages
+
+| Route | Purpose |
+|---|---|
+| `/` | Mission Control live feed |
+| `/config` | **Config Summary** — effective runtime config (read-only) |
+| `/config/health` | **Config Health** — doctor-style checks + score |
+| `/profiles` | Profile metadata, resume/keyword status, usage |
+| `/ai` | AI providers, key status (never values), recent calls |
+| `/settings` | Grouped General / Advanced / Developer (read-only v1) |
+| `/health` | Process / disk / heartbeat snapshot |
+
+Settings remain **read-only** in the v1 freeze. Edit `config.yaml` / `.env` on disk and restart.
 
 ```
 Browser (LAN laptop)

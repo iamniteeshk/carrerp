@@ -123,7 +123,7 @@ telegram:
 # ---- Career profiles (folders under profiles/) ------------------------------
 profiles:
   dir: profiles
-  default: Sample_Candidate         # rename after you copy a real profile folder
+  default: General                  # specialization name under profiles/Murahari_M/
   confidence_threshold: 70          # below this → fall back to default profile
 
 # ---- Search / filter rules --------------------------------------------------

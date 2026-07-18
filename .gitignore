@@ -42,6 +42,8 @@ careerpilot.pid
 !/data/profiles/
 !/data/profiles/Sample_Candidate/
 !/data/profiles/Sample_Candidate/**
+!/data/profiles/Murahari_M/
+!/data/profiles/Murahari_M/**
 
 # Still never commit live secrets if someone copies them into app/data/
 /data/.env

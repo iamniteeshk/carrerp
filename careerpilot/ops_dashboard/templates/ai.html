@@ -2,31 +2,45 @@
 {% block title %}AI · CareerPilot{% endblock %}
 {% block content %}
 <div x-data="aiPage()" x-init="load()">
-  <div class="topbar"><h1 class="h1">AI Dashboard</h1></div>
+  <div class="topbar"><h1 class="h1">AI Management</h1>
+    <button class="btn" @click="load()">Refresh</button>
+  </div>
   <div class="grid kpis">
-    <div class="card"><div class="kpi-val" x-text="data.active_provider || '—'"></div><div class="kpi-label">Provider</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.active_provider || '—'"></div><div class="kpi-label">Active provider</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.any_available === true ? 'yes' : (data.any_available === false ? 'no' : '—')"></div><div class="kpi-label">Reachable</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.secrets?.gemini || '—'"></div><div class="kpi-label">Gemini keys</div></div>
+    <div class="card"><div class="kpi-val" x-text="(data.timeout||'—') + 's'"></div><div class="kpi-label">Timeout</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.max_retries ?? '—'"></div><div class="kpi-label">Max retries</div></div>
     <div class="card"><div class="kpi-val" x-text="data.today?.requests || 0"></div><div class="kpi-label">Requests today</div></div>
     <div class="card"><div class="kpi-val" x-text="data.today?.tokens || 0"></div><div class="kpi-label">Tokens today</div></div>
     <div class="card"><div class="kpi-val" x-text="avgMs"></div><div class="kpi-label">Avg latency ms</div></div>
-    <div class="card"><div class="kpi-val" x-text="data.runtime?.cache_hits || 0"></div><div class="kpi-label">Cache hits</div></div>
-    <div class="card"><div class="kpi-val" x-text="data.runtime?.cache_misses || 0"></div><div class="kpi-label">Cache misses</div></div>
     <div class="card"><div class="kpi-val" x-text="data.runtime?.failed || 0"></div><div class="kpi-label">Failed</div></div>
-    <div class="card"><div class="kpi-val" x-text="data.runtime?.retries || 0"></div><div class="kpi-label">Retries</div></div>
-    <div class="card"><div class="kpi-val" x-text="(data.runtime?.cost_usd || 0).toFixed?.(4) || '0'"></div><div class="kpi-label">Cost est. USD</div></div>
   </div>
+
   <div class="card" style="margin-top:1rem">
-    <h3>Providers</h3>
+    <h3>Configured providers <span class="muted">(keys never shown)</span></h3>
+    <p class="muted">Change provider/model in <code>config.yaml</code> → restart. v1 freeze keeps AI policy on disk.</p>
     <div class="table-wrap">
       <table class="data">
-        <thead><tr><th>Name</th><th>Available</th><th>Model</th></tr></thead>
+        <thead><tr><th>Name</th><th>Enabled</th><th>Kind</th><th>Preferred model</th><th>Discover</th><th>Keys</th><th>Live available</th><th>Live model</th></tr></thead>
         <tbody>
-          <template x-for="p in data.providers || []" :key="p.name">
-            <tr><td x-text="p.name"></td><td x-text="p.available"></td><td x-text="p.model"></td></tr>
+          <template x-for="p in mergedProviders" :key="p.name">
+            <tr>
+              <td x-text="p.name"></td>
+              <td x-text="p.enabled"></td>
+              <td x-text="p.kind"></td>
+              <td x-text="p.preferred_model || '(auto)'"></td>
+              <td x-text="p.discover_models"></td>
+              <td x-text="p.keys_status"></td>
+              <td x-text="p.available"></td>
+              <td x-text="p.model || '—'"></td>
+            </tr>
           </template>
         </tbody>
       </table>
     </div>
   </div>
+
   <div class="card" style="margin-top:1rem">
     <h3>Recent calls</h3>
     <div class="table-wrap">
@@ -54,11 +68,27 @@
 <script>
 function aiPage() {
   return {
-    data: { today: {}, runtime: {}, providers: [], recent: [] },
+    data: { today: {}, runtime: {}, providers: [], config_providers: [], recent: [], secrets: {} },
     get avgMs() {
       const t = this.data.today?.avg_time;
       if (t) return Math.round(t * 1000);
       return this.data.runtime?.avg_latency_ms ?? '—';
+    },
+    get mergedProviders() {
+      const live = Object.fromEntries((this.data.providers || []).map(p => [p.name, p]));
+      const cfg = this.data.config_providers || [];
+      if (!cfg.length) {
+        return (this.data.providers || []).map(p => ({
+          name: p.name, enabled: true, kind: '', preferred_model: '',
+          discover_models: '', keys_status: '—',
+          available: p.available, model: p.model,
+        }));
+      }
+      return cfg.map(c => ({
+        ...c,
+        available: live[c.name]?.available,
+        model: live[c.name]?.model,
+      }));
     },
     async load() { this.data = await fetch('/api/ai').then(r => r.json()); }
   };

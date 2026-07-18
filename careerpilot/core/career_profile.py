@@ -1,32 +1,35 @@
 """Career Profile Engine.
 
-A Career Profile is a self-contained career specialization living in its own
-folder under ``profiles/``. Each profile owns everything needed to apply within
-that specialization: resume, optional cover letter, keywords, preferred
-locations, screening-answer cache, optional salary override, and supporting
-documents.
+A Career Profile is a self-contained career specialization. Production layout
+(v1 freeze)::
 
     profiles/
-      Infrastructure/
-        profile.yaml
-        resume.pdf
-        cover_letter.docx          (optional)
-        keywords.yaml
-        screening_answers.yaml     (optional)
-        preferred_locations.yaml   (optional)
-        documents/                 (optional)
+      Murahari_M/                 # candidate owner folder (one deployment)
+        General/
+          profile.yaml
+          Murahari_M_Resume.pdf
+          keywords.yaml           # optional
+          preferred_locations.yaml
+          screening_answers.yaml
+        Leadership/
+          ...
+        GCC/
+        GCC_Head_CXO/
+        Digital_Workplace/
+        Contact_Centre/
 
-Adding a specialization is just adding a folder -- no Python or central config
-changes. The AI returns a *profile name* and a *confidence*, never a filename;
-the engine maps the name to the profile and falls back to the configured default
-profile when confidence is below threshold or the name is unknown.
+Flat layout (``profiles/<Name>/profile.yaml``) is still accepted for tests and
+shipped sample packs.
+
+The AI returns a *profile name* and a *confidence*, never a filename; the engine
+maps the name to the profile and falls back to the configured default when
+confidence is below threshold or the name is unknown.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-
 
 from .logging_setup import get_logger
 from .yaml_utils import load_yaml, strip_line_meta
@@ -47,6 +50,8 @@ class CareerProfile:
     name: str
     folder: Path
     description: str = ""
+    owner: str = ""          # parent folder e.g. Murahari_M (empty if flat)
+    enabled: bool = True
     resume_path: Path | None = None
     cover_letter_path: Path | None = None
     required_keywords: list[str] = field(default_factory=list)
@@ -61,13 +66,10 @@ class CareerProfile:
         """Return a cached screening answer for ``question`` (case-insensitive)."""
         return self.screening_answers.get(_normalize(question))
 
-    # ---- document accessors (the only way other modules get files) -------
-
     def has_resume(self) -> bool:
         return self.resume_path is not None and self.resume_path.exists()
 
     def resume_file(self) -> str:
-        """Path to this profile's resume, or '' if it has none on disk."""
         return str(self.resume_path) if self.has_resume() else ""
 
     def has_own_cover_letter(self) -> bool:
@@ -78,14 +80,18 @@ class CareerProfile:
         return str(self.cover_letter_path) if self.has_own_cover_letter() else ""
 
     def document(self, doc_type: str) -> str:
-        """Path to a named supporting document, or '' if absent."""
         path = self.documents.get(doc_type)
         return str(path) if path is not None and path.exists() else ""
 
     def all_documents(self) -> dict[str, str]:
-        """All existing supporting documents as {type: path}."""
         return {t: str(p) for t, p in self.documents.items()
                 if p is not None and p.exists()}
+
+    def relative_key(self) -> str:
+        """Stable path key: Owner/Name or Name."""
+        if self.owner:
+            return f"{self.owner}/{self.name}"
+        return self.name
 
 
 def _normalize(text: str) -> str:
@@ -109,19 +115,21 @@ class CareerProfileEngine:
     # ---- discovery / loading --------------------------------------------
 
     def load(self) -> dict[str, CareerProfile]:
-        """Discover and load every profile folder. Idempotent."""
+        """Discover nested and flat profile folders. Idempotent."""
         self.profiles = {}
         if not self.profiles_dir.exists():
             raise CareerProfileError(
                 f"Profiles directory not found: {self.profiles_dir}")
-        for child in sorted(self.profiles_dir.iterdir()):
-            if not child.is_dir() or child.name.startswith("."):
-                continue
-            if not (child / PROFILE_FILE).exists():
-                logger.warning("Skipping '%s': no %s", child.name, PROFILE_FILE)
-                continue
-            profile = self._load_one(child)
+
+        for folder, owner in self._discover_profile_dirs():
+            profile = self._load_one(folder, owner=owner)
+            if profile.name in self.profiles:
+                raise CareerProfileError(
+                    f"Duplicate profile name '{profile.name}' from "
+                    f"{folder} (already loaded from "
+                    f"{self.profiles[profile.name].folder})")
             self.profiles[profile.name] = profile
+
         if not self.profiles:
             raise CareerProfileError(
                 f"No valid career profiles found under {self.profiles_dir}")
@@ -129,9 +137,40 @@ class CareerProfileEngine:
                     len(self.profiles), ", ".join(self.profiles))
         return self.profiles
 
-    def _load_one(self, folder: Path) -> CareerProfile:
+    def _discover_profile_dirs(self) -> list[tuple[Path, str]]:
+        """Return ``(folder, owner)`` for every specialization directory.
+
+        Production: ``profiles/<Owner>/<Specialization>/profile.yaml``
+        Flat/sample: ``profiles/<Specialization>/profile.yaml``
+        """
+        found: list[tuple[Path, str]] = []
+        for child in sorted(self.profiles_dir.iterdir()):
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            if (child / PROFILE_FILE).exists():
+                found.append((child, ""))
+                continue
+            # Nested owner folder — scan one level deep.
+            nested_any = False
+            for sub in sorted(child.iterdir()):
+                if not sub.is_dir() or sub.name.startswith("."):
+                    continue
+                if (sub / PROFILE_FILE).exists():
+                    found.append((sub, child.name))
+                    nested_any = True
+            if not nested_any:
+                logger.warning(
+                    "Skipping '%s': no %s (expected flat profile or "
+                    "Owner/Specialization/%s)",
+                    child.name, PROFILE_FILE, PROFILE_FILE)
+        return found
+
+    def _load_one(self, folder: Path, *, owner: str = "") -> CareerProfile:
         meta = strip_line_meta(load_yaml(folder / PROFILE_FILE))
         name = meta.get("name") or folder.name
+        enabled = meta.get("enabled", True)
+        if isinstance(enabled, str):
+            enabled = enabled.strip().lower() in ("1", "true", "yes", "on")
 
         resume_path = self._resolve(folder, meta.get("resume", "resume.pdf"))
         cover = meta.get("cover_letter")
@@ -152,6 +191,8 @@ class CareerProfileEngine:
         return CareerProfile(
             name=name,
             folder=folder,
+            owner=owner or str(meta.get("owner") or ""),
+            enabled=bool(enabled),
             description=meta.get("description", ""),
             resume_path=resume_path,
             cover_letter_path=cover_path,
@@ -210,12 +251,18 @@ class CareerProfileEngine:
     def get(self, name: str) -> CareerProfile | None:
         return self.profiles.get(name)
 
+    def enabled_profiles(self) -> dict[str, CareerProfile]:
+        return {n: p for n, p in self.profiles.items() if p.enabled}
+
     @property
     def default_profile(self) -> CareerProfile:
         profile = self.profiles.get(self.default_profile_name)
         if profile is None:
             raise CareerProfileError(
                 f"Default career profile '{self.default_profile_name}' not loaded")
+        if not profile.enabled:
+            raise CareerProfileError(
+                f"Default career profile '{self.default_profile_name}' is disabled")
         return profile
 
     def select(self, profile_name: str, confidence: float) -> CareerProfile:
@@ -226,27 +273,51 @@ class CareerProfileEngine:
                         self.default_profile_name)
             return self.default_profile
         profile = self.profiles.get(profile_name)
-        if profile is None:
-            logger.warning("Unknown profile '%s' from AI; using default '%s'",
+        if profile is None or not profile.enabled:
+            logger.warning("Unknown/disabled profile '%s' from AI; using default '%s'",
                            profile_name, self.default_profile_name)
             return self.default_profile
         return profile
 
-    # ---- aggregates used by the Rule Engine (union across profiles) ------
+    # ---- aggregates used by the Rule Engine (union across enabled) ------
 
     def all_required_keywords(self) -> list[str]:
         seen: dict[str, None] = {}
-        for p in self.profiles.values():
+        for p in self.enabled_profiles().values():
             for kw in p.required_keywords:
                 seen.setdefault(kw, None)
         return list(seen)
 
     def all_preferred_locations(self) -> list[str]:
         seen: dict[str, None] = {}
-        for p in self.profiles.values():
+        for p in self.enabled_profiles().values():
             for loc in p.preferred_locations:
                 seen.setdefault(loc, None)
         return list(seen)
 
     def names(self) -> list[str]:
         return list(self.profiles)
+
+    def summary_rows(self) -> list[dict]:
+        """Operator-facing metadata for Mission Control."""
+        rows = []
+        for p in self.profiles.values():
+            rows.append({
+                "name": p.name,
+                "owner": p.owner,
+                "key": p.relative_key(),
+                "enabled": p.enabled,
+                "description": p.description,
+                "folder": str(p.folder),
+                "is_default": p.name == self.default_profile_name,
+                "resume_ok": p.has_resume(),
+                "resume_path": p.resume_file(),
+                "cover_letter_ok": p.has_own_cover_letter(),
+                "keyword_count": len(p.required_keywords) + len(p.preferred_keywords),
+                "required_keywords": list(p.required_keywords),
+                "location_count": len(p.preferred_locations),
+                "locations": list(p.preferred_locations),
+                "screening_count": len(p.screening_answers),
+                "resume_version": p.resume_version,
+            })
+        return rows

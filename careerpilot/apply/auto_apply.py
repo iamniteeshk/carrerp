@@ -124,6 +124,11 @@ class AutoApplyEngine:
         # Resolve the Career Profile (confidence-gated default fallback).
         profile = self.profile_engine.select(
             evaluation.career_profile, evaluation.confidence)
+        try:
+            from ..ops_dashboard.runtime import HUB
+            HUB.note_profile(profile.name)
+        except Exception:  # noqa: BLE001
+            pass
         resume_path = self.documents.resume_for(profile)
         cover_letter = self._maybe_cover_letter(job, profile)
         answer_fn = self._make_answer_fn(profile, job)

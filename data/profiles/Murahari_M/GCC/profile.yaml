@@ -1,0 +1,8 @@
+# Specialization: GCC
+name: GCC
+description: GCC specialization
+enabled: true
+resume: Murahari_M_Resume_GCC.pdf
+resume_version: v1
+documents:
+  resume: Murahari_M_Resume_GCC.pdf

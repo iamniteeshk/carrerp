@@ -103,8 +103,9 @@ class BrowserManager:
             return
         if not _PLAYWRIGHT_AVAILABLE:
             raise RuntimeError(
-                "Playwright is not installed. Run: py -m py -m pip install playwright "
-                "&& playwright install chromium")
+                "Playwright is not installed. Run: py -m pip install playwright "
+                "(or: .\\.venv\\Scripts\\python.exe -m pip install playwright). "
+                "Then: py -m playwright install chromium")
         self._pw = sync_playwright().start()
 
     def profile_dir(self, portal: str) -> Path:

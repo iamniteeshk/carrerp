@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Config Health · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="configHealth()" x-init="load()" class="page">
+  <header class="page-head">
+    <h1>Configuration Health</h1>
+    <p class="muted">Doctor-style diagnostics for the live deployment.</p>
+    <button class="btn" @click="load()">Refresh</button>
+  </header>
+
+  <div class="score-band" x-show="data">
+    <div class="score" x-text="(data.score||0) + '/100'"></div>
+    <div>
+      <strong x-text="data.band"></strong>
+      <span class="muted" x-text="' · ' + (data.fails||0) + ' fail · ' + (data.warns||0) + ' warn'"></span>
+      <div class="mono muted" x-text="data.data_root"></div>
+    </div>
+  </div>
+
+  <template x-if="error"><p class="warn" x-text="error"></p></template>
+
+  <section class="panel" x-show="data">
+    <table class="table">
+      <thead><tr><th>Group</th><th>Check</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>
+        <template x-for="c in (data.checks||[])" :key="c.group+c.name">
+          <tr>
+            <td x-text="c.group"></td>
+            <td x-text="c.name"></td>
+            <td>
+              <span class="pill" :class="'st-'+c.status" x-text="c.status"></span>
+            </td>
+            <td class="muted" x-text="c.message"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </section>
+</div>
+<style>
+.score-band { display:flex; gap:1.5rem; align-items:center; margin:1rem 0 1.5rem; }
+.score { font-size:2.4rem; font-weight:700; font-family:var(--mono, monospace); }
+.pill { padding:.15rem .5rem; border-radius:4px; font-size:.75rem; font-weight:600; }
+.st-PASS { background:#1b4332; color:#b7f7c8; }
+.st-WARN { background:#5c3d00; color:#ffd666; }
+.st-FAIL { background:#5c1010; color:#ffb4b4; }
+.st-SKIP { background:#222; color:#aaa; }
+</style>
+<script>
+function configHealth() {
+  return {
+    data: {}, error: '',
+    async load() {
+      try {
+        const r = await fetch('/api/config/health');
+        if (!r.ok) { this.error = await r.text(); return; }
+        this.data = await r.json(); this.error = '';
+      } catch (e) { this.error = String(e); }
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -20,7 +20,7 @@ C:\CareerPilot\                         CAREERPILOT_HOME
 ├── data\                               CAREERPILOT_DATA_ROOT
 │   ├── .env                            secrets
 │   ├── config\config.yaml              machine + candidate + rules
-│   ├── profiles\<Name>\                resumes + profile YAML
+│   ├── profiles/<Owner>/<Spec>/         e.g. Murahari_M/General + resume
 │   ├── documents\                      optional supporting files
 │   ├── certificates\                   optional (backed up; not auto-used)
 │   ├── browser\{linkedin,naukri}\      Playwright Chromium user-data dirs

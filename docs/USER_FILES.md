@@ -9,18 +9,29 @@ Legend: **T** = template in Git · **R** = required (you create) · **O** = opti
 
 ## Templates shipped with the repository (`app/data/`)
 
-These use **fictional** John Doe / ExampleCorp values only.
+These use **placeholder** values only.
 
 | Template | Copy / rename to (live data root) |
 |---|---|
 | `data/.env.example` | `.env` |
 | `data/config/config.example.yaml` | `config/config.yaml` |
-| `data/profiles/Sample_Candidate/profile.example.yaml` | `profiles/<Name>/profile.yaml` |
-| `data/profiles/Sample_Candidate/keywords.example.yaml` | `profiles/<Name>/keywords.yaml` |
-| `data/profiles/Sample_Candidate/preferred_locations.example.yaml` | `profiles/<Name>/preferred_locations.yaml` |
-| `data/profiles/Sample_Candidate/screening_answers.example.yaml` | `profiles/<Name>/screening_answers.yaml` |
-| `data/profiles/Sample_Candidate/cover_letter.example.md` | `profiles/<Name>/cover_letter.md` (optional) |
-| `data/profiles/Sample_Candidate/resume.pdf` | Replace with your real PDF |
+| `data/profiles/Murahari_M/<Spec>/` | `profiles/Murahari_M/<Spec>/` (production layout) |
+| `data/profiles/Sample_Candidate/` | Optional flat sample pack |
+
+### Production profile layout (frozen)
+
+```
+profiles/Murahari_M/
+  General/profile.yaml + Murahari_M_Resume.pdf
+  Leadership/...
+  GCC/...
+  GCC_Head_CXO/...
+  Digital_Workplace/...
+  Contact_Centre/...
+```
+
+Set `profiles.default` to a specialization **name** (e.g. `General`).
+Optional: `enabled: false` in `profile.yaml` to exclude a specialization.
 
 Also kept for backward compatibility: root `.env.example`, `config.example.yaml`,
 `profiles.example/`.

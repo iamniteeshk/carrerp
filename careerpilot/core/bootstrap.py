@@ -159,14 +159,21 @@ def ensure_scaffold(config_path: str | Path | None = None,
     elif not cfg_dest.exists():
         logger.warning("No config example found to scaffold %s", cfg_dest)
 
-    # Profiles — prefer Sample_Candidate template pack, else profiles.example/
+    # Profiles — prefer nested Murahari_M pack, then Sample_Candidate, then profiles.example/
     profiles_dest = layout.profiles_dir
     has_live = any(profiles_dest.glob("*/profile.yaml")) if profiles_dest.exists() else False
+    has_nested = any(profiles_dest.glob("*/*/profile.yaml")) if profiles_dest.exists() else False
+    sample_nested = templates / "profiles" / "Murahari_M"
     sample_src = templates / "profiles" / "Sample_Candidate"
     example_profiles = app / "profiles.example"
 
-    if not has_live:
-        if sample_src.is_dir() and (sample_src / "profile.example.yaml").exists():
+    if not has_live and not has_nested:
+        if sample_nested.is_dir() and (sample_nested / "General" / "profile.yaml").exists():
+            dest = profiles_dest / "Murahari_M"
+            if not dest.exists():
+                shutil.copytree(sample_nested, dest)
+                actions.append(f"created {dest}/ from data/profiles/Murahari_M/")
+        elif sample_src.is_dir() and (sample_src / "profile.example.yaml").exists():
             dest = profiles_dest / "Sample_Candidate"
             if not (dest / "profile.yaml").exists():
                 actions.extend(_materialize_sample_profile(sample_src, dest))

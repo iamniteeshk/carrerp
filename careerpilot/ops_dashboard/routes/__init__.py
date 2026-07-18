@@ -100,6 +100,21 @@ async def ai_page(request: Request):
     return _render(request, "ai.html", page="ai")
 
 
+@router.get("/profiles", response_class=HTMLResponse)
+async def profiles_page(request: Request):
+    return _render(request, "profiles.html", page="profiles")
+
+
+@router.get("/config", response_class=HTMLResponse)
+async def config_summary_page(request: Request):
+    return _render(request, "config_summary.html", page="config")
+
+
+@router.get("/config/health", response_class=HTMLResponse)
+async def config_health_page(request: Request):
+    return _render(request, "config_health.html", page="config_health")
+
+
 @router.get("/browser", response_class=HTMLResponse)
 async def browser_page(request: Request):
     return _render(request, "browser.html", page="browser")

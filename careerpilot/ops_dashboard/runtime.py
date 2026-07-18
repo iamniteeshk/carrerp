@@ -43,6 +43,7 @@ class RuntimeHub:
         self.telegram = None
         self.app = None  # CareerPilot composition root (optional)
         self.paused = False
+        self.last_profile_name: str | None = None
         self._commands: deque[ControlCommand] = deque(maxlen=50)
         self._browser_restarts = 0
         self._last_browser_restart = ""
@@ -130,6 +131,10 @@ class RuntimeHub:
 
     def set_paused(self, value: bool) -> None:
         self.paused = bool(value)
+
+    def note_profile(self, name: str | None) -> None:
+        with self._lock:
+            self.last_profile_name = name or None
 
     def note_browser_restart(self) -> None:
         with self._lock:

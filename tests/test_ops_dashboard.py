@@ -36,8 +36,17 @@ def main() -> int:
 
     check("create_ops_dashboard import", callable(create_ops_dashboard))
     check("templates exist", (ROOT / "careerpilot/ops_dashboard/templates/mission.html").exists())
+    check("config summary template",
+          (ROOT / "careerpilot/ops_dashboard/templates/config_summary.html").exists())
+    check("config health template",
+          (ROOT / "careerpilot/ops_dashboard/templates/config_health.html").exists())
+    check("profiles template",
+          (ROOT / "careerpilot/ops_dashboard/templates/profiles.html").exists())
     check("static css exists", (ROOT / "careerpilot/ops_dashboard/static/css/ops.css").exists())
     check("docs exist", (ROOT / "docs/OPS_DASHBOARD.md").exists())
+    check("freeze doc", (ROOT / "docs/PRODUCTION_FREEZE_v1.md").exists())
+    check("nested Murahari_M template",
+          (ROOT / "data/profiles/Murahari_M/General/profile.yaml").exists())
 
     with tempfile.TemporaryDirectory() as td:
         db_path = Path(td) / "t.db"
@@ -78,6 +87,35 @@ def main() -> int:
         check("api jobs 200", r.status_code == 200, str(r.status_code))
         r = client.get("/api/health")
         check("api health 200", r.status_code == 200, str(r.status_code))
+        for path in ("/config", "/config/health", "/profiles", "/settings", "/ai"):
+            rr = client.get(path)
+            check(f"page {path} 200", rr.status_code == 200, str(rr.status_code))
+        # Config APIs need a bound AppConfig
+        from tests._fixture import make_deployment
+        cfg_path, env_path = make_deployment(Path(td) / "deploy")
+        from careerpilot.core.config import load_config
+        old = os.getcwd()
+        try:
+            os.chdir(Path(td) / "deploy")
+            # Isolate data root to deploy dir
+            os.environ["CAREERPILOT_DATA_ROOT"] = str(Path(td) / "deploy")
+            cfg = load_config(cfg_path, env_path)
+        finally:
+            os.chdir(old)
+        HUB.bind(config=cfg, db=db)
+        r = client.get("/api/config/summary")
+        check("api config summary 200", r.status_code == 200, str(r.status_code))
+        if r.status_code == 200:
+            check("config summary has candidate", "candidate" in r.json())
+        r = client.get("/api/config/health")
+        check("api config health 200", r.status_code == 200, str(r.status_code))
+        if r.status_code == 200:
+            check("config health has score", "score" in r.json())
+        r = client.get("/api/profiles")
+        check("api profiles 200", r.status_code == 200, str(r.status_code))
+        r = client.get("/api/settings")
+        check("api settings groups", r.status_code == 200 and "groups" in r.json())
+        os.environ.pop("CAREERPILOT_DATA_ROOT", None)
         # WebSocket live feed
         try:
             with client.websocket_connect("/ws/live") as ws:
