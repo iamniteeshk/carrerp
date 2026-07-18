@@ -43,6 +43,9 @@ from .core.logging_setup import get_logger, setup_logging
 from .core.pipeline import ScanPipeline
 from .core.scheduler import Scheduler
 from .dashboard.app import create_dashboard
+from .ops_dashboard import start_ops_dashboard_thread
+from .ops_dashboard.activity import FEED, emit
+from .ops_dashboard.runtime import HUB
 from .db.database import Database
 from .db.services import (AIHistoryService, ApplicationService, FailedJobService,
                           JobService, NotificationService, ScanService)
@@ -77,6 +80,7 @@ class CareerPilot:
             config.ai, candidate_profile=self._candidate_profile(),
             profile_names=config.profile_engine.names(),
             default_profile=config.default_career_profile)
+        self.ai.history_service = self.ai_history
 
         self.portals = self._build_portals()
         # Route AI request logs into the Diagnostics recorder (read-only use of
@@ -133,6 +137,13 @@ class CareerPilot:
             summary_hour=config.daily_summary_hour,
             maintenance_hour=getattr(config.retention, "maintenance_hour", 3),
             app_config=config)
+
+        # Bind live runtime into the ops dashboard hub (read-only + controls).
+        HUB.bind(
+            config=config, db=self.db, scheduler=self.scheduler,
+            browser=self.browser, ai=self.ai, pipeline=self.pipeline,
+            diagnostics=self.diagnostics, telegram=self.telegram, app=self)
+        FEED.bind_db(self.db)
 
     def _candidate_profile(self) -> str:
         return self.cfg.candidate.summary()
@@ -208,14 +219,23 @@ class CareerPilot:
                                  "that pass the Rule Engine will be QUEUED.")
             write_event(EventKind.AI, "No AI provider available at startup — "
                         "jobs will be QUEUED until keys/network recover")
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
-        threading.Thread(
-            target=lambda: dashboard.run(
-                host=self.cfg.dashboard_host, port=self.cfg.dashboard_port,
-                debug=False, use_reloader=False),
-            daemon=True).start()
-        self.logger.info("Dashboard at http://%s:%s",
+        # Ops Mission Control (FastAPI) — LAN-ready by default (0.0.0.0:8006).
+        start_ops_dashboard_thread(db=self.db, config=self.cfg)
+        emit("CareerPilot started — ops dashboard online",
+             level="success", category="system")
+        self.logger.info("Ops dashboard at http://%s:%s",
                          self.cfg.dashboard_host, self.cfg.dashboard_port)
+        # Optional legacy Flask read-only board on +1 port when explicitly enabled.
+        if getattr(self.cfg, "dashboard_legacy_flask", False):
+            legacy = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
+            legacy_port = int(self.cfg.dashboard_port) + 1
+            threading.Thread(
+                target=lambda: legacy.run(
+                    host="127.0.0.1", port=legacy_port,
+                    debug=False, use_reloader=False),
+                daemon=True).start()
+            self.logger.info("Legacy Flask dashboard at http://127.0.0.1:%s",
+                             legacy_port)
         self.scheduler.start(run_immediately=True)
         try:
             threading.Event().wait()  # keep main thread alive
@@ -343,8 +363,18 @@ class CareerPilot:
         return self.pipeline.run_once()
 
     def run_dashboard(self) -> None:
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
-        dashboard.run(host=self.cfg.dashboard_host, port=self.cfg.dashboard_port)
+        """Run the ops dashboard only (no scheduler). Blocks."""
+        import uvicorn
+        from .ops_dashboard.app import create_ops_dashboard
+        HUB.bind(
+            config=self.cfg, db=self.db, scheduler=self.scheduler,
+            browser=self.browser, ai=self.ai, pipeline=self.pipeline,
+            diagnostics=self.diagnostics, telegram=self.telegram, app=self)
+        FEED.bind_db(self.db)
+        app = create_ops_dashboard(db=self.db, config=self.cfg)
+        uvicorn.run(
+            app, host=app.state.bind_host, port=app.state.bind_port,
+            log_level="info")
 
     def shutdown(self) -> None:
         if self._shutting_down:

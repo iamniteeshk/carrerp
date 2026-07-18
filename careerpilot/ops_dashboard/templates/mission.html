@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Mission Control · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="mission()" x-init="init()">
+  <div class="topbar">
+    <div>
+      <h1 class="h1">Mission Control</h1>
+      <div class="meta-row" style="margin-top:.35rem">
+        <span class="badge dot" :class="'phase-' + phase" x-text="phase"></span>
+        <span x-show="paused" class="badge" style="color:var(--warn)">PAUSED</span>
+        <span>Uptime <strong x-text="uptime"></strong></span>
+        <span x-text="applyMode"></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn warn" @click="act('pause')" :disabled="paused">Pause</button>
+      <button class="btn primary" @click="act('resume')" :disabled="!paused">Resume</button>
+      <button class="btn" @click="act('restart_browser')">Restart Browser</button>
+      <button class="btn" @click="act('doctor')">Run Doctor</button>
+      <button class="btn" @click="act('backup')">Backup Now</button>
+      <button class="btn" @click="act('scan_now')">Scan Now</button>
+    </div>
+  </div>
+
+  <div class="grid kpis" style="margin-bottom:1rem">
+    <template x-for="k in kpis" :key="k.label">
+      <div class="card">
+        <div class="kpi-val" x-text="k.value"></div>
+        <div class="kpi-label" x-text="k.label"></div>
+      </div>
+    </template>
+  </div>
+
+  <div class="grid two">
+    <div class="card">
+      <h3>Live browser</h3>
+      <div class="browser-frame">
+        <img :src="previewUrl" alt="Browser preview" />
+      </div>
+      <div class="meta-row">
+        <span>URL <code x-text="preview.url || '—'"></code></span>
+        <span>Step <code x-text="preview.step || live.stage || '—'"></code></span>
+        <span>Portal <code x-text="preview.portal || live.portal || '—'"></code></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Live activity</h3>
+      <div class="feed" id="live-feed">
+        <template x-for="(ev,i) in events" :key="i + ev.ts">
+          <div class="ev">
+            <span class="ts" x-text="(ev.ts||'').slice(11,19)"></span>
+            <span :class="'lvl-' + ev.level" x-text="'[' + ev.category + '] ' + ev.message"></span>
+          </div>
+        </template>
+      </div>
+      <h3 style="margin-top:1rem">Alerts</h3>
+      <div class="feed" style="max-height:160px">
+        <template x-for="(a,i) in alerts" :key="'a'+i">
+          <div class="ev">
+            <span class="ts" x-text="(a.ts||'').slice(11,19)"></span>
+            <span class="lvl-alert" x-text="a.message"></span>
+          </div>
+        </template>
+        <div class="ev" x-show="!alerts.length"><span class="ts">—</span><span class="lvl-success">No active alerts</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid two" style="margin-top:1rem">
+    <div class="card">
+      <h3>Recent applications</h3>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>When</th><th>Company</th><th>Portal</th><th>Score</th><th>Status</th></tr></thead>
+          <tbody>
+            <template x-for="row in apps" :key="row.application_id">
+              <tr>
+                <td x-text="(row.applied_at||'').slice(0,16)"></td>
+                <td><a :href="'/jobs/' + row.job_id" x-text="row.company"></a></td>
+                <td x-text="row.portal"></td>
+                <td x-text="row.match_score"></td>
+                <td x-text="row.application_status"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>AI pulse</h3>
+      <canvas id="aiSpark" height="120"></canvas>
+      <div class="meta-row" style="margin-top:.8rem">
+        <span>Provider <code x-text="ai.active_provider || '—'"></code></span>
+        <span>Today <code x-text="ai.today?.requests || 0"></code> req</span>
+        <span>Tokens <code x-text="ai.today?.tokens || 0"></code></span>
+        <span>Fails <code x-text="ai.runtime?.failed || 0"></code></span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function mission() {
+  return {
+    phase: '{{ phase }}',
+    paused: {{ 'true' if paused else 'false' }},
+    uptime: '—',
+    applyMode: '{{ apply_mode }}',
+    kpis: [],
+    events: [],
+    alerts: [],
+    apps: [],
+    live: {},
+    preview: {},
+    previewUrl: '/api/browser/preview.png?t=' + Date.now(),
+    ai: { today: {}, runtime: {} },
+    chart: null,
+    async init() {
+      await this.refresh();
+      CPOps.connectLive((tick) => {
+        this.phase = tick.phase || this.phase;
+        this.paused = !!tick.paused;
+        this.uptime = CPOps.fmtUptime(tick.uptime_seconds);
+        this.live = tick.live || {};
+        this.preview = tick.preview || {};
+        if (tick.events && tick.events.length) {
+          this.events = [...tick.events.reverse(), ...this.events].slice(0, 80);
+        }
+        this.alerts = tick.alerts || this.alerts;
+        this.previewUrl = '/api/browser/preview.png?t=' + Date.now();
+      });
+      setInterval(() => this.refresh(), 8000);
+    },
+    async refresh() {
+      const [sum, apps, ai] = await Promise.all([
+        fetch('/api/summary').then(r => r.json()),
+        fetch('/api/applications?limit=8').then(r => r.json()),
+        fetch('/api/ai').then(r => r.json()),
+      ]);
+      this.phase = sum.phase;
+      this.paused = sum.paused;
+      this.uptime = CPOps.fmtUptime(sum.uptime_seconds);
+      this.live = sum.live || {};
+      this.preview = sum.preview || {};
+      this.alerts = sum.alerts || [];
+      const c = sum.cards || {};
+      const h = sum.health || {};
+      const res = h.resources || {};
+      const disk = h.disk || {};
+      this.kpis = [
+        { label: 'Found today', value: c.jobs_found_today ?? '—' },
+        { label: 'Scored', value: c.jobs_scored_today ?? '—' },
+        { label: 'Applied', value: c.jobs_applied_today ?? '—' },
+        { label: 'Rejected', value: c.jobs_rejected_today ?? '—' },
+        { label: 'Pending', value: c.jobs_pending ?? '—' },
+        { label: 'Failed', value: c.failed_jobs ?? '—' },
+        { label: 'AI reqs', value: c.ai_requests_today ?? '—' },
+        { label: 'CPU %', value: res.cpu_percent ?? '—' },
+        { label: 'RAM %', value: res.ram_percent ?? '—' },
+        { label: 'Disk %', value: disk.used_percent ?? '—' },
+      ];
+      this.apps = apps.applications || [];
+      this.ai = ai;
+      const act = await fetch('/api/activity?limit=60').then(r => r.json());
+      this.events = act.events || this.events;
+      this.renderSpark(ai);
+    },
+    renderSpark(ai) {
+      const recent = (ai.recent || []).slice(0, 20).reverse();
+      const labels = recent.map(r => (r.created_at || '').slice(11, 16));
+      const data = recent.map(r => Math.round((r.execution_time || 0) * 1000));
+      const ctx = document.getElementById('aiSpark');
+      if (!ctx) return;
+      if (this.chart) { this.chart.destroy(); }
+      this.chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Latency ms', data, borderColor: '#0f766e', tension: .35, fill: false, pointRadius: 0 }] },
+        options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { beginAtZero: true } }, animation: false },
+      });
+    },
+    async act(action) {
+      if (action === 'restart_browser' || action === 'scan_now') {
+        if (!confirm('Confirm: ' + action + '?')) return;
+      }
+      await CPOps.control(action);
+      await this.refresh();
+    },
+  };
+}
+</script>
+{% endblock %}

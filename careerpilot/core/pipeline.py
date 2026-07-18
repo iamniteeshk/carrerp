@@ -402,6 +402,29 @@ class ScanPipeline:
         logger.info(line)
         self._run_log.append(line)
         self._status(job_number=n, stage=stage)
+        try:
+            from ..ops_dashboard.activity import emit
+            level = "info"
+            low = stage.lower()
+            if "reject" in low or "fail" in low:
+                level = "warn"
+            elif "accept" in low or "appl" in low or "submit" in low:
+                level = "success"
+            emit(f"{stage}" + (f" — {detail}" if detail else ""),
+                 level=level, category="scan", detail=f"job #{n}")
+        except Exception:  # noqa: BLE001
+            pass
+        # Best-effort live browser thumbnail for Mission Control (worker thread).
+        try:
+            from ..ops_dashboard.runtime import HUB
+            browser = HUB.browser
+            live = HUB.live_status()
+            portal = str(live.get("portal") or "").strip()
+            if browser is not None and portal:
+                browser.capture_preview(portal, "logs/browser_preview.png",
+                                        step=stage)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _process_job(self, job: Job, counts: dict[str, int], dry_run: bool) -> None:
         """Run ONE job through the entire pipeline immediately (streaming).

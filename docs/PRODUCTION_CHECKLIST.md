@@ -57,6 +57,8 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 
 ## 24×7 ops
 
+- [ ] Ops dashboard reachable on LAN (`http://<geekom-ip>:8006`) with `DASHBOARD_PASSWORD`
+- [ ] Mission Control shows live KPIs / activity after `run`
 - [ ] Startup task registered (`.\scripts\Register-CareerPilotStartup.ps1`)
 - [ ] PID lock prevents double start
 - [ ] Graceful stop via `scripts\stop_careerpilot.bat` leaves DB intact

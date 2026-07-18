@@ -259,6 +259,8 @@ with restart-on-failure (3 attempts).
 ```
 
 Acceptance checklist: `docs/PRODUCTION_CHECKLIST.md`.
+Ops Mission Control (LAN dashboard): `docs/OPS_DASHBOARD.md` — default
+`http://0.0.0.0:8006` with `DASHBOARD_PASSWORD` in `.env`.
 
 ---
 
@@ -281,7 +283,7 @@ Acceptance checklist: `docs/PRODUCTION_CHECKLIST.md`.
 | Playwright package + Chromium | Driver + browser binary |
 | Chrome profile dirs | `profiles_browser\...` |
 | LinkedIn / Naukri login | Warning until session exists |
-| Dashboard port | 5000 free / in use |
+| Dashboard port | 8006 free / in use (ops Mission Control) |
 | Maintenance | Retention settings loaded |
 
 **`--fix` repairs:** missing folders, config templates, DB init, Playwright
@@ -336,7 +338,7 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 | Chrome channel errors | Install Chrome, or set `browser.channel: ""` |
 | Doctor FAIL: no AI key | Edit `.env` — `--fix` cannot invent keys |
 | Doctor WARN: LinkedIn/Naukri login | Run a headed `scan` and log in once |
-| Port 5000 in use | Stop the other CareerPilot (`careerpilot.pid`) or change `dashboard.port` |
+| Port 8006 in use | Stop the other CareerPilot (`careerpilot.pid`) or change `dashboard.port` |
 | Sleep kills browser | Disable sleep/hibernate (Phase A) |
 | After Windows Update, logins lost | Re-login; profiles usually survive but cookies can expire |
 | Stack traces on startup | Run `doctor --fix` first — prefer its messages over raw traces |

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Reports · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="reports()" x-init="load()">
+  <div class="topbar"><h1 class="h1">Reports & Trends</h1></div>
+  <div class="grid two">
+    <div class="card"><h3>Jobs per day</h3><div class="chart-box"><canvas id="cDay"></canvas></div></div>
+    <div class="card"><h3>Portal comparison</h3><div class="chart-box"><canvas id="cPortal"></canvas></div></div>
+    <div class="card"><h3>AI score distribution</h3><div class="chart-box"><canvas id="cScore"></canvas></div></div>
+    <div class="card"><h3>Rejection reasons</h3><div class="chart-box"><canvas id="cRej"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Companies applied</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Company</th><th>Count</th></tr></thead>
+        <tbody>
+          <template x-for="row in companies" :key="row.company">
+            <tr><td x-text="row.company"></td><td x-text="row.c"></td></tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function reports() {
+  return {
+    companies: [],
+    async load() {
+      const d = await fetch('/api/reports/charts').then(r => r.json());
+      this.companies = d.companies || [];
+      const days = d.per_day || [];
+      new Chart(document.getElementById('cDay'), {
+        type: 'bar',
+        data: {
+          labels: days.map(x => x.day),
+          datasets: [
+            { label: 'Found', data: days.map(x => x.found), backgroundColor: '#1a5f7a' },
+            { label: 'Accepted', data: days.map(x => x.accepted), backgroundColor: '#0f766e' },
+            { label: 'Rejected', data: days.map(x => x.rejected), backgroundColor: '#b91c1c' },
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+      const portals = d.portals || [];
+      new Chart(document.getElementById('cPortal'), {
+        type: 'bar',
+        data: {
+          labels: portals.map(x => x.portal),
+          datasets: [
+            { label: 'Found', data: portals.map(x => x.found), backgroundColor: '#1a5f7a' },
+            { label: 'Applied', data: portals.map(x => x.applied), backgroundColor: '#0f766e' },
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+      const scores = d.score_dist || [];
+      new Chart(document.getElementById('cScore'), {
+        type: 'line',
+        data: {
+          labels: scores.map(x => x.bucket + '–' + (x.bucket+9)),
+          datasets: [{ label: 'Jobs', data: scores.map(x => x.c), borderColor: '#0f766e', tension: .3, fill: false }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+      const rej = d.rejections || [];
+      new Chart(document.getElementById('cRej'), {
+        type: 'doughnut',
+        data: {
+          labels: rej.map(x => (x.rejection_reason || '').slice(0, 40)),
+          datasets: [{ data: rej.map(x => x.c), backgroundColor: ['#0f766e','#1a5f7a','#b45309','#b91c1c','#64748b','#0ea5e9','#15803d','#7c3aed'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+  };
+}
+</script>
+{% endblock %}

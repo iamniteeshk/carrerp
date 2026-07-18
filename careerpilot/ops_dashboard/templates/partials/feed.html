@@ -1,0 +1,8 @@
+{% for ev in events %}
+<div class="ev">
+  <span class="ts">{{ ev.ts[11:19] if ev.ts|length > 19 else ev.ts }}</span>
+  <span class="lvl-{{ ev.level }}">[{{ ev.category }}] {{ ev.message }}{% if ev.detail %} — {{ ev.detail }}{% endif %}</span>
+</div>
+{% else %}
+<div class="ev"><span class="ts">--:--:--</span><span class="lvl-info">Waiting for activity…</span></div>
+{% endfor %}

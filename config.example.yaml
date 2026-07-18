@@ -110,9 +110,12 @@ browser:
   scroll_passes: 3               # natural scrolls to trigger lazy-loading
 
 dashboard:
-  host: 127.0.0.1
-  port: 5000
-  refresh_seconds: 30
+  host: 0.0.0.0                 # LAN access; set DASHBOARD_PASSWORD in .env
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false           # optional old Flask board on port+1 (loopback)
 
 database:
   path: database/careerpilot.db

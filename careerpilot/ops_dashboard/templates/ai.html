@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}AI · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="aiPage()" x-init="load()">
+  <div class="topbar"><h1 class="h1">AI Dashboard</h1></div>
+  <div class="grid kpis">
+    <div class="card"><div class="kpi-val" x-text="data.active_provider || '—'"></div><div class="kpi-label">Provider</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.today?.requests || 0"></div><div class="kpi-label">Requests today</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.today?.tokens || 0"></div><div class="kpi-label">Tokens today</div></div>
+    <div class="card"><div class="kpi-val" x-text="avgMs"></div><div class="kpi-label">Avg latency ms</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.runtime?.cache_hits || 0"></div><div class="kpi-label">Cache hits</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.runtime?.cache_misses || 0"></div><div class="kpi-label">Cache misses</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.runtime?.failed || 0"></div><div class="kpi-label">Failed</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.runtime?.retries || 0"></div><div class="kpi-label">Retries</div></div>
+    <div class="card"><div class="kpi-val" x-text="(data.runtime?.cost_usd || 0).toFixed?.(4) || '0'"></div><div class="kpi-label">Cost est. USD</div></div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Providers</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Name</th><th>Available</th><th>Model</th></tr></thead>
+        <tbody>
+          <template x-for="p in data.providers || []" :key="p.name">
+            <tr><td x-text="p.name"></td><td x-text="p.available"></td><td x-text="p.model"></td></tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Recent calls</h3>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>When</th><th>Provider</th><th>Model</th><th>Tokens</th><th>Latency</th><th>OK</th><th>Job</th></tr></thead>
+        <tbody>
+          <template x-for="r in data.recent || []" :key="r.created_at + r.job_id">
+            <tr>
+              <td x-text="(r.created_at||'').slice(0,19)"></td>
+              <td x-text="r.provider"></td>
+              <td x-text="r.model"></td>
+              <td x-text="r.tokens_used"></td>
+              <td x-text="r.execution_time"></td>
+              <td x-text="r.success"></td>
+              <td><a :href="r.job_id ? '/jobs/'+r.job_id : '#'" x-text="r.job_id || '—'"></a></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function aiPage() {
+  return {
+    data: { today: {}, runtime: {}, providers: [], recent: [] },
+    get avgMs() {
+      const t = this.data.today?.avg_time;
+      if (t) return Math.round(t * 1000);
+      return this.data.runtime?.avg_latency_ms ?? '—';
+    },
+    async load() { this.data = await fetch('/api/ai').then(r => r.json()); }
+  };
+}
+</script>
+{% endblock %}

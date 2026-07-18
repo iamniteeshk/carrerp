@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Browser · CareerPilot{% endblock %}
+{% block content %}
+<div x-data="browserPage()" x-init="load(); setInterval(() => load(), 4000)">
+  <div class="topbar">
+    <h1 class="h1">Browser Dashboard</h1>
+    <button class="btn warn" @click="CPOps.control('restart_browser').then(() => load())">Restart Browser</button>
+  </div>
+  <div class="grid kpis">
+    <div class="card"><div class="kpi-val" x-text="running"></div><div class="kpi-label">Running</div></div>
+    <div class="card"><div class="kpi-val" x-text="data.restart_count || 0"></div><div class="kpi-label">Restarts</div></div>
+    <div class="card"><div class="kpi-val" style="font-size:1rem" x-text="data.last_restart || '—'"></div><div class="kpi-label">Last restart</div></div>
+    <div class="card"><div class="kpi-val" style="font-size:1rem" x-text="preview.portal || live.portal || '—'"></div><div class="kpi-label">Profile / portal</div></div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Live view (worker-thread screenshot)</h3>
+    <div class="browser-frame"><img :src="img" alt="preview" /></div>
+    <div class="meta-row">
+      <span>URL <code x-text="preview.url || live.url || '—'"></code></span>
+      <span>Title <code x-text="preview.title || '—'"></code></span>
+      <span>Step <code x-text="preview.step || live.stage || '—'"></code></span>
+    </div>
+  </div>
+  <div class="card" style="margin-top:1rem">
+    <h3>Portals</h3>
+    <pre style="font-family:var(--mono);font-size:.8rem;white-space:pre-wrap" x-text="JSON.stringify(data.portals || data, null, 2)"></pre>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function browserPage() {
+  return {
+    data: {}, live: {}, preview: {}, img: '/api/browser/preview.png',
+    get running() {
+      const p = this.data.portals || {};
+      return Object.values(p).some(x => x.healthy || x.open) ? 'yes' : 'no';
+    },
+    async load() {
+      this.data = await fetch('/api/browser').then(r => r.json());
+      this.live = this.data.live || {};
+      this.preview = this.data.preview || {};
+      this.img = '/api/browser/preview.png?t=' + Date.now();
+    }
+  };
+}
+</script>
+{% endblock %}

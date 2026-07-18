@@ -80,9 +80,12 @@ browser:
   scroll_passes: 3
 
 dashboard:
-  host: 127.0.0.1
-  port: 5000
-  refresh_seconds: 30
+  host: 0.0.0.0                 # reach from your laptop on the LAN
+  port: 8006
+  refresh_seconds: 5
+  password_env: DASHBOARD_PASSWORD
+  session_hours: 12
+  legacy_flask: false
 
 database:
   path: database/careerpilot.db

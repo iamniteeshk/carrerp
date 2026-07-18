@@ -465,7 +465,7 @@ class Doctor:
     def _check_port(self) -> None:
         assert self.config
         host = self.config.dashboard_host or "127.0.0.1"
-        port = int(self.config.dashboard_port or 5000)
+        port = int(self.config.dashboard_port or 8006)
         ok, msg = wenv.port_available(host, port)
         self._add("Dashboard port", PASS if ok else WARN, msg, mandatory=False)
 

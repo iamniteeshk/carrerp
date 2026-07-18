@@ -57,6 +57,10 @@ class Scheduler:
         self._scheduler.add_job(
             self._daily_maintenance, "cron", hour=self.maintenance_hour, minute=15,
             id="maintenance")
+        # Drain ops-dashboard control queue even when no scan is due.
+        self._scheduler.add_job(
+            self.drain_ops_commands, "interval", seconds=15,
+            id="ops_commands", max_instances=1, coalesce=True)
         if run_immediately:
             # Run the first scan ON THE SCHEDULER'S WORKER THREAD (not the main
             # thread), so Playwright is created and reused on one thread. The
@@ -82,11 +86,23 @@ class Scheduler:
                             "cycle is used)")
                 return
         try:
+            # Honour ops-dashboard pause + drain control queue on the worker thread.
+            self.drain_ops_commands()
+            try:
+                from ..ops_dashboard.runtime import HUB
+                if HUB.paused:
+                    logger.info("Scan skipped — ops dashboard paused")
+                    from ..core.maintenance import write_health_heartbeat
+                    write_health_heartbeat(status="paused")
+                    return
+            except Exception:  # noqa: BLE001
+                pass
             from ..core.maintenance import write_health_heartbeat
             write_health_heartbeat(status="scanning")
             self.pipeline.run_once()
             write_health_heartbeat(status="ok")
             self._consecutive_failures = 0
+            self.drain_ops_commands()
         except Exception as exc:  # noqa: BLE001
             self._consecutive_failures = getattr(self, "_consecutive_failures", 0) + 1
             logger.exception("Scheduled scan crashed: %s", exc)
@@ -182,7 +198,116 @@ class Scheduler:
         except Exception as exc:  # noqa: BLE001
             logger.warning("Daily maintenance failed: %s", exc)
 
+    def is_running(self) -> bool:
+        try:
+            return bool(self._scheduler.running)
+        except Exception:  # noqa: BLE001
+            return False
+
+    def status(self) -> dict:
+        """Read-only snapshot for the ops dashboard (no side effects)."""
+        jobs = []
+        next_scan = None
+        try:
+            for job in self._scheduler.get_jobs():
+                nxt = job.next_run_time.isoformat() if job.next_run_time else None
+                jobs.append({
+                    "id": job.id,
+                    "name": job.name or job.id,
+                    "next_run_time": nxt,
+                    "trigger": str(job.trigger),
+                })
+                if job.id in ("scan", "initial_scan") and nxt:
+                    if next_scan is None or nxt < next_scan:
+                        next_scan = nxt
+        except Exception as exc:  # noqa: BLE001
+            return {
+                "running": self.is_running(),
+                "error": str(exc),
+                "interval_hours": self.interval_hours,
+                "consecutive_failures": self._consecutive_failures,
+                "jobs": [],
+            }
+        return {
+            "running": self.is_running(),
+            "interval_hours": self.interval_hours,
+            "summary_hour": self.summary_hour,
+            "maintenance_hour": self.maintenance_hour,
+            "consecutive_failures": self._consecutive_failures,
+            "next_scan": next_scan,
+            "queue_length": len(jobs),
+            "jobs": jobs,
+        }
+
+    def drain_ops_commands(self) -> None:
+        """Execute control commands queued by the ops dashboard (safe thread)."""
+        try:
+            from ..ops_dashboard.runtime import HUB
+            cmds = HUB.drain_commands()
+        except Exception:  # noqa: BLE001
+            return
+        for cmd in cmds:
+            action = (cmd.action or "").lower()
+            try:
+                if action == "restart_browser":
+                    self._restart_browser()
+                elif action == "backup":
+                    self._ops_backup()
+                elif action == "doctor":
+                    self._ops_doctor()
+                elif action == "scan_now":
+                    self._safe_scan(allow_skip=False)
+                else:
+                    logger.warning("Unknown ops command: %s", action)
+            except Exception:  # noqa: BLE001
+                logger.exception("Ops command failed: %s", action)
+
+    def _restart_browser(self) -> None:
+        from ..ops_dashboard.activity import emit
+        from ..ops_dashboard.runtime import HUB
+        browser = HUB.browser
+        if browser is None:
+            emit("Restart browser requested but browser not bound",
+                 level="warn", category="browser")
+            return
+        try:
+            browser.close_all()
+            HUB.note_browser_restart()
+            emit("Browser restarted by operator", level="warn", category="browser")
+        except Exception as exc:  # noqa: BLE001
+            emit(f"Browser restart failed: {exc}", level="error", category="browser")
+
+    def _ops_backup(self) -> None:
+        from ..ops_dashboard.activity import emit
+        from ..core.backup_ops import create_backup
+        cfg = self.app_config
+        create_backup(
+            database_path=getattr(cfg, "database_path", "database/careerpilot.db")
+            if cfg else "database/careerpilot.db",
+            profiles_dir=getattr(cfg, "profiles_dir", "profiles") if cfg else "profiles",
+            browser_profiles=getattr(cfg, "browser_profiles_path", "profiles_browser")
+            if cfg else "profiles_browser",
+            logs_dir=getattr(cfg, "log_path", "logs") if cfg else "logs",
+            reports_dir=getattr(cfg, "report_path", "reports") if cfg else "reports",
+            include_chrome_profiles=False,
+        )
+        emit("Operator backup completed", level="success", category="system")
+
+    def _ops_doctor(self) -> None:
+        from ..ops_dashboard.activity import emit
+        from ..core.doctor import run_doctor
+        cfg = self.app_config
+        path = getattr(cfg, "source_path", "config/config.yaml") if cfg else "config/config.yaml"
+        ok = run_doctor(path)
+        emit("Doctor PASS" if ok else "Doctor reported failures",
+             level="success" if ok else "error", category="system")
+
     def shutdown(self) -> None:
         if self._scheduler.running:
             self._scheduler.shutdown(wait=True)
             logger.info("Scheduler stopped")
+            try:
+                from ..ops_dashboard.activity import emit
+                emit("Scheduler stopped", level="warn", category="scheduler")
+            except Exception:  # noqa: BLE001
+                pass

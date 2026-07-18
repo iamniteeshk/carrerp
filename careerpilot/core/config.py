@@ -149,6 +149,9 @@ class AppConfig:
     telegram_chat_id: str = ""
     source_path: str = ""    # absolute path of the loaded config file
     retention: RetentionSettings = field(default_factory=RetentionSettings)
+    dashboard_password_env: str = "DASHBOARD_PASSWORD"
+    dashboard_session_hours: int = 12
+    dashboard_legacy_flask: bool = False
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     # Convenience accessors kept for the rest of the codebase.
@@ -341,9 +344,12 @@ def load_config(config_path: str | Path = "config/config.yaml",
         log_path=log_path,
         log_level=str(logging_cfg.get("level", "INFO")).upper(),
         report_path=report_path,
-        dashboard_host=dash.get("host", "127.0.0.1"),
-        dashboard_port=int(dash.get("port", 5000)),
-        dashboard_refresh_seconds=int(dash.get("refresh_seconds", 30)),
+        dashboard_host=dash.get("host", "0.0.0.0"),
+        dashboard_port=int(dash.get("port", 8006)),
+        dashboard_refresh_seconds=int(dash.get("refresh_seconds", 5)),
+        dashboard_password_env=str(dash.get("password_env", "DASHBOARD_PASSWORD")),
+        dashboard_session_hours=int(dash.get("session_hours", 12)),
+        dashboard_legacy_flask=bool(dash.get("legacy_flask", False)),
         profiles_dir=profiles_dir,
         default_career_profile=default_profile,
         profile_confidence_threshold=confidence_threshold,

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf }}" />
+  <title>{% block title %}CareerPilot Ops{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/ops.css" />
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <script src="/static/js/ops.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+{% if request.url.path != '/login' %}
+<div class="shell">
+  <aside class="nav">
+    <div class="brand">Career<span>Pilot</span></div>
+    <div class="brand-sub">Operations · :{{ request.app.state.bind_port }}</div>
+    {% set links = [
+      ('/', 'Mission Control', 'mission'),
+      ('/home', 'Overview', 'home'),
+      ('/jobs', 'Jobs', 'jobs'),
+      ('/csv', 'CSV Explorer', 'csv'),
+      ('/reports', 'Reports', 'reports'),
+      ('/ai', 'AI', 'ai'),
+      ('/browser', 'Browser', 'browser'),
+      ('/scheduler', 'Scheduler', 'scheduler'),
+      ('/health', 'Health', 'health'),
+      ('/notifications', 'Alerts', 'notifications'),
+      ('/settings', 'Settings', 'settings'),
+    ] %}
+    {% for href, label, key in links %}
+      <a href="{{ href }}" class="{{ 'active' if page == key else '' }}">{{ label }}</a>
+    {% endfor %}
+    <div class="spacer" style="flex:1"></div>
+    <a href="/logout">Sign out</a>
+  </aside>
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block login %}{% endblock %}
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
