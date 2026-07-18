@@ -12,7 +12,7 @@
 #
 # One-command setup on a fresh Windows 11 box:
 #   .\setup_windows.ps1 -ProductionConfig
-#   python doctor.py --fix
+#   py doctor.py --fix
 # See docs/INSTALL_WINDOWS.md
 #
 # Goals: 24x7 stability, match quality, human-like browsing, safe apply.

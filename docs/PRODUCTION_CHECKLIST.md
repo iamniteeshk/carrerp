@@ -25,22 +25,22 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 - [ ] Telegram configured (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) — or consciously skipped
 - [ ] `config\config.yaml` candidate details filled (no placeholders)
 - [ ] Resume PDF present in each used `profiles\<Name>\`
-- [ ] `python doctor.py` → **RESULT: PASS** (no mandatory FAILs)
-- [ ] `python doctor.py --fix` re-run after any Windows change
+- [ ] `py doctor.py` → **RESULT: PASS** (no mandatory FAILs)
+- [ ] `py doctor.py --fix` re-run after any Windows change
 
 ## Browser sessions
 
 - [ ] Chrome / Playwright profile dirs exist under `profiles_browser\`
 - [ ] Chrome profile logged into **LinkedIn** (session survives restart)
 - [ ] Chrome profile logged into **Naukri** (session survives restart)
-- [ ] Headed browser launches via `python -m careerpilot.main scan`
+- [ ] Headed browser launches via `py -m careerpilot.main scan`
 
 ## Functional validation
 
 - [ ] Doctor PASS
 - [ ] Dry-run scan PASS (`apply.mode: dry_run`)
 - [ ] Reports generated under `reports\` and `reports\sessions\`
-- [ ] Scheduler starts (`python -m careerpilot.main run` or Task Scheduler)
+- [ ] Scheduler starts (`py -m careerpilot.main run` or Task Scheduler)
 - [ ] Startup banner shows version / git commit / AI provider
 - [ ] `.\scripts\health.ps1` returns a JSON snapshot without errors
 - [ ] `.\scripts\backup.ps1` creates `backups\YYYY-MM-DD\`

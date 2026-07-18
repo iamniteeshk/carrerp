@@ -38,7 +38,7 @@ One-command onboarding:
 
 ```powershell
 .\setup_windows.ps1 -ProductionConfig
-python doctor.py --fix
+py doctor.py --fix
 ```
 
 See `docs/INSTALL_WINDOWS.md` for power settings, Chrome profiles, Task
@@ -58,9 +58,9 @@ templates. It never invents API keys or portal logins.
 Commands:
 
 ```bat
-python -m careerpilot.main doctor
-python -m careerpilot.main maintenance
-python -m careerpilot.main run
+py -m careerpilot.main doctor
+py -m careerpilot.main maintenance
+py -m careerpilot.main run
 ```
 
 Health heartbeat: `logs/health.json` (updated each scan / maintenance).

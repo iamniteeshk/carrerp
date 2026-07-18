@@ -31,6 +31,16 @@ def python_version_ok() -> tuple[bool, str]:
     return ok, msg
 
 
+def py_launcher_available() -> tuple[bool, str]:
+    """Windows ``py`` launcher (preferred). On non-Windows, report SKIP-equivalent."""
+    if not is_windows():
+        return True, f"n/a on {sys.platform} (use python3 / .venv)"
+    path = shutil.which("py")
+    if path:
+        return True, path
+    return False, "py launcher not on PATH — install Python with 'py launcher' enabled"
+
+
 def git_installed() -> tuple[bool, str]:
     path = shutil.which("git")
     if not path:
@@ -41,9 +51,19 @@ def git_installed() -> tuple[bool, str]:
 def pip_working() -> tuple[bool, str]:
     try:
         import pip  # noqa: F401
-        return True, f"pip {getattr(pip, '__version__', '?')}"
+        return True, f"pip {getattr(pip, '__version__', '?')} (use: py -m pip …)"
     except Exception as exc:  # noqa: BLE001
-        return False, str(exc)
+        # Fall back: can we run pip as a module via current interpreter?
+        try:
+            import subprocess
+            r = subprocess.run(
+                [sys.executable, "-m", "pip", "--version"],
+                capture_output=True, text=True, timeout=30)
+            if r.returncode == 0:
+                return True, (r.stdout or r.stderr or "pip via -m").strip()
+            return False, str(exc)
+        except Exception as exc2:  # noqa: BLE001
+            return False, f"{exc}; {exc2}"
 
 
 def venv_active_or_present(root: Path | None = None) -> tuple[bool, str]:
@@ -61,7 +81,9 @@ def venv_active_or_present(root: Path | None = None) -> tuple[bool, str]:
             py = d / "bin" / "python"
         if py.exists():
             return True, f"present at {d} (not activated in this process)"
-    return False, "no .venv found — run setup_windows.ps1 or python -m venv .venv"
+    hint = "run setup_windows.ps1" if is_windows() else "run: python3 -m venv .venv"
+    return False, f"no .venv found — {hint}"
+
 
 
 def chrome_install_paths() -> list[Path]:
@@ -210,6 +232,6 @@ def playwright_browser_installed() -> tuple[bool, str]:
             exe = pw.chromium.executable_path
         if exe and Path(exe).exists():
             return True, exe
-        return False, "chromium executable missing — run: python -m playwright install chromium"
+        return False, "chromium executable missing — run: py -m playwright install chromium"
     except Exception as exc:  # noqa: BLE001
-        return False, f"{exc} — run: python -m playwright install chromium"
+        return False, f"{exc} — run: py -m playwright install chromium"

@@ -73,6 +73,7 @@ class Doctor:
             self._apply_safe_fixes()
 
         self._check_host_python()
+        self._check_py_launcher()
         self._check_git()
         self._check_pip()
         self._check_venv()
@@ -162,8 +163,9 @@ class Doctor:
             self.fixes.append(FixAction(
                 "installing Playwright Chromium browser...", True, msg))
             try:
+                from .python_launcher import resolve_python_argv
                 r = subprocess.run(
-                    [sys.executable, "-m", "playwright", "install", "chromium"],
+                    [*resolve_python_argv(), "-m", "playwright", "install", "chromium"],
                     capture_output=True, text=True, timeout=600)
                 if r.returncode == 0:
                     self.fixes.append(FixAction(
@@ -208,13 +210,32 @@ class Doctor:
         ok, msg = wenv.python_version_ok()
         self._add("Python", PASS if ok else FAIL, msg)
 
-    def _check_git(self) -> None:
-        ok, msg = wenv.git_installed()
-        self._add("Git", PASS if ok else WARN, msg, mandatory=False)
+    def _check_py_launcher(self) -> None:
+        """On Windows, prefer ``py``. Missing bare ``python`` is OK."""
+        if not wenv.is_windows():
+            self._add("py launcher", SKIP, "non-Windows host", mandatory=False)
+            return
+        ok, msg = wenv.py_launcher_available()
+        # WARN not FAIL — .venv\Scripts\python.exe is enough after setup.
+        self._add("py launcher", PASS if ok else WARN, msg, mandatory=False)
+        # Explicitly do NOT fail if `python` is missing from PATH.
+        bare = __import__("shutil").which("python")
+        if bare and "WindowsApps" in bare:
+            self._add("python on PATH", WARN,
+                      f"WindowsApps stub at {bare} — use py or .venv instead",
+                      mandatory=False)
+        elif not bare:
+            self._add("python on PATH", PASS,
+                      "not required — CareerPilot uses py / .venv",
+                      mandatory=False)
 
     def _check_pip(self) -> None:
         ok, msg = wenv.pip_working()
         self._add("pip", PASS if ok else FAIL, msg)
+
+    def _check_git(self) -> None:
+        ok, msg = wenv.git_installed()
+        self._add("Git", PASS if ok else WARN, msg, mandatory=False)
 
     def _check_venv(self) -> None:
         ok, msg = wenv.venv_active_or_present(Path.cwd())
@@ -267,7 +288,7 @@ class Doctor:
         else:
             self._add(".env file", FAIL,
                       f"{self.env_path} not found (copy .env.example to .env "
-                      f"or run: python -m careerpilot.main doctor --fix)")
+                      f"or run: py -m careerpilot.main doctor --fix)")
 
     def _check_env_file_raw(self) -> None:
         if Path(self.env_path).exists():
@@ -490,7 +511,7 @@ class Doctor:
         else:
             self._add("Playwright package", FAIL,
                       "not installed — run setup_windows.ps1 or: "
-                      "pip install -r requirements.txt")
+                      "py -m pip install -r requirements.txt")
 
     def _check_browser_binary(self) -> None:
         ok, msg = wenv.playwright_browser_installed()
@@ -501,7 +522,7 @@ class Doctor:
             if self.fix:
                 hint += " (doctor --fix already attempted install)"
             else:
-                hint += " — run: python -m careerpilot.main doctor --fix"
+                hint += " — run: py -m careerpilot.main doctor --fix"
             self._add("Playwright Chromium", FAIL, hint)
 
     # ---- report ----------------------------------------------------------
@@ -520,7 +541,8 @@ class Doctor:
         if failed:
             lines.append(f"  RESULT: FAIL — {len(failed)} mandatory check(s) failed.")
             lines.append("  Fix the items above before starting CareerPilot.")
-            lines.append("  Tip: python -m careerpilot.main doctor --fix")
+            from .python_launcher import cli_hint
+            lines.append(f"  Tip: {cli_hint('careerpilot.main doctor --fix')}")
             lines.append("       repairs folders/DB/Playwright browsers automatically.")
             lines.append("  Secrets (API keys) and portal logins always need you.")
         else:

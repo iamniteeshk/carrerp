@@ -1,8 +1,9 @@
 @echo off
-REM Pull latest code and re-install dependencies. Windows.
+REM Update deps (legacy helper). Prefer scripts\update_careerpilot.ps1.
 cd /d "%~dp0\.."
-where git >nul 2>nul || (echo ERROR: git not found. & exit /b 1)
-echo Pulling latest...
-git pull --ff-only || (echo ERROR: git pull failed (uncommitted changes?). & exit /b 1)
-python -m pip install -r requirements.txt
-echo Updated. Run scripts\doctor.bat before starting.
+call "%~dp0_resolve_python.bat" || exit /b 1
+if exist requirements.lock (
+  "%PY%" -m pip install -r requirements.lock
+) else (
+  "%PY%" -m pip install -r requirements.txt
+)

@@ -103,7 +103,7 @@ class BrowserManager:
             return
         if not _PLAYWRIGHT_AVAILABLE:
             raise RuntimeError(
-                "Playwright is not installed. Run: pip install playwright "
+                "Playwright is not installed. Run: py -m py -m pip install playwright "
                 "&& playwright install chromium")
         self._pw = sync_playwright().start()
 

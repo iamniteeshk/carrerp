@@ -9,19 +9,16 @@ param(
 )
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
+. (Join-Path $PSScriptRoot "_ResolvePython.ps1")
 
-$py = $null
-if (Test-Path ".venv\Scripts\python.exe") {
-    $py = (Resolve-Path ".venv\Scripts\python.exe").Path
-} elseif (Get-Command python -ErrorAction SilentlyContinue) {
-    $py = "python"
-} else {
-    Write-Host "ERROR: Python not found. Run .\setup_windows.ps1 first." -ForegroundColor Red
+$py = Get-CareerPilotPython
+if (-not $py) {
+    Write-Host "ERROR: No Python launcher found. Install Python with the py launcher, then run .\setup_windows.ps1" -ForegroundColor Red
     exit 1
 }
 
 $argsList = @("-m", "careerpilot.main", "doctor")
 if ($Fix) { $argsList += "--fix" }
 if ($Production) { $argsList += "--production" }
-& $py @argsList
+if ($py -eq "py") { & py @argsList } else { & $py @argsList }
 exit $LASTEXITCODE

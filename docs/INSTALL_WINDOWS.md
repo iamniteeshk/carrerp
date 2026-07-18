@@ -13,6 +13,9 @@ After setup, the machine should:
 Live auto-submit stays **off** until you explicitly enable it after validation.
 Keep `apply.mode: dry_run` and `require_final_confirmation: true`.
 
+**Python on Windows:** always prefer the **`py` launcher** (see
+`docs/WINDOWS_PYTHON.md`). Do not rely on the WindowsApps `python` stub.
+
 ---
 
 ## What CareerPilot actually needs
@@ -24,7 +27,7 @@ Inferred from this repository (not guessed):
 | Windows 10/11 | Yes (this guide) | Dedicated production host |
 | Git | Recommended | Clone + update |
 | Python **3.10+** | Yes | Runtime (`docs/INSTALL.md`) |
-| `pip` + `.venv` | Yes | Isolated deps |
+| `py` launcher + `.venv` | Yes | Prefer `py`; never rely on WindowsApps `python` |
 | Packages in `requirements.txt` | Yes | playwright, flask, APScheduler, PyYAML, requests, python-dotenv |
 | Playwright **Chromium** browser | Yes | Fallback browser + Playwright driver |
 | Google **Chrome** (or Edge) | Recommended | `browser.channel: chrome` (production) or `msedge` |
@@ -84,7 +87,8 @@ Do this once on the new PC:
 4. Install **Git for Windows**: https://git-scm.com/download/win  
    (defaults are fine; enable “Git from the command line”).
 5. Install **Python 3.12** (or 3.11 / 3.10): https://www.python.org/downloads/windows/  
-   - Enable **Add python.exe to PATH**  
+   - Enable **Install launcher for all users** (`py.exe`)  
+   - PATH for `python.exe` is optional (CareerPilot prefers `py`)  
    - Enable **Install launcher for all users** (py.exe)
 6. Open **PowerShell** and confirm:
 
@@ -143,9 +147,9 @@ What `setup_windows.ps1` does (idempotent — safe to re-run):
 1. Verifies Git / Python 3.10+
 2. Creates `.venv`
 3. Upgrades pip; installs `requirements.txt`
-4. Runs `python -m playwright install chromium`
+4. Runs Playwright Chromium install via the venv (`-m playwright`)
 5. Checks for Google Chrome
-6. Runs `python -m careerpilot.main doctor --fix --production`
+6. Runs `py -m careerpilot.main doctor --fix --production`
 7. Prints the remaining **manual** steps (keys, resumes, logins)
 
 Equivalent entry points:
@@ -199,7 +203,7 @@ profiles\Infrastructure\resume.pdf
 ```powershell
 .\.venv\Scripts\python.exe -m careerpilot.main doctor
 # or:
-python doctor.py
+py doctor.py
 .\scripts\doctor.ps1
 .\scripts\doctor.ps1 -Fix
 ```
@@ -324,13 +328,15 @@ Chromium install, empty profile dirs.
 
 ```powershell
 cd C:\CareerPilot
+.\scripts\update_careerpilot.ps1
+# or manually:
 git pull
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m playwright install chromium
-.\.venv\Scripts\python.exe -m careerpilot.main doctor --fix
+py -m pip install -r requirements.txt          # or .\.venv\Scripts\python.exe -m pip …
+py -m playwright install chromium
+py -m careerpilot.main doctor --fix
 ```
 
-Or re-run `.\setup_windows.ps1` (idempotent).
+Or re-run `.\setup_windows.ps1` (idempotent). See also `docs/WINDOWS_PYTHON.md`.
 
 ---
 
@@ -352,8 +358,8 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 2. Clone / copy the app tree  
 3. Restore the files listed above  
 4. `.\setup_windows.ps1`  
-5. `python doctor.py`  
-6. `python -m careerpilot.main run`
+5. `py doctor.py`  
+6. `py -m careerpilot.main run`
 
 ---
 
@@ -361,7 +367,7 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 
 | Symptom | Fix |
 |---|---|
-| `python` not found | Re-install Python with PATH + py launcher; open a **new** PowerShell |
+| `py` not found | Re-install Python with **py launcher**; open a **new** PowerShell |
 | `playwright install` fails | Check internet; re-run `doctor --fix` |
 | Chrome channel errors | Install Chrome, or set `browser.channel: ""` |
 | Doctor FAIL: no AI key | Edit `.env` — `--fix` cannot invent keys |
@@ -378,8 +384,8 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 Only treat the machine as **Production Ready** when **all** of these are true:
 
 - [ ] `setup_windows.ps1` completed without install errors  
-- [ ] `python doctor.py` → **RESULT: PASS** (warnings only for optional Telegram if you chose to skip it)  
-- [ ] Gemini key works (`python -m careerpilot.main ai-health` or a dry scan that scores a job)  
+- [ ] `py doctor.py` → **RESULT: PASS** (warnings only for optional Telegram if you chose to skip it)  
+- [ ] Gemini key works (`py -m careerpilot.main ai-health` or a dry scan that scores a job)  
 - [ ] Telegram delivers a test notification (if enabled)  
 - [ ] Headed browser launches; LinkedIn + Naukri sessions persist across restart  
 - [ ] Database file exists; reports directory writable  

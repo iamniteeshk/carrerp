@@ -1,13 +1,9 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-  Quick health snapshot (CPU/RAM/DB/AI/scheduler/disk/last scan).
-
-.EXAMPLE
-  .\scripts\health.ps1
-#>
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
-$py = if (Test-Path ".venv\Scripts\python.exe") { ".venv\Scripts\python.exe" } else { "python" }
-& $py -m careerpilot.main health
+. (Join-Path $PSScriptRoot "_ResolvePython.ps1")
+$py = Get-CareerPilotPython
+if (-not $py) { Write-Host "ERROR: No Python launcher." -ForegroundColor Red; exit 1 }
+if ($py -eq "py") { & py -m careerpilot.main health }
+else { & $py -m careerpilot.main health }
 exit $LASTEXITCODE

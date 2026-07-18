@@ -1,10 +1,13 @@
-# Install dependencies and Chromium from PowerShell.
-# Prefer the full production setup on a fresh machine:
-#   ..\setup_windows.ps1
+#Requires -Version 5.1
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
-$py = if (Test-Path ".venv\Scripts\python.exe") { ".venv\Scripts\python.exe" } else { "python" }
-& $py -m pip install --upgrade pip
-& $py -m pip install -r requirements.txt
-& $py -m playwright install chromium
-Write-Host "Done. Prefer .\setup_windows.ps1 on a fresh PC. Then edit .env and config\config.yaml" -ForegroundColor Green
+. (Join-Path $PSScriptRoot "_ResolvePython.ps1")
+
+$py = Get-CareerPilotPython
+if (-not $py) {
+    Write-Host "ERROR: No Python launcher. Run setup_windows.ps1 first." -ForegroundColor Red
+    exit 1
+}
+if ($py -eq "py") { & py -m pip install --upgrade pip; & py -m pip install -r requirements.txt }
+else { & $py -m pip install --upgrade pip; & $py -m pip install -r requirements.txt }
+exit $LASTEXITCODE

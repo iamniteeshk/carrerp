@@ -40,7 +40,7 @@ pipeline stages; the UI polls `/api/browser/preview.png`.
 
 ### Startup
 
-`python -m careerpilot.main run` and `… dashboard` both launch the ops board.
+`py -m careerpilot.main run` and `… dashboard` both launch the ops board.
 Set in `config.yaml`:
 
 ```yaml

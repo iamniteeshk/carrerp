@@ -87,7 +87,7 @@ def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
     if not path.exists():
         report.error(
             f"config file not found: {path} — Fix: run "
-            f"`python -m careerpilot.main doctor --fix` or "
+            f"`py -m careerpilot.main doctor --fix` or "
             f"`.\\setup_windows.ps1 -ProductionConfig`")
         return None
     try:

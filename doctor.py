@@ -2,12 +2,12 @@
 """Convenience entry point for production pre-flight checks.
 
 Examples:
-    python doctor.py
-    python doctor.py --fix
-    python doctor.py --fix --production
+    py doctor.py
+    py doctor.py --fix
+    py doctor.py --fix --production
 
 Prefer the package entry when possible:
-    python -m careerpilot.main doctor [--fix] [--production]
+    py -m careerpilot.main doctor [--fix] [--production]
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-# Ensure the repo root is importable when launched as ``python doctor.py``.
+# Ensure the repo root is importable when launched as ``py doctor.py``.
 _ROOT = Path(__file__).resolve().parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))

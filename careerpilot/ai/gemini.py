@@ -157,7 +157,7 @@ class GeminiProvider(AIProvider):
             raise AIProviderError(
                 f"model '{self.model}' not found (HTTP 404). Set ai.gemini_model "
                 f"in config.yaml to one of the available models: {hint}. "
-                f"Run `python -m careerpilot.main models` to list them.")
+                f"Run `py -m careerpilot.main models` to list them.")
         if resp.status_code >= 400:
             raise AIProviderError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 

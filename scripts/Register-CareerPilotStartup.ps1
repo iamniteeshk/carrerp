@@ -13,15 +13,14 @@
     Starts at system boot, runs whether the user is logged on or not
     (registers as SYSTEM; requires Administrator).
 
+  Launch command prefers .venv\Scripts\python.exe when present (isolated deps);
+  otherwise uses ``py -m careerpilot.main run``.
+
   Both modes restart the task up to 3 times on failure, every 1 minute.
 
 .EXAMPLE
-  # First days — easier to debug
   .\scripts\Register-CareerPilotStartup.ps1
-
-  # Stable dedicated machine — survive power restore without login
   .\scripts\Register-CareerPilotStartup.ps1 -Mode Startup
-
   .\scripts\Register-CareerPilotStartup.ps1 -Remove
 #>
 [CmdletBinding()]
@@ -35,7 +34,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$Python = Join-Path $Root ".venv\Scripts\python.exe"
+. (Join-Path $PSScriptRoot "_ResolvePython.ps1")
 
 if ($Remove) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
@@ -43,19 +42,27 @@ if ($Remove) {
     exit 0
 }
 
-if (-not (Test-Path $Python)) {
-    Write-Host "ERROR: $Python not found. Run setup_windows.ps1 first." -ForegroundColor Red
+$venvPy = Join-Path $Root ".venv\Scripts\python.exe"
+if (Test-Path $venvPy) {
+    $Execute = $venvPy
+    $Argument = "-m careerpilot.main run"
+    $LaunchDesc = ".venv\Scripts\python.exe -m careerpilot.main run"
+} elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    $Execute = (Get-Command py).Source
+    $Argument = "-m careerpilot.main run"
+    $LaunchDesc = "py -m careerpilot.main run"
+} else {
+    Write-Host "ERROR: Neither .venv nor py launcher found. Run .\setup_windows.ps1 first." -ForegroundColor Red
     exit 1
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "logs") | Out-Null
 
 $action = New-ScheduledTaskAction `
-    -Execute $Python `
-    -Argument "-m careerpilot.main run" `
+    -Execute $Execute `
+    -Argument $Argument `
     -WorkingDirectory $Root
 
-# Restart every 1 minute, up to 3 times (both modes).
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
@@ -65,7 +72,6 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit ([TimeSpan]::Zero)
 
 if ($Mode -eq "LogOn") {
-    # Phase 1: current-user logon — no Admin required; best for first validation.
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
     $principal = New-ScheduledTaskPrincipal `
         -UserId $env:USERNAME `
@@ -83,21 +89,18 @@ if ($Mode -eq "LogOn") {
 
     Write-Host "Registered scheduled task '$TaskName' (Mode=LogOn)." -ForegroundColor Green
     Write-Host "  Trigger: At LogOn (user $($env:USERNAME))"
+    Write-Host "  Launch:  $LaunchDesc"
     Write-Host "  WorkingDirectory: $Root"
     Write-Host "  Restart on failure: every 1 min, up to 3 times"
     Write-Host ""
     Write-Host "After the machine is stable, switch to unattended boot recovery:" -ForegroundColor Cyan
     Write-Host "  .\scripts\Register-CareerPilotStartup.ps1 -Mode Startup"
 } else {
-    # Phase 2: At Startup — survives power restore without interactive login.
-    # Requires Administrator (SYSTEM principal).
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principalCheck = New-Object Security.Principal.WindowsPrincipal($identity)
     if (-not $principalCheck.IsInRole(
             [Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host "ERROR: -Mode Startup requires an elevated PowerShell (Run as Administrator)." -ForegroundColor Red
-        Write-Host "  Right-click PowerShell -> Run as administrator, then re-run:"
-        Write-Host "  .\scripts\Register-CareerPilotStartup.ps1 -Mode Startup"
         exit 1
     }
 
@@ -118,11 +121,9 @@ if ($Mode -eq "LogOn") {
 
     Write-Host "Registered scheduled task '$TaskName' (Mode=Startup)." -ForegroundColor Green
     Write-Host "  Trigger: At Startup (SYSTEM — runs whether user is logged on or not)"
+    Write-Host "  Launch:  $LaunchDesc"
     Write-Host "  WorkingDirectory: $Root"
     Write-Host "  Restart on failure: every 1 min, up to 3 times"
-    Write-Host ""
-    Write-Host "Ensure Windows sleep/hibernate are disabled, and install path" -ForegroundColor Yellow
-    Write-Host "is readable by SYSTEM (e.g. C:\CareerPilot)."
 }
 
 Write-Host "Remove later with: .\scripts\Register-CareerPilotStartup.ps1 -Remove"

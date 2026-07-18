@@ -5,14 +5,14 @@ Startup sequence (P004): load+validate config -> logging -> database+migrations
 validation fails fast before anything else starts.
 
 Usage:
-    python -m careerpilot.main run          # start scheduler + dashboard
-    python -m careerpilot.main scan         # run a single scan and exit
-    python -m careerpilot.main dashboard    # dashboard only
-    python -m careerpilot.main check        # validate config + init DB, exit
-    python -m careerpilot.main doctor       # pre-flight PASS/WARN/FAIL report
-    python -m careerpilot.main doctor --fix  # repair safe issues, then report
-    python -m careerpilot.main maintenance  # retention cleanup
-    python -m careerpilot.main setup        # scaffold config/profiles/.env
+    py -m careerpilot.main run          # start scheduler + dashboard
+    py -m careerpilot.main scan         # run a single scan and exit
+    py -m careerpilot.main dashboard    # dashboard only
+    py -m careerpilot.main check        # validate config + init DB, exit
+    py -m careerpilot.main doctor       # pre-flight PASS/WARN/FAIL report
+    py -m careerpilot.main doctor --fix  # repair safe issues, then report
+    py -m careerpilot.main maintenance  # retention cleanup
+    py -m careerpilot.main setup        # scaffold config/profiles/.env
 """
 
 from __future__ import annotations
@@ -856,7 +856,7 @@ def main(argv: list[str] | None = None) -> int:
               "(name, email, phone) and rules.")
         print("  2. Put your resume.pdf in each profiles/<Name>/ folder.")
         print("  3. Add API keys to .env")
-        print("  4. python -m careerpilot.main doctor")
+        print("  4. py -m careerpilot.main doctor")
         return 0
 
     # Auto-bootstrap on first run so the project is clone-and-run even without
@@ -883,7 +883,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config()
     except ConfigError as exc:
-        print(f"CONFIG ERROR: {exc}\nRun 'python -m careerpilot.main doctor' "
+        print(f"CONFIG ERROR: {exc}\nRun 'py -m careerpilot.main doctor' "
               f"for a full diagnostic.", file=sys.stderr)
         return 2
 

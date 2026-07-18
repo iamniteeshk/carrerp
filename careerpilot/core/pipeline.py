@@ -575,7 +575,7 @@ class ScanPipeline:
                             NotificationType.APPROVAL_REQUEST,
                             "AI provider unavailable -- jobs are being queued and "
                             "the scan is continuing. Check the Gemini model with "
-                            "`python -m careerpilot.main models`.")
+                            "`py -m careerpilot.main models`.")
                     except Exception as exc:  # noqa: BLE001
                         logger.debug("AI-unavailable notify failed: %s", exc)
                 return

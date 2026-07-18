@@ -33,7 +33,7 @@ git clone <repo-url> C:\CareerPilot
 cd C:\CareerPilot
 .\setup_windows.ps1 -ProductionConfig
 # edit .env + config\config.yaml + profiles\*\resume.pdf
-python doctor.py
+py doctor.py
 .\scripts\run_careerpilot.ps1
 ```
 
