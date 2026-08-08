@@ -13,6 +13,7 @@ scheduler:
   daily_summary_hour: 20          # 24-hour local time
 
 # Operator schedule (Jarvis Schedule tab can override live).
+# Default batches: morning ~1h sometimes, evening ~40m, night 2–3h random.
 schedule:
   mode: batches                   # batches | fixed | human_random
   enabled_days: [mon, tue, wed, thu, fri, sat, sun]
@@ -22,23 +23,45 @@ schedule:
       enabled: true
       start: "07:15"
       end: "09:30"
-      duration_minutes: 120
-      portals: [LinkedIn]
-      max_jobs: 40
-    lunch:
-      enabled: true
-      start: "12:00"
-      end: "13:30"
       duration_minutes: 60
-      portals: [Naukri]
-      max_jobs: 30
+      duration_min: 50
+      duration_max: 70
+      run_probability: 0.55       # sometime in the morning
+      portals: [LinkedIn]
+      max_jobs: 25
+      max_jobs_min: 15
+      max_jobs_max: 35
     evening:
       enabled: true
-      start: "18:30"
-      end: "20:30"
-      duration_minutes: 60
+      start: "17:45"
+      end: "19:15"
+      duration_minutes: 40
+      duration_min: 35
+      duration_max: 45
+      run_probability: 1.0
+      portals: [Naukri]
+      max_jobs: 30
+      max_jobs_min: 20
+      max_jobs_max: 40
+    night:
+      enabled: true
+      start: "20:00"
+      end: "23:30"
+      duration_minutes: 150
+      duration_min: 120           # 2–3 hours
+      duration_max: 180
+      run_probability: 1.0
       portals: [LinkedIn, Naukri]
-      max_jobs: 50
+      max_jobs: 80
+      max_jobs_min: 50
+      max_jobs_max: 120
+    lunch:
+      enabled: false
+      start: "12:00"
+      end: "13:30"
+      duration_minutes: 40
+      portals: [Naukri]
+      max_jobs: 25
   fixed:
     - enabled: false
       days: [mon, wed, fri]

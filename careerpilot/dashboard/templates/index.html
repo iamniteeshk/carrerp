@@ -190,7 +190,7 @@
           <div>
             <label>Mode</label>
             <select id="sched-mode">
-              <option value="batches">Batches (morning / lunch / evening)</option>
+              <option value="batches">Batches (default: random ~1h morning sometimes / ~40m evening / 2–3h night)</option>
               <option value="fixed">Fixed timings</option>
               <option value="human_random">Human random (legacy)</option>
             </select>
@@ -392,7 +392,7 @@ async function loadConsole() {
   document.getElementById('sched-json').value = JSON.stringify(st.schedule, null, 2);
   document.getElementById('sched-lines').textContent = (st.schedule_lines || []).join('\n');
   document.getElementById('sched-lock').textContent = IS_ADMIN
-    ? 'Edit hours by day and per batch (e.g. morning 2h, evening 1h), or fixed slots.'
+    ? 'Default is random batches: morning ~1h sometimes, evening ~40m, night 2–3h. Edit JSON for fixed hours or probabilities.'
     : 'Viewer mode — Admin login required to change schedule.';
 }
 

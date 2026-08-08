@@ -23,8 +23,14 @@ from careerpilot.db.services import SettingsService
 def test_default_morning_batch_two_hours():
     s = default_schedule()
     assert s.mode == "batches"
-    assert s.batches["morning"].duration_minutes == 120
-    assert s.batches["evening"].duration_minutes == 60
+    # Default: morning ~1h (sometimes), evening ~40m, night 2–3h
+    assert s.batches["morning"].duration_min == 50
+    assert s.batches["morning"].duration_max == 70
+    assert s.batches["morning"].run_probability == 0.55
+    assert s.batches["evening"].duration_min == 35
+    assert s.batches["evening"].duration_max == 45
+    assert s.batches["night"].duration_min == 120
+    assert s.batches["night"].duration_max == 180
 
 
 def test_active_batch_by_clock():
@@ -32,20 +38,42 @@ def test_active_batch_by_clock():
     now = datetime(2026, 8, 10, 8, 0)  # Monday morning
     b = active_batch(s, now)
     assert b is not None and b.name == "morning"
-    now2 = datetime(2026, 8, 10, 19, 0)
+    now2 = datetime(2026, 8, 10, 18, 30)
     assert active_batch(s, now2).name == "evening"
+    now_night = datetime(2026, 8, 10, 21, 0)
+    assert active_batch(s, now_night).name == "night"
     now3 = datetime(2026, 8, 10, 3, 0)
     assert active_batch(s, now3) is None
 
 
 def test_plan_from_schedule_batches():
     s = default_schedule()
+    # Force morning to always run for a deterministic assertion.
+    s.batches["morning"].run_probability = 1.0
     plan = plan_from_schedule(s, datetime(2026, 8, 10, 8, 0), Random(1),
                               keywords=["Director"])
     assert plan.skip_today is False
     assert plan.window == "morning"
-    assert plan.duration_minutes == 120
+    assert 50 <= plan.duration_minutes <= 70
     assert "LinkedIn" in plan.portals
+
+
+def test_morning_sometime_can_skip():
+    s = default_schedule()
+    s.batches["morning"].run_probability = 0.0  # never
+    plan = plan_from_schedule(s, datetime(2026, 8, 10, 8, 0), Random(0),
+                              keywords=["Director"])
+    assert plan.skip_today is True
+    assert plan.window == "morning_skipped"
+
+
+def test_night_random_duration_2_to_3_hours():
+    s = default_schedule()
+    plan = plan_from_schedule(s, datetime(2026, 8, 10, 21, 0), Random(7),
+                              keywords=["Head"])
+    assert plan.window == "night"
+    assert 120 <= plan.duration_minutes <= 180
+    assert set(plan.portals) == {"LinkedIn", "Naukri"}
 
 
 def test_fixed_slot_plan():

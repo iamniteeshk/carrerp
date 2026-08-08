@@ -2,7 +2,9 @@
 
 Modes
 -----
-* ``batches`` — named morning/lunch/evening (etc.) windows with duration + portals
+* ``batches`` — named morning/evening/night windows (default). Durations can be
+  fixed or randomized between ``duration_min`` / ``duration_max``. Per-batch
+  ``run_probability`` lets a window fire only “sometimes” (e.g. morning ~1h).
 * ``fixed`` — explicit day + start/end slots
 * ``human_random`` — legacy randomized plan_daily_session behaviour
 
@@ -25,12 +27,39 @@ class BatchWindow:
     enabled: bool = True
     start: str = "08:00"          # HH:MM local
     end: str = "10:00"            # HH:MM local (inclusive window for matching)
-    duration_minutes: int = 120   # how long a scan inside this batch may run
+    duration_minutes: int = 60    # used when min/max not set
+    # When both set, each run picks a random duration in [min, max].
+    duration_min: int | None = None
+    duration_max: int | None = None
+    # 1.0 = always run when clock is in window; 0.55 = “sometimes” (~half the days).
+    run_probability: float = 1.0
     portals: list[str] = field(default_factory=lambda: ["LinkedIn", "Naukri"])
     max_jobs: int = 40
+    max_jobs_min: int | None = None
+    max_jobs_max: int | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+    def pick_duration(self, rng) -> int:
+        lo = self.duration_min
+        hi = self.duration_max
+        if lo is not None and hi is not None:
+            a, b = int(lo), int(hi)
+            if a > b:
+                a, b = b, a
+            return max(1, rng.randint(a, b))
+        return max(1, int(self.duration_minutes or 60))
+
+    def pick_max_jobs(self, rng) -> int:
+        lo = self.max_jobs_min
+        hi = self.max_jobs_max
+        if lo is not None and hi is not None:
+            a, b = int(lo), int(hi)
+            if a > b:
+                a, b = b, a
+            return max(1, rng.randint(a, b))
+        return max(1, int(self.max_jobs or 40))
 
 
 @dataclass
@@ -77,8 +106,19 @@ def _day_key(weekday: int) -> str:
     return DAY_NAMES[weekday % 7]
 
 
+def _opt_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    return int(value)
+
+
 def default_schedule() -> ScheduleConfig:
-    """Sensible dry-run appliance defaults: morning 2h, evening 1h."""
+    """Default: randomized human-like batches.
+
+    * Morning — ~1 hour, only *sometimes* (run_probability 0.55)
+    * Evening — ~40 minutes
+    * Night — 2–3 hours (main session)
+    """
     return ScheduleConfig(
         mode="batches",
         enabled_days=list(DAY_NAMES),
@@ -86,16 +126,37 @@ def default_schedule() -> ScheduleConfig:
         batches={
             "morning": BatchWindow(
                 name="morning", enabled=True,
-                start="07:15", end="09:30", duration_minutes=120,
-                portals=["LinkedIn"], max_jobs=40),
-            "lunch": BatchWindow(
-                name="lunch", enabled=True,
-                start="12:00", end="13:30", duration_minutes=60,
-                portals=["Naukri"], max_jobs=30),
+                start="07:15", end="09:30",
+                duration_minutes=60,
+                duration_min=50, duration_max=70,
+                run_probability=0.55,          # sometime in the morning
+                portals=["LinkedIn"],
+                max_jobs=25, max_jobs_min=15, max_jobs_max=35),
             "evening": BatchWindow(
                 name="evening", enabled=True,
-                start="18:30", end="20:30", duration_minutes=60,
-                portals=["LinkedIn", "Naukri"], max_jobs=50),
+                start="17:45", end="19:15",
+                duration_minutes=40,
+                duration_min=35, duration_max=45,
+                run_probability=1.0,
+                portals=["Naukri"],
+                max_jobs=30, max_jobs_min=20, max_jobs_max=40),
+            "night": BatchWindow(
+                name="night", enabled=True,
+                start="20:00", end="23:30",
+                duration_minutes=150,
+                duration_min=120, duration_max=180,   # 2–3 hours
+                run_probability=1.0,
+                portals=["LinkedIn", "Naukri"],
+                max_jobs=80, max_jobs_min=50, max_jobs_max=120),
+            # Lunch kept available but off by default (enable in Jarvis if wanted).
+            "lunch": BatchWindow(
+                name="lunch", enabled=False,
+                start="12:00", end="13:30",
+                duration_minutes=40,
+                duration_min=30, duration_max=45,
+                run_probability=1.0,
+                portals=["Naukri"],
+                max_jobs=25),
         },
         fixed=[
             FixedSlot(days=list(DAY_NAMES[:5]), start="09:00", end="11:00",
@@ -126,8 +187,13 @@ def schedule_from_dict(raw: dict | None) -> ScheduleConfig:
                 start=str(b.get("start", "08:00")),
                 end=str(b.get("end", "10:00")),
                 duration_minutes=int(b.get("duration_minutes", 60) or 60),
+                duration_min=_opt_int(b.get("duration_min")),
+                duration_max=_opt_int(b.get("duration_max")),
+                run_probability=float(b.get("run_probability", 1.0) or 1.0),
                 portals=list(b.get("portals") or ["LinkedIn", "Naukri"]),
                 max_jobs=int(b.get("max_jobs", 40) or 40),
+                max_jobs_min=_opt_int(b.get("max_jobs_min")),
+                max_jobs_max=_opt_int(b.get("max_jobs_max")),
             )
     if not batches:
         batches = base.batches
@@ -225,18 +291,26 @@ def plan_from_schedule(schedule: ScheduleConfig, now: datetime, rng,
             max_jobs=max(1, int(slot.max_jobs)),
             is_weekend=is_weekend, keywords=kw, portals=portals, idle_gaps=gaps)
 
-    # batches (default)
+    # batches (default) — random duration / max_jobs within configured ranges
     batch = active_batch(schedule, now)
     if batch is None:
         return SessionPlan(skip_today=True, window="off", duration_minutes=0,
                            max_jobs=0, is_weekend=is_weekend, keywords=kw,
                            portals=[], idle_gaps=[])
+    # “Sometime” windows (e.g. morning): skip this run even though clock matches.
+    raw_prob = getattr(batch, "run_probability", 1.0)
+    prob = 1.0 if raw_prob is None else float(raw_prob)
+    if prob < 1.0 and rng.random() > prob:
+        return SessionPlan(skip_today=True, window=f"{batch.name}_skipped",
+                           duration_minutes=0, max_jobs=0,
+                           is_weekend=is_weekend, keywords=kw,
+                           portals=[], idle_gaps=[])
     portals = list(batch.portals)
     gaps = [rng.randint(5, 12)] if len(portals) > 1 else []
     return SessionPlan(
         skip_today=False, window=batch.name,
-        duration_minutes=max(1, int(batch.duration_minutes)),
-        max_jobs=max(1, int(batch.max_jobs)),
+        duration_minutes=batch.pick_duration(rng),
+        max_jobs=batch.pick_max_jobs(rng),
         is_weekend=is_weekend, keywords=kw, portals=portals, idle_gaps=gaps)
 
 
@@ -247,8 +321,15 @@ def describe_schedule(schedule: ScheduleConfig) -> list[str]:
     if schedule.mode == "batches":
         for name, b in schedule.batches.items():
             flag = "ON" if b.enabled else "off"
+            if b.duration_min is not None and b.duration_max is not None:
+                dur = f"{b.duration_min}-{b.duration_max}m random"
+            else:
+                dur = f"{b.duration_minutes}m"
+            sometime = ""
+            if float(b.run_probability or 1) < 1:
+                sometime = f" sometime≈{int(float(b.run_probability)*100)}%"
             lines.append(
-                f"{name}: {flag} {b.start}-{b.end} / {b.duration_minutes}m "
+                f"{name}: {flag} {b.start}-{b.end} / {dur}{sometime} "
                 f"portals={','.join(b.portals)} max={b.max_jobs}")
     elif schedule.mode == "fixed":
         for i, s in enumerate(schedule.fixed):
@@ -256,4 +337,6 @@ def describe_schedule(schedule: ScheduleConfig) -> list[str]:
             lines.append(
                 f"slot{i+1}: {flag} {','.join(s.days)} {s.start}-{s.end} "
                 f"{s.duration_minutes}m")
+    elif schedule.mode == "human_random":
+        lines.append("Legacy random windows (morning short / lunch / evening)")
     return lines
