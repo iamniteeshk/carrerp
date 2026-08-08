@@ -107,7 +107,10 @@ rules:
   # Prefer Chennai first; Remote allowed. Add cities only if explicitly allowed.
   search_locations: [Chennai, Remote]
   search_nationwide: false
-  search_include_recommended: false
+  # Feeds BEFORE keyword/category searches: Easy Apply → Recommended → All.
+  search_include_easy_apply_feed: true
+  search_include_recommended: true
+  search_include_all_feed: true
   search_keywords:
     - Head IT
     - Director IT

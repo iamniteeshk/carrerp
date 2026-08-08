@@ -177,6 +177,10 @@ class CareerPilot:
             portal.search_nationwide = self.cfg.rules.search_nationwide
             portal.search_include_recommended = (
                 self.cfg.rules.search_include_recommended)
+            portal.search_include_easy_apply_feed = (
+                self.cfg.rules.search_include_easy_apply_feed)
+            portal.search_include_all_feed = (
+                self.cfg.rules.search_include_all_feed)
         return portals
 
     def run(self) -> None:

@@ -582,11 +582,15 @@ class BasePortal(abc.ABC):
     SPINNER_SELECTOR: str = ""
     CAPTCHA_SELECTOR: str = ""
     RECOMMENDED_URL: str = ""          # logged-in "recommended jobs" feed
+    EASY_APPLY_URL: str = ""           # Easy Apply / apply-friendly feed
+    ALL_JOBS_URL: str = ""             # general jobs home / "all" feed
     debugger = None                    # VisualDebugger | None
     humanizer = None                  # Humanizer | None
     detail_extractor = None           # JobDetailExtractor | None
     search_nationwide: bool = False
     search_include_recommended: bool = False
+    search_include_easy_apply_feed: bool = True
+    search_include_all_feed: bool = True
 
     def _debug_selectors(self) -> dict:
         return {"job_card": self._results_selector(),
@@ -597,10 +601,11 @@ class BasePortal(abc.ABC):
 
     def _build_search_plan(self, keywords: list[str],
                            locations: list[str]) -> list[tuple]:
-        """Ordered plan: optional recommended feed, then LOCATION-MAJOR searches.
+        """Ordered plan: priority feeds FIRST, then LOCATION-MAJOR category searches.
 
-        Nationwide sweep is OFF by default (quality-first). Enable via
-        ``search_nationwide: true`` in config rules.
+        Feed order (when enabled): Easy Apply → Recommended → All jobs, then
+        each keyword×location category. Nationwide sweep stays OFF unless
+        ``search_nationwide: true``.
         """
         plan: list[tuple] = []
         seen: set[str] = set()
@@ -610,9 +615,16 @@ class BasePortal(abc.ABC):
                 seen.add(url)
                 plan.append((label, url, search, loc))
 
-        if self.RECOMMENDED_URL and getattr(self, "search_include_recommended",
-                                            False):
+        # ---- Priority feeds before any keyword/category search ----
+        if getattr(self, "search_include_easy_apply_feed", True) and getattr(
+                self, "EASY_APPLY_URL", ""):
+            add("easy apply feed", self.EASY_APPLY_URL, "easy_apply", "")
+        if getattr(self, "search_include_recommended", False) and self.RECOMMENDED_URL:
             add("recommended jobs", self.RECOMMENDED_URL, "recommended", "")
+        if getattr(self, "search_include_all_feed", True) and getattr(
+                self, "ALL_JOBS_URL", ""):
+            add("all jobs feed", self.ALL_JOBS_URL, "all", "")
+
         # Location-major: finish each preferred city across ALL keywords first.
         for loc in (locations or []):
             for kw in keywords:

@@ -154,6 +154,12 @@ rules:
   # this becomes REJECTED instead of appearing in MatchedJobs, so a weak
   # off-domain fit (e.g. an AI/ML role scored 15-20) is never matched. 0 = off.
   minimum_match_score: 60
+  # Search plan: priority feeds FIRST (Easy Apply → Recommended → All), then
+  # each keyword × location category. Toggle feeds without code changes.
+  search_nationwide: false
+  search_include_easy_apply_feed: true
+  search_include_recommended: true
+  search_include_all_feed: true
 
 apply:
   mode: dry_run                   # dry_run | live  -- START IN DRY RUN
