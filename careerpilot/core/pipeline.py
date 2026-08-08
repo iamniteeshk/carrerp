@@ -151,13 +151,22 @@ class ScanPipeline:
             else:
                 if schedule is None:
                     schedule = schedule_from_dict({})
+                used = 0
+                hist = getattr(self, "session_history", None)
+                if hist is not None and hasattr(hist, "all"):
+                    try:
+                        from .schedule_config import minutes_used_today
+                        used = minutes_used_today(hist.all(), now or datetime.now())
+                    except Exception:  # noqa: BLE001
+                        used = 0
                 if schedule.mode == "human_random":
                     plan = plan_daily_session(
                         rng, now or datetime.now(), kws,
                         skip_probability=float(schedule.skip_probability or 0.12))
                 else:
                     plan = plan_from_schedule(
-                        schedule, now or datetime.now(), rng, keywords=kws)
+                        schedule, now or datetime.now(), rng, keywords=kws,
+                        used_minutes_today=used)
             self.session_plan = plan
             self.session_max_jobs = plan.max_jobs
             self.session_deadline = (time.time() + plan.duration_minutes * 60

@@ -13,63 +13,65 @@ scheduler:
   daily_summary_hour: 20          # 24-hour local time
 
 # Operator schedule (Jarvis Schedule tab can override live).
-# Default batches: morning ~1h sometimes, evening ~40m, night 2–3h random.
+# Totally random light sessions; hard daily budget max 3–4 hours total.
 schedule:
   mode: batches                   # batches | fixed | human_random
   enabled_days: [mon, tue, wed, thu, fri, sat, sun]
-  skip_probability: 0.0
+  skip_probability: 0.10          # occasional full day off
+  daily_min_minutes: 60           # light day ~1h
+  daily_max_minutes: 240          # hard cap 4h (never more)
   batches:
     morning:
       enabled: true
-      start: "07:15"
-      end: "09:30"
-      duration_minutes: 60
-      duration_min: 50
-      duration_max: 70
-      run_probability: 0.55       # sometime in the morning
+      start: "07:00"
+      end: "10:00"
+      duration_minutes: 30
+      duration_min: 20
+      duration_max: 45
+      run_probability: 0.40       # often skip
       portals: [LinkedIn]
-      max_jobs: 25
-      max_jobs_min: 15
-      max_jobs_max: 35
+      max_jobs: 20
+      max_jobs_min: 8
+      max_jobs_max: 25
     evening:
       enabled: true
-      start: "17:45"
-      end: "19:15"
-      duration_minutes: 40
-      duration_min: 35
+      start: "17:30"
+      end: "19:30"
+      duration_minutes: 35
+      duration_min: 25
       duration_max: 45
-      run_probability: 1.0
+      run_probability: 0.45
       portals: [Naukri]
-      max_jobs: 30
-      max_jobs_min: 20
-      max_jobs_max: 40
+      max_jobs: 25
+      max_jobs_min: 10
+      max_jobs_max: 30
     night:
       enabled: true
       start: "20:00"
-      end: "23:30"
-      duration_minutes: 150
-      duration_min: 120           # 2–3 hours
-      duration_max: 180
-      run_probability: 1.0
+      end: "23:00"
+      duration_minutes: 75
+      duration_min: 40
+      duration_max: 110           # chunk of daily budget, not a 3h block alone
+      run_probability: 0.50
       portals: [LinkedIn, Naukri]
-      max_jobs: 80
-      max_jobs_min: 50
-      max_jobs_max: 120
+      max_jobs: 50
+      max_jobs_min: 20
+      max_jobs_max: 70
     lunch:
       enabled: false
       start: "12:00"
       end: "13:30"
-      duration_minutes: 40
+      duration_minutes: 30
       portals: [Naukri]
-      max_jobs: 25
+      max_jobs: 20
   fixed:
     - enabled: false
       days: [mon, wed, fri]
       start: "09:00"
       end: "11:00"
-      duration_minutes: 120
+      duration_minutes: 90
       portals: [LinkedIn, Naukri]
-      max_jobs: 50
+      max_jobs: 40
 
 # ---- Candidate: all personal/factual data (was candidate.yaml) -------------
 candidate:

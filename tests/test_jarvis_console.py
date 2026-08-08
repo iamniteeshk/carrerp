@@ -23,14 +23,12 @@ from careerpilot.db.services import SettingsService
 def test_default_morning_batch_two_hours():
     s = default_schedule()
     assert s.mode == "batches"
-    # Default: morning ~1h (sometimes), evening ~40m, night 2–3h
-    assert s.batches["morning"].duration_min == 50
-    assert s.batches["morning"].duration_max == 70
-    assert s.batches["morning"].run_probability == 0.55
-    assert s.batches["evening"].duration_min == 35
-    assert s.batches["evening"].duration_max == 45
-    assert s.batches["night"].duration_min == 120
-    assert s.batches["night"].duration_max == 180
+    assert s.daily_max_minutes <= 240
+    # Light random windows — not multi-hour stacks by default
+    assert s.batches["morning"].duration_max <= 60
+    assert s.batches["evening"].duration_max <= 60
+    assert s.batches["night"].duration_max <= 120
+    assert s.batches["morning"].run_probability < 0.6
 
 
 def test_active_batch_by_clock():
@@ -48,18 +46,19 @@ def test_active_batch_by_clock():
 
 def test_plan_from_schedule_batches():
     s = default_schedule()
-    # Force morning to always run for a deterministic assertion.
+    s.skip_probability = 0.0
     s.batches["morning"].run_probability = 1.0
     plan = plan_from_schedule(s, datetime(2026, 8, 10, 8, 0), Random(1),
                               keywords=["Director"])
     assert plan.skip_today is False
     assert plan.window == "morning"
-    assert 50 <= plan.duration_minutes <= 70
+    assert 20 <= plan.duration_minutes <= 45
     assert "LinkedIn" in plan.portals
 
 
 def test_morning_sometime_can_skip():
     s = default_schedule()
+    s.skip_probability = 0.0
     s.batches["morning"].run_probability = 0.0  # never
     plan = plan_from_schedule(s, datetime(2026, 8, 10, 8, 0), Random(0),
                               keywords=["Director"])
@@ -69,11 +68,37 @@ def test_morning_sometime_can_skip():
 
 def test_night_random_duration_2_to_3_hours():
     s = default_schedule()
+    s.skip_probability = 0.0
+    s.batches["night"].run_probability = 1.0
     plan = plan_from_schedule(s, datetime(2026, 8, 10, 21, 0), Random(7),
-                              keywords=["Head"])
+                              keywords=["Head"], used_minutes_today=0)
     assert plan.window == "night"
-    assert 120 <= plan.duration_minutes <= 180
+    assert 40 <= plan.duration_minutes <= 110
     assert set(plan.portals) == {"LinkedIn", "Naukri"}
+
+
+def test_daily_budget_caps_total_at_4h():
+    from careerpilot.core.schedule_config import day_budget_minutes, minutes_used_today
+    s = default_schedule()
+    s.skip_probability = 0.0
+    s.daily_min_minutes = 180
+    s.daily_max_minutes = 240
+    now = datetime(2026, 8, 10, 21, 0)
+    budget = day_budget_minutes(s, now)
+    assert 180 <= budget <= 240
+    s.batches["night"].run_probability = 1.0
+    # Already used almost all of today's budget → skip
+    plan = plan_from_schedule(s, now, Random(1), keywords=["X"],
+                              used_minutes_today=budget - 5)
+    assert plan.skip_today is True
+    assert plan.window == "daily_budget_spent"
+    # History helper
+    used = minutes_used_today([
+        {"start": "2026-08-10T08:00:00", "planned_duration_minutes": 40},
+        {"start": "2026-08-10T18:00:00", "planned_duration_minutes": 35},
+        {"start": "2026-08-09T21:00:00", "planned_duration_minutes": 99},
+    ], now)
+    assert used == 75
 
 
 def test_fixed_slot_plan():
