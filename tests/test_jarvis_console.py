@@ -124,6 +124,10 @@ def test_vision_json_parse():
     assert data["logged_in"] is True
     data2 = _parse_json_reply('```json\n{"logged_in": false, "reason": "login"}\n```')
     assert data2["logged_in"] is False
+    data3 = _parse_json_reply(
+        '<think>looking at navbar</think>\n'
+        '{"logged_in": true, "reason": "profile menu"}')
+    assert data3["logged_in"] is True
 
 
 def test_settings_and_console_schedule():
@@ -147,8 +151,8 @@ def test_settings_and_console_schedule():
         stored = settings.get_json("schedule_json")
         assert stored["batches"]["morning"]["duration_minutes"] == 90
         r = client.post("/api/console/ai", json={
-            "active_provider": "ollama", "text_model": "qwen2.5:8b",
-            "vision_login_enabled": True, "vision_model": "qwen2-vl:7b",
+            "active_provider": "ollama", "text_model": "qwen3:8b",
+            "vision_login_enabled": True, "vision_model": "qwen3-vl:8b",
         })
         assert r.status_code == 200
         assert settings.get("ai_active_provider") == "ollama"

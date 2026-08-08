@@ -83,7 +83,7 @@ class CollectorManager:
         cfg = self.vision_cfg
         # Dashboard may override model / base_url
         base_url = getattr(cfg, "base_url", "http://127.0.0.1:11434/v1")
-        model = getattr(cfg, "model", "qwen2-vl:7b")
+        model = getattr(cfg, "model", "qwen3-vl:8b")
         timeout = int(getattr(cfg, "timeout_seconds", 90) or 90)
         if self.settings is not None:
             base_url = self.settings.get("vision_base_url", base_url) or base_url

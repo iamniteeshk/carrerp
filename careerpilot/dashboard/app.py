@@ -234,7 +234,7 @@ def create_dashboard(
                 settings_svc.get("vision_login_enabled")
                 or str(bool(getattr(vision, "login_check", True))).lower()),
             "vision_model": settings_svc.get("vision_model") or getattr(
-                vision, "model", "qwen2-vl:7b"),
+                vision, "model", "qwen3-vl:8b"),
             "vision_base_url": settings_svc.get("vision_base_url") or getattr(
                 vision, "base_url", "http://127.0.0.1:11434/v1"),
             "debug_visual_mode": (

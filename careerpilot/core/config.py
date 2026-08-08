@@ -105,7 +105,7 @@ class VisionConfig:
     """Local vision model used for compulsory login verification."""
     login_check: bool = True
     base_url: str = "http://127.0.0.1:11434/v1"
-    model: str = "qwen2-vl:7b"
+    model: str = "qwen3-vl:8b"
     timeout_seconds: int = 90
     api_key: str = ""  # unused for local Ollama
 
@@ -358,7 +358,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
     vision_cfg = VisionConfig(
         login_check=bool(vision_raw.get("login_check", True)),
         base_url=str(vision_raw.get("base_url", "http://127.0.0.1:11434/v1")),
-        model=str(vision_raw.get("model", "qwen2-vl:7b")),
+        model=str(vision_raw.get("model", "qwen3-vl:8b")),
         timeout_seconds=int(vision_raw.get("timeout_seconds", 90) or 90),
         api_key=os.getenv(vision_raw.get("api_key_env", ""), "") if vision_raw.get("api_key_env") else "",
     )

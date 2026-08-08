@@ -46,6 +46,10 @@ def _encode_image(path: str | Path) -> str:
 
 def _parse_json_reply(text: str) -> dict:
     text = (text or "").strip()
+    # Qwen3 thinking mode may wrap reasoning before the JSON payload.
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.I)
+    text = re.sub(r"<thinking>[\s\S]*?</thinking>", "", text, flags=re.I)
+    text = text.strip()
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text)
@@ -66,7 +70,7 @@ def check_login_vision(
     *,
     portal: str,
     base_url: str = "http://127.0.0.1:11434/v1",
-    model: str = "qwen2-vl:7b",
+    model: str = "qwen3-vl:8b",
     api_key: str = "",
     timeout: int = 90,
 ) -> VisionLoginResult:

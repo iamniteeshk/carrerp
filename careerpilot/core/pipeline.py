@@ -544,8 +544,9 @@ class ScanPipeline:
                     job.job_id = existing["job_id"]
                     if hasattr(self.jobs, "update_material_fields"):
                         self.jobs.update_material_fields(job.job_id, job)
-                    self.jobs.update_status(job.job_id, JobStatus.FOUND,
-                                            rejection_reason=None)
+                    if hasattr(self.jobs, "update_status"):
+                        self.jobs.update_status(job.job_id, JobStatus.FOUND,
+                                                rejection_reason=None)
                     counts["found"] += 1
                     self._found = counts["found"]
                     self._recoveries = getattr(self, "_recoveries", 0) + 1

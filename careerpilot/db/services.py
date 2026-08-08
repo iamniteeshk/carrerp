@@ -42,7 +42,13 @@ def material_field_changes(existing: dict[str, Any], job: Job) -> list[str]:
 
     Only fields with a non-empty value on ``job`` are compared, so a card that
     omits JD does not look like a change against a previously stored JD.
+
+    If the stored row has no material content at all (status-only row), return
+    [] — there is no baseline to diff against, so REJECTED stays skipped.
     """
+    has_baseline = any(_norm_field(existing.get(field)) for field in MATERIAL_FIELDS)
+    if not has_baseline:
+        return []
     changed: list[str] = []
     for field in MATERIAL_FIELDS:
         new_v = _norm_field(getattr(job, field, "") if hasattr(job, field)

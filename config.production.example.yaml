@@ -105,7 +105,7 @@ ai:
       enabled: true
       base_url: http://127.0.0.1:11434/v1
       discover_models: true
-      preferred_model: qwen2.5:8b
+      preferred_model: qwen3:8b
     gemini:
       enabled: false
       kind: gemini
@@ -124,7 +124,7 @@ ai:
 vision:
   login_check: true
   base_url: http://127.0.0.1:11434/v1
-  model: qwen2-vl:7b
+  model: qwen3-vl:8b
   timeout_seconds: 90
 
 browser:
