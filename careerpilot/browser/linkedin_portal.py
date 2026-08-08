@@ -35,8 +35,10 @@ class LinkedInPortal(BasePortal):
     RESULTS_SELECTOR = ""
     SPINNER_SELECTOR = ""
     CAPTCHA_SELECTOR = ""
-    # Logged-in "recommended jobs" feed -- searched FIRST (public URL).
+    # Logged-in feeds -- searched BEFORE keyword/category searches when enabled.
     RECOMMENDED_URL = "https://www.linkedin.com/jobs/collections/recommended/"
+    EASY_APPLY_URL = "https://www.linkedin.com/jobs/search/?f_AL=true"
+    ALL_JOBS_URL = "https://www.linkedin.com/jobs/"
     # UNVERIFIED best-known selectors -- confirm with Visual Debug Mode and
     # override in config.yaml -> portals.linkedin. LinkedIn serves per-user
     # A/B markup, so these especially must be checked against your own account.

@@ -13,14 +13,44 @@
     table { color:#e6e6e6 !important; font-size:.85rem; }
     h5 { color:#9aa0ac; text-transform:uppercase; font-size:.8rem; letter-spacing:.05em; }
     .accent { color:#4da3ff; }
+    .reject-item { border:1px solid #2a2e38; border-radius:6px; margin-bottom:.5rem; overflow:hidden; }
+    .reject-head { display:flex; align-items:center; gap:.75rem; padding:.65rem .85rem; cursor:pointer; background:#151820; }
+    .reject-head:hover { background:#1e222c; }
+    .reject-body { display:none; padding:.85rem; border-top:1px solid #2a2e38; background:#12151b; }
+    .reject-body.open { display:block; }
+    .reject-title { flex:1; font-weight:600; }
+    .chev { color:#9aa0ac; transition:transform .15s; }
+    .chev.open { transform:rotate(90deg); }
+    .jd { white-space:pre-wrap; max-height:220px; overflow:auto; font-size:.8rem; color:#c5c9d3; }
+    .btn-approve { white-space:nowrap; }
   </style>
 </head>
 <body>
 <div class="container-fluid py-4">
-  <h3 class="mb-4"><span class="accent">CareerPilot</span> Dashboard
-    <span class="muted">— auto-refresh {{ refresh }}s</span></h3>
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <h3 class="mb-0"><span class="accent">CareerPilot</span> Dashboard
+      <span class="muted">— auto-refresh {{ refresh }}s</span></h3>
+    <div class="d-flex align-items-center gap-2">
+      <span class="muted" id="auth-label">{% if is_admin %}Signed in as Admin{% else %}Viewer (stats public){% endif %}</span>
+      {% if is_admin %}
+      <a class="btn btn-sm btn-outline-secondary" href="/logout">Logout</a>
+      {% else %}
+      <a class="btn btn-sm btn-outline-primary" href="/login">Admin login</a>
+      {% endif %}
+    </div>
+  </div>
 
   <div class="row g-3 mb-4" id="stat-cards"></div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-12">
+      <div class="card p-3">
+        <h5>Rejected Jobs</h5>
+        <p class="muted mb-2">Title only — expand for JD, salary, company, rejection reason. Admin can approve for apply on the next run.</p>
+        <div id="rejected-list"></div>
+      </div>
+    </div>
+  </div>
 
   <div class="row g-3">
     <div class="col-lg-6">
@@ -48,6 +78,13 @@
 
 <script>
 const REFRESH = {{ refresh }} * 1000;
+const IS_ADMIN = {{ 'true' if is_admin else 'false' }};
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
 
 function table(rows) {
   if (!rows.length) return '<p class="muted">No data yet.</p>';
@@ -55,8 +92,74 @@ function table(rows) {
   let h = '<table class="table table-dark table-sm table-striped"><thead><tr>';
   cols.forEach(c => h += `<th>${c}</th>`);
   h += '</tr></thead><tbody>';
-  rows.forEach(r => { h += '<tr>'; cols.forEach(c => h += `<td>${r[c] ?? ''}</td>`); h += '</tr>'; });
+  rows.forEach(r => { h += '<tr>'; cols.forEach(c => h += `<td>${esc(r[c])}</td>`); h += '</tr>'; });
   return h + '</tbody></table>';
+}
+
+function renderRejected(rows) {
+  const el = document.getElementById('rejected-list');
+  if (!rows.length) {
+    el.innerHTML = '<p class="muted mb-0">No rejected jobs.</p>';
+    return;
+  }
+  el.innerHTML = rows.map(r => {
+    const id = r.job_id;
+    const approveBtn = IS_ADMIN
+      ? `<button class="btn btn-sm btn-success btn-approve" data-approve="${id}">Approve for next run</button>`
+      : `<span class="muted">Login as Admin to approve</span>`;
+    return `<div class="reject-item" data-id="${id}">
+      <div class="reject-head" data-toggle="${id}">
+        <span class="chev" id="chev-${id}">▸</span>
+        <span class="reject-title">${esc(r.job_title || '(untitled)')}</span>
+        <span class="muted">${esc(r.portal || '')}</span>
+      </div>
+      <div class="reject-body" id="body-${id}">
+        <div class="row g-2 mb-2">
+          <div class="col-md-6"><span class="muted">Company</span><div>${esc(r.company || '—')}</div></div>
+          <div class="col-md-3"><span class="muted">Salary</span><div>${esc(r.salary || '—')}</div></div>
+          <div class="col-md-3"><span class="muted">Location</span><div>${esc(r.location || '—')}</div></div>
+        </div>
+        <div class="mb-2"><span class="muted">Rejection reason</span><div>${esc(r.rejection_reason || '—')}</div></div>
+        <div class="mb-2"><span class="muted">Job description</span><div class="jd">${esc(r.job_description || '—')}</div></div>
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <a class="muted" href="${esc(r.job_url || '#')}" target="_blank" rel="noopener">Open posting</a>
+          ${approveBtn}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('[data-toggle]').forEach(head => {
+    head.addEventListener('click', () => {
+      const id = head.getAttribute('data-toggle');
+      const body = document.getElementById('body-' + id);
+      const chev = document.getElementById('chev-' + id);
+      body.classList.toggle('open');
+      chev.classList.toggle('open');
+    });
+  });
+  el.querySelectorAll('[data-approve]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute('data-approve');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/api/jobs/${id}/approve`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          alert(data.error || 'Approve failed — are you logged in as Admin?');
+          btn.disabled = false;
+          return;
+        }
+        btn.textContent = 'Approved ✓';
+        btn.classList.replace('btn-success', 'btn-secondary');
+        load();
+      } catch (err) {
+        alert(String(err));
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 async function load() {
@@ -67,12 +170,14 @@ async function load() {
       ['Failed', stats.failed],
       ['Matched', stats.by_status.MATCHED || 0],
       ['Rejected', stats.by_status.REJECTED || 0],
+      ['Approved', stats.by_status.APPROVED || 0],
       ['Found', stats.by_status.FOUND || 0],
       ['Manual Review', stats.by_status.MANUAL_REVIEW || 0],
     ];
     document.getElementById('stat-cards').innerHTML = cards.map(([k,v]) =>
       `<div class="col"><div class="card p-3 text-center"><div class="stat">${v}</div><div class="muted">${k}</div></div></div>`).join('');
 
+    renderRejected(await (await fetch('/api/rejected')).json());
     document.getElementById('jobs').innerHTML = table(await (await fetch('/api/jobs')).json());
     document.getElementById('applications').innerHTML = table(await (await fetch('/api/applications')).json());
     document.getElementById('rejections').innerHTML = table(await (await fetch('/api/rejections')).json());

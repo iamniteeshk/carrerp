@@ -22,6 +22,8 @@ class JobStatus(str, Enum):
     SKIPPED = "SKIPPED"
     PARTIAL_DATA = "PARTIAL_DATA"  # JD could not be fully read; never auto-decided
     MANUAL_REVIEW = "MANUAL_REVIEW"  # e.g. LinkedIn -> external ATS redirect
+    # Operator overrode a REJECTED decision in the dashboard; apply on next run.
+    APPROVED = "APPROVED"
 
 
 class Portal(str, Enum):

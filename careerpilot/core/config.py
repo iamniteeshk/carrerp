@@ -74,6 +74,10 @@ class RuleConfig:
     search_nationwide: bool = False
     # When false, skip the logged-in recommended-jobs feed (fewer duplicates).
     search_include_recommended: bool = False
+    # When true, visit Easy Apply / apply-friendly feeds BEFORE keyword searches.
+    search_include_easy_apply_feed: bool = True
+    # When true, visit the portal's general "all jobs" feed before categories.
+    search_include_all_feed: bool = True
     # When set, ONLY these cities are searched (overrides profile location union).
     search_locations: list[str] = field(default_factory=list)
 
@@ -266,6 +270,9 @@ def load_config(config_path: str | Path = "config/config.yaml",
         search_nationwide=bool(rules.get("search_nationwide", False)),
         search_include_recommended=bool(rules.get("search_include_recommended",
                                                    False)),
+        search_include_easy_apply_feed=bool(
+            rules.get("search_include_easy_apply_feed", True)),
+        search_include_all_feed=bool(rules.get("search_include_all_feed", True)),
         search_locations=search_locs,
     )
 
