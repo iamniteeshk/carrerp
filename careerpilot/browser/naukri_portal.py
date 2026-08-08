@@ -130,8 +130,15 @@ class NaukriPortal(BasePortal):
         # drawer with one question at a time -- detect each, answer numeric/
         # dropdown from candidate config, free-text via answer_fn. Resume is
         # usually the saved profile resume; upload only if prompted.
+        evidence = getattr(self, "apply_evidence", None)
+        if evidence:
+            evidence.capture(page, job, "01_opened_job")
+            evidence.capture(page, job, "02_resume_ready")
+            evidence.capture(page, job, "03_form_filled")
 
         if dry_run:
+            if evidence:
+                evidence.capture(page, job, "04_stop_before_apply")
             shot = self.session.screenshot(
                 f"{self.session.profile_dir}/dryrun_{job.source_id or 'job'}.png")
             logger.info("DRY RUN: stopped before submit for %s @ %s",
@@ -143,6 +150,8 @@ class NaukriPortal(BasePortal):
         # final Submit are not yet completed against live DOM. Never claim
         # submitted=True. Stop at the confirmation boundary and wait for an
         # explicit human confirmation before any real submit.
+        if evidence:
+            evidence.capture(page, job, "04_stop_before_apply")
         shot = self.session.screenshot(
             f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
         logger.warning(

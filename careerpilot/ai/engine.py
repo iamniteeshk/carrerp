@@ -123,6 +123,16 @@ class AIEngine:
         # injected into the evaluation prompt so scoring improves over time.
         self.learned_summary = ""
 
+    def set_active_provider(self, name: str) -> None:
+        """Hot-switch active provider (dashboard Local AI / API toggle)."""
+        name = (name or "").strip()
+        if not name:
+            return
+        self.cfg.active_provider = name
+        if getattr(self.cfg, "providers", None):
+            self.providers = build_providers(self.cfg.providers, name)
+            logger.info("Active AI provider switched to %s", name)
+
     def startup_validate(self) -> dict:
         """Validate/repair provider config at startup. For Gemini, resolves the
         model against the live list (auto-selecting a compatible Flash model if

@@ -12,6 +12,42 @@ scheduler:
   scan_interval_hours: 4
   daily_summary_hour: 20          # 24-hour local time
 
+# Operator schedule (Jarvis Schedule tab can override live).
+schedule:
+  mode: batches                   # batches | fixed | human_random
+  enabled_days: [mon, tue, wed, thu, fri, sat, sun]
+  skip_probability: 0.0
+  batches:
+    morning:
+      enabled: true
+      start: "07:15"
+      end: "09:30"
+      duration_minutes: 120
+      portals: [LinkedIn]
+      max_jobs: 40
+    lunch:
+      enabled: true
+      start: "12:00"
+      end: "13:30"
+      duration_minutes: 60
+      portals: [Naukri]
+      max_jobs: 30
+    evening:
+      enabled: true
+      start: "18:30"
+      end: "20:30"
+      duration_minutes: 60
+      portals: [LinkedIn, Naukri]
+      max_jobs: 50
+  fixed:
+    - enabled: false
+      days: [mon, wed, fri]
+      start: "09:00"
+      end: "11:00"
+      duration_minutes: 120
+      portals: [LinkedIn, Naukri]
+      max_jobs: 50
+
 # ---- Candidate: all personal/factual data (was candidate.yaml) -------------
 candidate:
   full_name: "Your Name"
@@ -36,13 +72,18 @@ ai:
   # preferred_model empty to auto-discover, or set it to pin a specific model.
   # Adding any OpenAI-compatible provider (OpenRouter, Together, Fireworks,
   # Mistral, ...) needs only a block here -- no Python changes.
-  active_provider: gemini
-  request_timeout_seconds: 30
-  max_retries: 3
+  active_provider: ollama
+  request_timeout_seconds: 180
+  max_retries: 2
 
   providers:
-    gemini:
+    ollama:
       enabled: true
+      base_url: http://127.0.0.1:11434/v1
+      discover_models: true
+      preferred_model: qwen2.5:8b
+    gemini:
+      enabled: false
       kind: gemini                 # only Gemini needs its own adapter
       api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
       discover_models: true
@@ -72,25 +113,14 @@ ai:
       discover_models: true
       preferred_model: ""
 
-    # Local OpenAI-compatible servers need NO api_key. Omit api_key_env and the
-    # adapter treats the provider as keyless (no Authorization header). If the
-    # server doesn't expose /models, set discover_models:false and pin
-    # preferred_model -- discovery is optional and falls back gracefully.
-    # ollama:
-    #   enabled: false
-    #   base_url: http://localhost:11434/v1
-    #   discover_models: true        # Ollama exposes /v1/models
-    #   preferred_model: llama3.1
-    # lmstudio:
-    #   enabled: false
-    #   base_url: http://localhost:1234/v1
-    #   discover_models: true
-    #   preferred_model: ""
-    # vllm:
-    #   enabled: false
-    #   base_url: http://localhost:8000/v1
-    #   discover_models: false       # pin the served model explicitly
-    #   preferred_model: my-served-model
+    # lmstudio / vllm: same pattern as ollama (no api_key_env)
+
+# Vision login check (Qwen2-VL). Dashboard can toggle / change model.
+vision:
+  login_check: true
+  base_url: http://127.0.0.1:11434/v1
+  model: qwen2-vl:7b
+  timeout_seconds: 90
 
 # ---- Browser: fully configuration-driven; switch engines with no code change -
 browser:
@@ -174,6 +204,8 @@ apply:
   require_final_confirmation: true
   # When true, refuse to apply if location is unknown or outside preferred list.
   require_preferred_location: false
+  # Screenshot after resume / each form step / stop-before-Apply (Jarvis toggle).
+  step_screenshots: true
 
 # Long-running retention (24x7). Daily cleanup runs at maintenance_hour:15.
 maintenance:

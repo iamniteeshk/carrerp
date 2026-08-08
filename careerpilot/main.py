@@ -45,7 +45,8 @@ from .core.scheduler import Scheduler
 from .dashboard.app import create_dashboard
 from .db.database import Database
 from .db.services import (AIHistoryService, ApplicationService, FailedJobService,
-                          JobService, NotificationService, ScanService)
+                          JobService, NotificationService, ScanService,
+                          SettingsService)
 from .notify.telegram_service import TelegramService
 from .reports.csv_reporter import CSVReporter
 from .rules.rule_engine import RuleEngine
@@ -69,6 +70,8 @@ class CareerPilot:
         self.notif_service = NotificationService(self.db)
         self.failed_service = FailedJobService(self.db)
         self.scan_service = ScanService(self.db)
+        self.settings = SettingsService(self.db)
+        self._apply_runtime_overrides()
 
         self.telegram = TelegramService(
             config.telegram_token, config.telegram_chat_id, self.notif_service)
@@ -77,6 +80,8 @@ class CareerPilot:
             config.ai, candidate_profile=self._candidate_profile(),
             profile_names=config.profile_engine.names(),
             default_profile=config.default_career_profile)
+        # Re-apply AI provider override after engine build.
+        self._apply_ai_overrides()
 
         self.portals = self._build_portals()
         # Route AI request logs into the Diagnostics recorder (read-only use of
@@ -89,11 +94,20 @@ class CareerPilot:
             diagnostics_dir=config.screenshot_path,
             notify=lambda msg: self.telegram.send(
                 NotificationType.APPROVAL_REQUEST, msg))
+        from .browser.apply_evidence import ApplyStepEvidence
+        self.apply_evidence = ApplyStepEvidence(
+            enabled=bool(getattr(config.apply, "step_screenshots", True)),
+            root=Path(config.screenshot_path) / "apply_steps")
+        for p in self.portals.values():
+            p.apply_evidence = self.apply_evidence
         self.collector = CollectorManager(
             list(self.portals.values()),
             keywords=(config.rules.search_keywords or config.rules.accepted_titles),
             locations=config.rules.preferred_locations,
-            human=self.human)
+            human=self.human,
+            vision_cfg=getattr(config, "vision", None),
+            settings=self.settings,
+            screenshot_dir=config.screenshot_path)
         self.rules = RuleEngine(config.rules)
         self.reporter = CSVReporter(self.db, config.report_path)
 
@@ -110,6 +124,7 @@ class CareerPilot:
             notifier=self.telegram)
         self.pipeline.status_sink = self.diagnostics.status
         self.pipeline.diagnostics = self.diagnostics
+        self.pipeline.settings = self.settings
 
         # Learning + session memory (JSON stores next to the SQLite DB). These let
         # CareerPilot vary behaviour over time and improve scoring from history.
@@ -136,6 +151,56 @@ class CareerPilot:
 
     def _candidate_profile(self) -> str:
         return self.cfg.candidate.summary()
+
+    def _apply_runtime_overrides(self) -> None:
+        """Apply dashboard-persisted settings onto the live config object."""
+        s = self.settings
+        step = s.get("apply_step_screenshots")
+        if step is not None:
+            self.cfg.apply.step_screenshots = str(step).lower() in (
+                "1", "true", "yes", "on")
+        vis = s.get("vision_login_enabled")
+        if vis is not None and getattr(self.cfg, "vision", None) is not None:
+            self.cfg.vision.login_check = str(vis).lower() in (
+                "1", "true", "yes", "on")
+        vmodel = s.get("vision_model")
+        if vmodel and getattr(self.cfg, "vision", None) is not None:
+            self.cfg.vision.model = vmodel
+        vbase = s.get("vision_base_url")
+        if vbase and getattr(self.cfg, "vision", None) is not None:
+            self.cfg.vision.base_url = vbase
+        dbg = s.get("debug_visual_mode")
+        if dbg is not None and getattr(self.cfg, "debug", None) is not None:
+            self.cfg.debug.visual_mode = str(dbg).lower() in (
+                "1", "true", "yes", "on")
+        mode = s.get("apply_mode")
+        if mode in ("dry_run", "live"):
+            self.cfg.apply.mode = mode
+
+    def _apply_ai_overrides(self) -> None:
+        prov = self.settings.get("ai_active_provider")
+        if prov and hasattr(self, "ai"):
+            self.ai.set_active_provider(prov)
+            # Pin preferred model on the matching provider spec when set.
+            model = self.settings.get("ai_text_model")
+            if model:
+                for spec in getattr(self.cfg.ai, "providers", []) or []:
+                    if getattr(spec, "name", "") == prov:
+                        spec.preferred_model = model
+                for p in getattr(self.ai, "providers", []) or []:
+                    if getattr(p, "name", "").lower() == prov.lower():
+                        if hasattr(p, "model"):
+                            p.model = model
+
+    def refresh_runtime_from_settings(self) -> None:
+        """Called by dashboard after Admin saves settings."""
+        self._apply_runtime_overrides()
+        self._apply_ai_overrides()
+        if hasattr(self, "apply_evidence"):
+            self.apply_evidence.enabled = bool(
+                getattr(self.cfg.apply, "step_screenshots", True))
+        if hasattr(self, "collector"):
+            self.collector.vision_cfg = getattr(self.cfg, "vision", None)
 
     def _build_portals(self) -> dict:
         # ONE Playwright instance for the whole process (see BrowserManager).
@@ -212,7 +277,10 @@ class CareerPilot:
                                  "that pass the Rule Engine will be QUEUED.")
             write_event(EventKind.AI, "No AI provider available at startup — "
                         "jobs will be QUEUED until keys/network recover")
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
+        dashboard = create_dashboard(
+            self.db, self.cfg.dashboard_refresh_seconds,
+            config=self.cfg, settings=self.settings,
+            on_settings_change=self.refresh_runtime_from_settings)
         threading.Thread(
             target=lambda: dashboard.run(
                 host=self.cfg.dashboard_host, port=self.cfg.dashboard_port,
@@ -347,7 +415,10 @@ class CareerPilot:
         return self.pipeline.run_once()
 
     def run_dashboard(self) -> None:
-        dashboard = create_dashboard(self.db, self.cfg.dashboard_refresh_seconds)
+        dashboard = create_dashboard(
+            self.db, self.cfg.dashboard_refresh_seconds,
+            config=self.cfg, settings=self.settings,
+            on_settings_change=self.refresh_runtime_from_settings)
         dashboard.run(host=self.cfg.dashboard_host, port=self.cfg.dashboard_port)
 
     def shutdown(self) -> None:

@@ -142,8 +142,15 @@ class LinkedInPortal(BasePortal):
         # answer screening questions (numeric/dropdown from candidate config;
         # free-text via answer_fn). On any unmapped *knockout* question, abort
         # and return submitted=False with a note (the confidence gate decides).
+        evidence = getattr(self, "apply_evidence", None)
+        if evidence:
+            evidence.capture(page, job, "01_opened_job")
+            evidence.capture(page, job, "02_resume_ready")
+            evidence.capture(page, job, "03_form_filled")
 
         if dry_run:
+            if evidence:
+                evidence.capture(page, job, "04_stop_before_apply")
             shot = self.session.screenshot(
                 f"{self.session.profile_dir}/dryrun_{job.source_id or 'job'}.png")
             logger.info("DRY RUN: stopped before submit for %s @ %s",
@@ -155,6 +162,8 @@ class LinkedInPortal(BasePortal):
         # are not yet completed against live LinkedIn DOM. Never claim
         # submitted=True. Fill what we can, reach (or simulate) the confirmation
         # boundary, then WAIT for explicit human confirmation before Submit.
+        if evidence:
+            evidence.capture(page, job, "04_stop_before_apply")
         shot = self.session.screenshot(
             f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
         logger.warning(

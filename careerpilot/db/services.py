@@ -304,6 +304,50 @@ class FailedJobService:
         conn.commit()
 
 
+class SettingsService:
+    """Key/value settings in SQLite — used by the dashboard for live overrides."""
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        conn = self.db.connect()
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key=?", (key,)
+        ).fetchone()
+        if row is None:
+            return default
+        return row["value"]
+
+    def set(self, key: str, value: str) -> None:
+        conn = self.db.connect()
+        conn.execute(
+            """INSERT INTO settings (key, value, updated_at) VALUES (?,?,?)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value,
+               updated_at=excluded.updated_at""",
+            (key, value, _now()),
+        )
+        conn.commit()
+
+    def get_json(self, key: str, default: Any = None) -> Any:
+        raw = self.get(key)
+        if raw is None or raw == "":
+            return default
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("settings[%s] is not valid JSON", key)
+            return default
+
+    def set_json(self, key: str, value: Any) -> None:
+        self.set(key, json.dumps(value, default=str))
+
+    def all(self) -> dict[str, str]:
+        conn = self.db.connect()
+        rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        return {r["key"]: r["value"] for r in rows}
+
+
 class ScanService:
     def __init__(self, db: Database):
         self.db = db

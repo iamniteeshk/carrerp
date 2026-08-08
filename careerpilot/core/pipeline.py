@@ -136,8 +136,28 @@ class ScanPipeline:
                             "all portals) | portals=%s", self.session_plan.portals)
                 return
 
-            # ---- AUTOMATED: full human time-of-day session planning ----
-            plan = plan_daily_session(rng, now or datetime.now(), kws)
+            # ---- AUTOMATED: operator schedule (batches/fixed) or human_random ----
+            from .schedule_config import plan_from_schedule, schedule_from_dict
+            cfg = getattr(self, "cfg", None)
+            schedule = getattr(cfg, "schedule", None) if cfg is not None else None
+            settings = getattr(self, "settings", None)
+            if settings is not None:
+                override = settings.get_json("schedule_json")
+                if isinstance(override, dict) and override:
+                    schedule = schedule_from_dict(override)
+            # Tests / minimal harnesses without AppConfig keep legacy random windows.
+            if schedule is None and cfg is None:
+                plan = plan_daily_session(rng, now or datetime.now(), kws)
+            else:
+                if schedule is None:
+                    schedule = schedule_from_dict({})
+                if schedule.mode == "human_random":
+                    plan = plan_daily_session(
+                        rng, now or datetime.now(), kws,
+                        skip_probability=float(schedule.skip_probability or 0.12))
+                else:
+                    plan = plan_from_schedule(
+                        schedule, now or datetime.now(), rng, keywords=kws)
             self.session_plan = plan
             self.session_max_jobs = plan.max_jobs
             self.session_deadline = (time.time() + plan.duration_minutes * 60
@@ -156,8 +176,9 @@ class ScanPipeline:
             else:
                 # Off-hours / skip-day: a human is not searching -> no portal.
                 self.collector.portals = []
-            logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
-                        "portals=%s keyword_order=%s", plan.window,
+            logger.info("Session plan: mode=%s window=%s duration=%smin max_jobs=%s "
+                        "portals=%s keyword_order=%s",
+                        getattr(schedule, "mode", "legacy"), plan.window,
                         plan.duration_minutes, plan.max_jobs, plan.portals,
                         plan.keywords[:5])
         except Exception as exc:  # noqa: BLE001 - planning must never crash a scan

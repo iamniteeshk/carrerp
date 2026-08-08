@@ -3,78 +3,281 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CareerPilot Dashboard</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>CareerPilot · Jarvis Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { background:#0f1115; color:#e6e6e6; }
-    .card { background:#1a1d24; border:1px solid #2a2e38; }
-    .stat { font-size:2rem; font-weight:700; color:#4da3ff; }
-    .muted { color:#9aa0ac; font-size:.85rem; }
-    table { color:#e6e6e6 !important; font-size:.85rem; }
-    h5 { color:#9aa0ac; text-transform:uppercase; font-size:.8rem; letter-spacing:.05em; }
-    .accent { color:#4da3ff; }
-    .reject-item { border:1px solid #2a2e38; border-radius:6px; margin-bottom:.5rem; overflow:hidden; }
-    .reject-head { display:flex; align-items:center; gap:.75rem; padding:.65rem .85rem; cursor:pointer; background:#151820; }
-    .reject-head:hover { background:#1e222c; }
-    .reject-body { display:none; padding:.85rem; border-top:1px solid #2a2e38; background:#12151b; }
-    .reject-body.open { display:block; }
-    .reject-title { flex:1; font-weight:600; }
-    .chev { color:#9aa0ac; transition:transform .15s; }
-    .chev.open { transform:rotate(90deg); }
-    .jd { white-space:pre-wrap; max-height:220px; overflow:auto; font-size:.8rem; color:#c5c9d3; }
-    .btn-approve { white-space:nowrap; }
+    :root {
+      --bg: #05060a;
+      --panel: rgba(12, 14, 22, 0.86);
+      --line: rgba(90, 120, 255, 0.28);
+      --text: #e8ecff;
+      --muted: #8b93b3;
+      --blue: #3d7eff;
+      --purple: #9b5cff;
+      --red: #ff3b5c;
+      --cyan: #4de2ff;
+      --ok: #3dffa8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; color: var(--text);
+      font-family: "Rajdhani", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(155,92,255,.22), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(61,126,255,.18), transparent 50%),
+        radial-gradient(700px 400px at 50% 100%, rgba(255,59,92,.10), transparent 55%),
+        linear-gradient(180deg, #05060a 0%, #080a12 100%);
+    }
+    body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .14;
+      background-image:
+        linear-gradient(rgba(77,226,255,.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(77,226,255,.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at center, black, transparent 85%);
+    }
+    .wrap { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 1.25rem 1.25rem 3rem; }
+    .top {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem;
+      align-items: center; margin-bottom: 1.25rem;
+    }
+    .brand {
+      font-family: Orbitron, sans-serif; letter-spacing: .08em; font-size: 1.35rem;
+      text-transform: uppercase;
+    }
+    .brand span { color: var(--cyan); text-shadow: 0 0 18px rgba(77,226,255,.45); }
+    .brand .sub { display:block; font-size:.7rem; color: var(--muted); letter-spacing:.22em; margin-top:.2rem; }
+    .pill {
+      border: 1px solid var(--line); background: rgba(20,24,40,.7);
+      border-radius: 999px; padding: .35rem .9rem; color: var(--muted); font-size: .9rem;
+    }
+    .pill.ok { color: var(--ok); border-color: rgba(61,255,168,.35); }
+    .pill.warn { color: #ffd36a; border-color: rgba(255,211,106,.35); }
+    .btn {
+      appearance: none; border: 1px solid var(--line); background: linear-gradient(135deg, rgba(61,126,255,.25), rgba(155,92,255,.2));
+      color: var(--text); border-radius: 10px; padding: .45rem 1rem; font: inherit; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: .4rem;
+    }
+    .btn:hover { border-color: var(--cyan); box-shadow: 0 0 18px rgba(77,226,255,.2); }
+    .btn.danger { background: linear-gradient(135deg, rgba(255,59,92,.35), rgba(155,92,255,.15)); border-color: rgba(255,59,92,.5); }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .emergency {
+      display: none; margin-bottom: 1rem; padding: 1rem 1.1rem; border-radius: 14px;
+      border: 1px solid rgba(255,59,92,.65);
+      background: linear-gradient(90deg, rgba(255,59,92,.22), rgba(20,10,18,.9));
+      box-shadow: 0 0 40px rgba(255,59,92,.25); animation: pulse 1.6s ease-in-out infinite;
+    }
+    .emergency.show { display: block; }
+    .emergency h3 { margin: 0 0 .35rem; font-family: Orbitron, sans-serif; color: var(--red); letter-spacing: .06em; }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 18px rgba(255,59,92,.2); }
+      50% { box-shadow: 0 0 36px rgba(255,59,92,.45); }
+    }
+    .grid { display: grid; gap: 1rem; }
+    .stats { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); margin-bottom: 1rem; }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+      padding: 1rem; backdrop-filter: blur(10px);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 10px 30px rgba(0,0,0,.35);
+    }
+    .stat-val {
+      font-family: Orbitron, sans-serif; font-size: 1.7rem; color: var(--blue);
+      text-shadow: 0 0 16px rgba(61,126,255,.35);
+    }
+    .stat-label { color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; }
+    h5 {
+      margin: 0 0 .75rem; font-family: Orbitron, sans-serif; font-size: .78rem;
+      letter-spacing: .14em; text-transform: uppercase; color: var(--purple);
+    }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .layout { display: grid; grid-template-columns: 1.15fr .85fr; gap: 1rem; }
+    @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: .4rem .45rem; border-bottom: 1px solid rgba(90,120,255,.12); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+    .reject-item { border: 1px solid rgba(90,120,255,.18); border-radius: 12px; margin-bottom: .55rem; overflow: hidden; }
+    .reject-head {
+      display: flex; gap: .7rem; align-items: center; padding: .7rem .85rem; cursor: pointer;
+      background: rgba(18, 22, 36, .9);
+    }
+    .reject-head:hover { background: rgba(28, 34, 56, .95); }
+    .reject-title { flex: 1; font-weight: 600; }
+    .chev { color: var(--cyan); transition: transform .15s; }
+    .chev.open { transform: rotate(90deg); }
+    .reject-body { display: none; padding: .85rem; border-top: 1px solid rgba(90,120,255,.15); background: rgba(8,10,18,.9); }
+    .reject-body.open { display: block; }
+    .jd { white-space: pre-wrap; max-height: 200px; overflow: auto; font-size: .85rem; color: #c9d0ef; }
+    .tabs { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+    .tab {
+      border: 1px solid var(--line); background: transparent; color: var(--muted);
+      border-radius: 999px; padding: .3rem .8rem; cursor: pointer; font: inherit;
+    }
+    .tab.active { color: var(--text); border-color: var(--purple); background: rgba(155,92,255,.18); }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    label { display: block; color: var(--muted); font-size: .85rem; margin: .55rem 0 .2rem; }
+    input, select, textarea {
+      width: 100%; background: rgba(8,10,18,.9); border: 1px solid var(--line); color: var(--text);
+      border-radius: 10px; padding: .55rem .7rem; font: inherit;
+    }
+    textarea { min-height: 180px; font-family: ui-monospace, monospace; font-size: .82rem; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+    @media (max-width: 700px) { .row2 { grid-template-columns: 1fr; } }
+    .switch-row { display: flex; justify-content: space-between; align-items: center; gap: .7rem; padding: .45rem 0; border-bottom: 1px solid rgba(90,120,255,.1); }
+    .toast {
+      position: fixed; right: 1rem; bottom: 1rem; z-index: 20; display: none;
+      background: rgba(12,16,28,.95); border: 1px solid var(--cyan); color: var(--text);
+      padding: .7rem 1rem; border-radius: 12px; box-shadow: 0 0 24px rgba(77,226,255,.25);
+    }
+    .toast.show { display: block; }
+    .lock-note { font-size: .85rem; color: var(--muted); margin-bottom: .6rem; }
   </style>
 </head>
 <body>
-<div class="container-fluid py-4">
-  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-    <h3 class="mb-0"><span class="accent">CareerPilot</span> Dashboard
-      <span class="muted">— auto-refresh {{ refresh }}s</span></h3>
-    <div class="d-flex align-items-center gap-2">
-      <span class="muted" id="auth-label">{% if is_admin %}Signed in as Admin{% else %}Viewer (stats public){% endif %}</span>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <div class="brand"><span>CareerPilot</span> Jarvis
+        <span class="sub">Network Operations Console</span>
+      </div>
+    </div>
+    <div style="display:flex; gap:.55rem; align-items:center; flex-wrap:wrap;">
+      <span class="pill" id="mode-pill">MODE · …</span>
+      <span class="pill" id="auth-pill">{% if is_admin %}ADMIN ONLINE{% else %}VIEWER{% endif %}</span>
+      <span class="muted">refresh {{ refresh }}s</span>
       {% if is_admin %}
-      <a class="btn btn-sm btn-outline-secondary" href="/logout">Logout</a>
+      <a class="btn ghost" href="/logout">Logout</a>
       {% else %}
-      <a class="btn btn-sm btn-outline-primary" href="/login">Admin login</a>
+      <a class="btn" href="/login">Admin login</a>
       {% endif %}
     </div>
   </div>
 
-  <div class="row g-3 mb-4" id="stat-cards"></div>
+  <div class="emergency" id="emergency">
+    <h3>⚠ EMERGENCY · PORTAL LOGIN HOLD</h3>
+    <div id="emergency-body" class="muted"></div>
+    <div style="margin-top:.7rem;">
+      {% if is_admin %}
+      <button class="btn danger" id="clear-emergency">Clear alarm</button>
+      {% else %}
+      <span class="muted">Admin login required to clear.</span>
+      {% endif %}
+    </div>
+  </div>
 
-  <div class="row g-3 mb-4">
-    <div class="col-12">
-      <div class="card p-3">
-        <h5>Rejected Jobs</h5>
-        <p class="muted mb-2">Title only — expand for JD, salary, company, rejection reason. Admin can approve for apply on the next run.</p>
+  <div class="grid stats" id="stat-cards"></div>
+
+  <div class="layout">
+    <div class="card">
+      <h5>Mission Controls</h5>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="rejected">Rejected</button>
+        <button class="tab" data-tab="schedule">Schedule</button>
+        <button class="tab" data-tab="ai">Local AI</button>
+        <button class="tab" data-tab="ops">Ops</button>
+      </div>
+
+      <div class="panel active" id="panel-rejected">
+        <p class="muted">Title only — expand for full details. Admin can approve for apply on the next run (dry-run still stops before Apply).</p>
         <div id="rejected-list"></div>
+      </div>
+
+      <div class="panel" id="panel-schedule">
+        <p class="lock-note" id="sched-lock"></p>
+        <div class="row2">
+          <div>
+            <label>Mode</label>
+            <select id="sched-mode">
+              <option value="batches">Batches (morning / lunch / evening)</option>
+              <option value="fixed">Fixed timings</option>
+              <option value="human_random">Human random (legacy)</option>
+            </select>
+          </div>
+          <div>
+            <label>Enabled days (comma: mon,tue,…)</label>
+            <input id="sched-days" placeholder="mon,tue,wed,thu,fri,sat,sun">
+          </div>
+        </div>
+        <label>Schedule JSON (edit batches duration / fixed slots)</label>
+        <textarea id="sched-json"></textarea>
+        <div style="margin-top:.7rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+          <button class="btn" id="sched-save" {% if not is_admin %}disabled{% endif %}>Save schedule</button>
+          <button class="btn ghost" id="sched-reload">Reload</button>
+        </div>
+        <pre class="muted" id="sched-lines" style="margin-top:.8rem; white-space:pre-wrap;"></pre>
+      </div>
+
+      <div class="panel" id="panel-ai">
+        <p class="lock-note">Local Ollama first. Cloud APIs stay optional fallbacks.</p>
+        <div class="row2">
+          <div>
+            <label>Active provider</label>
+            <select id="ai-provider"></select>
+          </div>
+          <div>
+            <label>Text model (pin)</label>
+            <input id="ai-model" placeholder="qwen2.5:8b">
+          </div>
+        </div>
+        <div class="row2">
+          <div>
+            <label>Vision model (login check)</label>
+            <input id="vision-model" placeholder="qwen2-vl:7b">
+          </div>
+          <div>
+            <label>Vision base URL</label>
+            <input id="vision-url" placeholder="http://127.0.0.1:11434/v1">
+          </div>
+        </div>
+        <div class="switch-row">
+          <span>Vision login check compulsory</span>
+          <input type="checkbox" id="vision-on">
+        </div>
+        <div style="margin-top:.8rem;">
+          <button class="btn" id="ai-save" {% if not is_admin %}disabled{% endif %}>Save AI settings</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-ops">
+        <div class="switch-row">
+          <span>Apply-step screenshots (resume / forms / stop-before-Apply)</span>
+          <input type="checkbox" id="shot-on">
+        </div>
+        <div class="switch-row">
+          <span>Visual debug mode</span>
+          <input type="checkbox" id="debug-on">
+        </div>
+        <div class="switch-row">
+          <span>Apply mode</span>
+          <select id="apply-mode" style="width:auto; min-width:140px;">
+            <option value="dry_run">dry_run (no Apply click)</option>
+            <option value="live">live (press Apply)</option>
+          </select>
+        </div>
+        <p class="muted" style="margin-top:.7rem;">Dry vs production differs only by whether the final Apply button is pressed. Keep dry_run until validated on the PC.</p>
+        <button class="btn" id="ops-save" {% if not is_admin %}disabled{% endif %}>Save ops</button>
+      </div>
+    </div>
+
+    <div class="grid" style="align-content:start;">
+      <div class="card">
+        <h5>Recent Jobs</h5>
+        <div class="table-responsive" id="jobs"></div>
+      </div>
+      <div class="card">
+        <h5>Recent Applications</h5>
+        <div class="table-responsive" id="applications"></div>
+      </div>
+      <div class="card">
+        <h5>Rejection Reasons</h5>
+        <div id="rejections"></div>
       </div>
     </div>
   </div>
-
-  <div class="row g-3">
-    <div class="col-lg-6">
-      <div class="card p-3"><h5>Recent Jobs</h5>
-        <div class="table-responsive" id="jobs"></div></div>
-    </div>
-    <div class="col-lg-6">
-      <div class="card p-3"><h5>Recent Applications</h5>
-        <div class="table-responsive" id="applications"></div></div>
-    </div>
-    <div class="col-lg-4">
-      <div class="card p-3"><h5>Rejection Reasons</h5>
-        <div id="rejections"></div></div>
-    </div>
-    <div class="col-lg-4">
-      <div class="card p-3"><h5>AI Usage</h5>
-        <div id="ai"></div></div>
-    </div>
-    <div class="col-lg-4">
-      <div class="card p-3"><h5>Resume Usage</h5>
-        <div id="resume"></div></div>
-    </div>
-  </div>
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
 const REFRESH = {{ refresh }} * 1000;
@@ -85,106 +288,185 @@ function esc(s) {
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
   }[c]));
 }
-
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
 function table(rows) {
   if (!rows.length) return '<p class="muted">No data yet.</p>';
   const cols = Object.keys(rows[0]);
-  let h = '<table class="table table-dark table-sm table-striped"><thead><tr>';
-  cols.forEach(c => h += `<th>${c}</th>`);
+  let h = '<table><thead><tr>';
+  cols.forEach(c => h += `<th>${esc(c)}</th>`);
   h += '</tr></thead><tbody>';
   rows.forEach(r => { h += '<tr>'; cols.forEach(c => h += `<td>${esc(r[c])}</td>`); h += '</tr>'; });
   return h + '</tbody></table>';
 }
+function boolish(v) {
+  return String(v).toLowerCase() === 'true' || v === true || v === 1 || v === '1';
+}
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
 
 function renderRejected(rows) {
   const el = document.getElementById('rejected-list');
-  if (!rows.length) {
-    el.innerHTML = '<p class="muted mb-0">No rejected jobs.</p>';
-    return;
-  }
+  if (!rows.length) { el.innerHTML = '<p class="muted mb-0">No rejected jobs.</p>'; return; }
   el.innerHTML = rows.map(r => {
     const id = r.job_id;
     const approveBtn = IS_ADMIN
-      ? `<button class="btn btn-sm btn-success btn-approve" data-approve="${id}">Approve for next run</button>`
-      : `<span class="muted">Login as Admin to approve</span>`;
-    return `<div class="reject-item" data-id="${id}">
+      ? `<button class="btn" data-approve="${id}">Approve next run</button>`
+      : `<span class="muted">Admin to approve</span>`;
+    return `<div class="reject-item">
       <div class="reject-head" data-toggle="${id}">
         <span class="chev" id="chev-${id}">▸</span>
         <span class="reject-title">${esc(r.job_title || '(untitled)')}</span>
         <span class="muted">${esc(r.portal || '')}</span>
       </div>
       <div class="reject-body" id="body-${id}">
-        <div class="row g-2 mb-2">
-          <div class="col-md-6"><span class="muted">Company</span><div>${esc(r.company || '—')}</div></div>
-          <div class="col-md-3"><span class="muted">Salary</span><div>${esc(r.salary || '—')}</div></div>
-          <div class="col-md-3"><span class="muted">Location</span><div>${esc(r.location || '—')}</div></div>
+        <div class="row2" style="margin-bottom:.5rem;">
+          <div><span class="muted">Company</span><div>${esc(r.company || '—')}</div></div>
+          <div><span class="muted">Salary</span><div>${esc(r.salary || '—')}</div></div>
         </div>
-        <div class="mb-2"><span class="muted">Rejection reason</span><div>${esc(r.rejection_reason || '—')}</div></div>
-        <div class="mb-2"><span class="muted">Job description</span><div class="jd">${esc(r.job_description || '—')}</div></div>
-        <div class="d-flex justify-content-between align-items-center gap-2">
+        <div style="margin-bottom:.5rem;"><span class="muted">Rejection</span><div>${esc(r.rejection_reason || '—')}</div></div>
+        <div style="margin-bottom:.5rem;"><span class="muted">Job description</span><div class="jd">${esc(r.job_description || '—')}</div></div>
+        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;">
           <a class="muted" href="${esc(r.job_url || '#')}" target="_blank" rel="noopener">Open posting</a>
           ${approveBtn}
         </div>
       </div>
     </div>`;
   }).join('');
-
   el.querySelectorAll('[data-toggle]').forEach(head => {
     head.addEventListener('click', () => {
       const id = head.getAttribute('data-toggle');
-      const body = document.getElementById('body-' + id);
-      const chev = document.getElementById('chev-' + id);
-      body.classList.toggle('open');
-      chev.classList.toggle('open');
+      document.getElementById('body-' + id).classList.toggle('open');
+      document.getElementById('chev-' + id).classList.toggle('open');
     });
   });
   el.querySelectorAll('[data-approve]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const id = btn.getAttribute('data-approve');
       btn.disabled = true;
-      try {
-        const res = await fetch(`/api/jobs/${id}/approve`, { method: 'POST' });
-        const data = await res.json();
-        if (!res.ok || !data.ok) {
-          alert(data.error || 'Approve failed — are you logged in as Admin?');
-          btn.disabled = false;
-          return;
-        }
-        btn.textContent = 'Approved ✓';
-        btn.classList.replace('btn-success', 'btn-secondary');
-        load();
-      } catch (err) {
-        alert(String(err));
-        btn.disabled = false;
-      }
+      const res = await fetch(`/api/jobs/${btn.dataset.approve}/approve`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { toast(data.error || 'Approve failed'); btn.disabled = false; return; }
+      toast('Approved for next run'); load();
     });
   });
+}
+
+async function loadConsole() {
+  const st = await (await fetch('/api/console/state')).json();
+  document.getElementById('mode-pill').textContent = 'MODE · ' + String(st.apply_mode || 'dry_run').toUpperCase();
+  document.getElementById('mode-pill').className = 'pill ' + (st.apply_mode === 'live' ? 'warn' : 'ok');
+
+  const em = st.emergency || {};
+  const box = document.getElementById('emergency');
+  if (em.active) {
+    box.classList.add('show');
+    document.getElementById('emergency-body').textContent =
+      `${em.portal || 'portal'}: ${em.reason || 'login hold'} @ ${em.at || ''}`;
+  } else box.classList.remove('show');
+
+  const sel = document.getElementById('ai-provider');
+  sel.innerHTML = (st.providers || []).map(p =>
+    `<option value="${esc(p.name)}" ${p.name === st.ai_active_provider ? 'selected' : ''}>${esc(p.name)}${p.requires_auth ? '' : ' (local)'}</option>`
+  ).join('') || `<option value="ollama">ollama</option>`;
+  document.getElementById('ai-model').value = st.ai_text_model || '';
+  document.getElementById('vision-model').value = st.vision_model || '';
+  document.getElementById('vision-url').value = st.vision_base_url || '';
+  document.getElementById('vision-on').checked = boolish(st.vision_login_enabled);
+  document.getElementById('shot-on').checked = boolish(st.apply_step_screenshots);
+  document.getElementById('debug-on').checked = boolish(st.debug_visual_mode);
+  document.getElementById('apply-mode').value = st.apply_mode || 'dry_run';
+
+  document.getElementById('sched-mode').value = st.schedule.mode || 'batches';
+  document.getElementById('sched-days').value = (st.schedule.enabled_days || []).join(',');
+  document.getElementById('sched-json').value = JSON.stringify(st.schedule, null, 2);
+  document.getElementById('sched-lines').textContent = (st.schedule_lines || []).join('\n');
+  document.getElementById('sched-lock').textContent = IS_ADMIN
+    ? 'Edit hours by day and per batch (e.g. morning 2h, evening 1h), or fixed slots.'
+    : 'Viewer mode — Admin login required to change schedule.';
 }
 
 async function load() {
   try {
     const stats = await (await fetch('/api/stats')).json();
     const cards = [
-      ['Applications', stats.applications],
-      ['Failed', stats.failed],
+      ['Live Apply', stats.applications],
+      ['Dry Runs', stats.dry_runs || 0],
       ['Matched', stats.by_status.MATCHED || 0],
       ['Rejected', stats.by_status.REJECTED || 0],
       ['Approved', stats.by_status.APPROVED || 0],
       ['Found', stats.by_status.FOUND || 0],
-      ['Manual Review', stats.by_status.MANUAL_REVIEW || 0],
+      ['Failed', stats.failed],
     ];
     document.getElementById('stat-cards').innerHTML = cards.map(([k,v]) =>
-      `<div class="col"><div class="card p-3 text-center"><div class="stat">${v}</div><div class="muted">${k}</div></div></div>`).join('');
-
+      `<div class="card" style="text-align:center;"><div class="stat-val">${v}</div><div class="stat-label">${k}</div></div>`
+    ).join('');
     renderRejected(await (await fetch('/api/rejected')).json());
     document.getElementById('jobs').innerHTML = table(await (await fetch('/api/jobs')).json());
     document.getElementById('applications').innerHTML = table(await (await fetch('/api/applications')).json());
     document.getElementById('rejections').innerHTML = table(await (await fetch('/api/rejections')).json());
-    document.getElementById('ai').innerHTML = table(await (await fetch('/api/ai')).json());
-    document.getElementById('resume').innerHTML = table(await (await fetch('/api/resume_usage')).json());
+    await loadConsole();
   } catch (e) { console.error(e); }
 }
+
+document.getElementById('sched-save')?.addEventListener('click', async () => {
+  let body;
+  try { body = JSON.parse(document.getElementById('sched-json').value); }
+  catch { toast('Invalid JSON'); return; }
+  body.mode = document.getElementById('sched-mode').value;
+  body.enabled_days = document.getElementById('sched-days').value.split(',').map(s => s.trim()).filter(Boolean);
+  const res = await fetch('/api/console/schedule', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  toast(res.ok ? 'Schedule saved' : (data.error || 'Failed'));
+  if (res.ok) loadConsole();
+});
+document.getElementById('sched-reload')?.addEventListener('click', loadConsole);
+
+document.getElementById('ai-save')?.addEventListener('click', async () => {
+  const res = await fetch('/api/console/ai', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      active_provider: document.getElementById('ai-provider').value,
+      text_model: document.getElementById('ai-model').value,
+      vision_login_enabled: document.getElementById('vision-on').checked,
+      vision_model: document.getElementById('vision-model').value,
+      vision_base_url: document.getElementById('vision-url').value,
+    })
+  });
+  toast(res.ok ? 'AI settings saved' : 'Failed');
+});
+
+document.getElementById('ops-save')?.addEventListener('click', async () => {
+  const res = await fetch('/api/console/toggles', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      apply_step_screenshots: document.getElementById('shot-on').checked,
+      debug_visual_mode: document.getElementById('debug-on').checked,
+      apply_mode: document.getElementById('apply-mode').value,
+    })
+  });
+  toast(res.ok ? 'Ops saved' : 'Failed');
+  if (res.ok) loadConsole();
+});
+
+document.getElementById('clear-emergency')?.addEventListener('click', async () => {
+  const res = await fetch('/api/emergency/clear', { method: 'POST' });
+  toast(res.ok ? 'Alarm cleared' : 'Failed');
+  load();
+});
+
 load();
 setInterval(load, REFRESH);
 </script>

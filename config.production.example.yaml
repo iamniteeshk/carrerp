@@ -24,8 +24,36 @@ application:
   reports_dir: reports
 
 scheduler:
-  scan_interval_hours: 4          # recurring scans; human windows still apply
+  scan_interval_hours: 4          # recurring scans; schedule windows still apply
   daily_summary_hour: 20          # local PC time
+
+schedule:
+  mode: batches
+  enabled_days: [mon, tue, wed, thu, fri, sat, sun]
+  skip_probability: 0.0
+  batches:
+    morning:
+      enabled: true
+      start: "07:15"
+      end: "09:30"
+      duration_minutes: 120
+      portals: [LinkedIn]
+      max_jobs: 40
+    lunch:
+      enabled: true
+      start: "12:00"
+      end: "13:30"
+      duration_minutes: 60
+      portals: [Naukri]
+      max_jobs: 30
+    evening:
+      enabled: true
+      start: "18:30"
+      end: "20:30"
+      duration_minutes: 60
+      portals: [LinkedIn, Naukri]
+      max_jobs: 50
+  fixed: []
 
 candidate:
   full_name: "Your Name"
@@ -45,12 +73,17 @@ candidate:
   preferred_shift: "Any"
 
 ai:
-  active_provider: gemini
-  request_timeout_seconds: 45
-  max_retries: 3
+  active_provider: ollama
+  request_timeout_seconds: 180
+  max_retries: 2
   providers:
-    gemini:
+    ollama:
       enabled: true
+      base_url: http://127.0.0.1:11434/v1
+      discover_models: true
+      preferred_model: qwen2.5:8b
+    gemini:
+      enabled: false
       kind: gemini
       api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
       discover_models: true
@@ -63,6 +96,12 @@ ai:
       preferred_model: ""
   # Doctor also reads this legacy list — keep in sync with providers.gemini.
   gemini_key_env_vars: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+
+vision:
+  login_check: true
+  base_url: http://127.0.0.1:11434/v1
+  model: qwen2-vl:7b
+  timeout_seconds: 90
 
 browser:
   open_jobs: true
@@ -173,6 +212,7 @@ apply:
   retry_limit: 2
   easy_apply_only: true
   require_final_confirmation: true   # NEVER auto-submit without human OK
+  step_screenshots: true
   require_preferred_location: true   # block apply outside Chennai/preferred
 
 maintenance:
