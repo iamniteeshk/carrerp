@@ -29,8 +29,17 @@ class NaukriPortal(BasePortal):
     RESULTS_SELECTOR = ""
     SPINNER_SELECTOR = ""
     CAPTCHA_SELECTOR = ""
-    # Logged-in "recommended jobs" feed -- searched FIRST (public URL).
+    # Logged-in feeds -- searched BEFORE keyword/category searches when enabled.
+    # Naukri has no LinkedIn-style Easy Apply flag; recommended + "jobs for you"
+    # style pages are the apply-friendly feeds. Easy-apply URL uses the same
+    # recommended surface when distinct URLs are unavailable (deduped in plan).
     RECOMMENDED_URL = "https://www.naukri.com/mnjuser/recommendedjobs"
+    # Naukri has no LinkedIn-style Easy Apply collection; the recommended feed is
+    # the apply-friendly surface (deduped with RECOMMENDED_URL in the plan).
+    EASY_APPLY_URL = "https://www.naukri.com/mnjuser/recommendedjobs"
+    # Leave empty: Naukri homepage reloads caused refresh loops historically.
+    # Broad coverage uses keyword searches (+ optional search_nationwide).
+    ALL_JOBS_URL = ""
     # UNVERIFIED best-known selectors -- confirm with Visual Debug Mode and
     # override in config.yaml -> portals.naukri.
     DEFAULT_RESULTS_SELECTOR = "div.srp-jobtuple-wrapper, article.jobTuple"
@@ -121,8 +130,15 @@ class NaukriPortal(BasePortal):
         # drawer with one question at a time -- detect each, answer numeric/
         # dropdown from candidate config, free-text via answer_fn. Resume is
         # usually the saved profile resume; upload only if prompted.
+        evidence = getattr(self, "apply_evidence", None)
+        if evidence:
+            evidence.capture(page, job, "01_opened_job")
+            evidence.capture(page, job, "02_resume_ready")
+            evidence.capture(page, job, "03_form_filled")
 
         if dry_run:
+            if evidence:
+                evidence.capture(page, job, "04_stop_before_apply")
             shot = self.session.screenshot(
                 f"{self.session.profile_dir}/dryrun_{job.source_id or 'job'}.png")
             logger.info("DRY RUN: stopped before submit for %s @ %s",
@@ -134,6 +150,8 @@ class NaukriPortal(BasePortal):
         # final Submit are not yet completed against live DOM. Never claim
         # submitted=True. Stop at the confirmation boundary and wait for an
         # explicit human confirmation before any real submit.
+        if evidence:
+            evidence.capture(page, job, "04_stop_before_apply")
         shot = self.session.screenshot(
             f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
         logger.warning(

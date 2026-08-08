@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CareerPilot · Admin Access</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Rajdhani:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --blue:#3d7eff; --purple:#9b5cff; --red:#ff3b5c; --cyan:#4de2ff; --text:#e8ecff; --muted:#8b93b3; }
+    body {
+      margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      font-family: Rajdhani, system-ui, sans-serif; color: var(--text);
+      background:
+        radial-gradient(800px 400px at 20% 0%, rgba(155,92,255,.25), transparent 55%),
+        radial-gradient(700px 400px at 90% 20%, rgba(61,126,255,.2), transparent 50%),
+        #05060a;
+    }
+    .card {
+      width: min(420px, 92vw); padding: 1.5rem; border-radius: 18px;
+      background: rgba(12,14,22,.9); border: 1px solid rgba(90,120,255,.35);
+      box-shadow: 0 0 40px rgba(61,126,255,.15);
+    }
+    h1 { font-family: Orbitron, sans-serif; font-size: 1.1rem; letter-spacing: .1em; margin: 0 0 .3rem; }
+    h1 span { color: var(--cyan); }
+    .muted { color: var(--muted); font-size: .9rem; margin-bottom: 1rem; }
+    label { display:block; color: var(--muted); margin: .6rem 0 .25rem; }
+    input {
+      width: 100%; box-sizing: border-box; padding: .65rem .75rem; border-radius: 10px;
+      border: 1px solid rgba(90,120,255,.35); background: #080a12; color: var(--text); font: inherit;
+    }
+    button {
+      width: 100%; margin-top: 1rem; padding: .7rem; border-radius: 10px; cursor: pointer;
+      border: 1px solid rgba(155,92,255,.5); color: var(--text); font: inherit;
+      background: linear-gradient(135deg, rgba(61,126,255,.35), rgba(155,92,255,.3));
+    }
+    .err { background: rgba(255,59,92,.15); border: 1px solid rgba(255,59,92,.5); color: #ffb3c0;
+      padding: .55rem .7rem; border-radius: 10px; margin-bottom: .8rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1><span>JARVIS</span> ACCESS</h1>
+    <p class="muted">Admin credentials from <code>DASHBOARD_USER</code> / <code>DASHBOARD_PASSWORD</code> in <code>.env</code>. Stats stay public.</p>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+    <form method="post">
+      <label>Username</label>
+      <input name="username" autocomplete="username" required>
+      <label>Password</label>
+      <input type="password" name="password" autocomplete="current-password" required>
+      <button type="submit">Authenticate</button>
+    </form>
+  </div>
+</body>
+</html>

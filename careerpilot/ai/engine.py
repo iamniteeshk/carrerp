@@ -12,6 +12,7 @@ Prompts request strict JSON to keep parsing robust and tokens low.
 from __future__ import annotations
 
 import json
+import re
 import time
 
 from ..core.config import AIConfig
@@ -122,6 +123,16 @@ class AIEngine:
         # Optional digest of past strong matches (from GoodJobsStore.summary()),
         # injected into the evaluation prompt so scoring improves over time.
         self.learned_summary = ""
+
+    def set_active_provider(self, name: str) -> None:
+        """Hot-switch active provider (dashboard Local AI / API toggle)."""
+        name = (name or "").strip()
+        if not name:
+            return
+        self.cfg.active_provider = name
+        if getattr(self.cfg, "providers", None):
+            self.providers = build_providers(self.cfg.providers, name)
+            logger.info("Active AI provider switched to %s", name)
 
     def startup_validate(self) -> dict:
         """Validate/repair provider config at startup. For Gemini, resolves the
@@ -304,9 +315,18 @@ def _truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[:limit] + " ...[truncated]"
 
 
+def _strip_thinking(text: str) -> str:
+    """Remove Qwen3 / similar chain-of-thought wrappers before JSON parse."""
+    cleaned = text or ""
+    # Official Qwen3 think tags + common variants from Ollama adapters.
+    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", cleaned, flags=re.I)
+    cleaned = re.sub(r"<thinking>[\s\S]*?</thinking>", "", cleaned, flags=re.I)
+    return cleaned.strip()
+
+
 def _extract_json(text: str) -> dict:
-    """Parse JSON from a model response, tolerating ```json fences."""
-    cleaned = text.strip()
+    """Parse JSON from a model response, tolerating think-tags + ```json fences."""
+    cleaned = _strip_thinking(text)
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`")
         if cleaned.lower().startswith("json"):

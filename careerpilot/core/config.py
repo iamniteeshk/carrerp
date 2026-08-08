@@ -74,6 +74,10 @@ class RuleConfig:
     search_nationwide: bool = False
     # When false, skip the logged-in recommended-jobs feed (fewer duplicates).
     search_include_recommended: bool = False
+    # When true, visit Easy Apply / apply-friendly feeds BEFORE keyword searches.
+    search_include_easy_apply_feed: bool = True
+    # When true, visit the portal's general "all jobs" feed before categories.
+    search_include_all_feed: bool = True
     # When set, ONLY these cities are searched (overrides profile location union).
     search_locations: list[str] = field(default_factory=list)
 
@@ -92,6 +96,18 @@ class ApplyConfig:
     require_final_confirmation: bool = True
     # When True, unknown location cannot proceed to apply.
     require_preferred_location: bool = False
+    # Capture screenshots after resume upload / each Next / stop-before-Apply.
+    step_screenshots: bool = True
+
+
+@dataclass
+class VisionConfig:
+    """Local vision model used for compulsory login verification."""
+    login_check: bool = True
+    base_url: str = "http://127.0.0.1:11434/v1"
+    model: str = "qwen3-vl:8b"
+    timeout_seconds: int = 90
+    api_key: str = ""  # unused for local Ollama
 
 
 @dataclass
@@ -149,6 +165,8 @@ class AppConfig:
     telegram_chat_id: str = ""
     source_path: str = ""    # absolute path of the loaded config file
     retention: RetentionSettings = field(default_factory=RetentionSettings)
+    schedule: Any = None     # ScheduleConfig — set in load_config
+    vision: VisionConfig = field(default_factory=VisionConfig)
     _raw: dict[str, Any] = field(default_factory=dict, repr=False)
 
     # Convenience accessors kept for the rest of the codebase.
@@ -266,6 +284,9 @@ def load_config(config_path: str | Path = "config/config.yaml",
         search_nationwide=bool(rules.get("search_nationwide", False)),
         search_include_recommended=bool(rules.get("search_include_recommended",
                                                    False)),
+        search_include_easy_apply_feed=bool(
+            rules.get("search_include_easy_apply_feed", True)),
+        search_include_all_feed=bool(rules.get("search_include_all_feed", True)),
         search_locations=search_locs,
     )
 
@@ -281,6 +302,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
             apply_cfg.get("require_final_confirmation", True)),
         require_preferred_location=bool(
             apply_cfg.get("require_preferred_location", False)),
+        step_screenshots=bool(apply_cfg.get("step_screenshots", True)),
     )
     if apply_obj.mode not in ("dry_run", "live"):
         raise ConfigError(f"apply.mode must be 'dry_run' or 'live', got '{apply_obj.mode}'")
@@ -331,6 +353,16 @@ def load_config(config_path: str | Path = "config/config.yaml",
         password=os.getenv(email_cfg.get("password_env_var", "EMAIL_PASSWORD"), ""),
     )
 
+    from .schedule_config import schedule_from_dict
+    vision_raw = raw.get("vision", {}) or {}
+    vision_cfg = VisionConfig(
+        login_check=bool(vision_raw.get("login_check", True)),
+        base_url=str(vision_raw.get("base_url", "http://127.0.0.1:11434/v1")),
+        model=str(vision_raw.get("model", "qwen3-vl:8b")),
+        timeout_seconds=int(vision_raw.get("timeout_seconds", 90) or 90),
+        api_key=os.getenv(vision_raw.get("api_key_env", ""), "") if vision_raw.get("api_key_env") else "",
+    )
+
     cfg = AppConfig(
         app_name=application.get("name", "CareerPilot"),
         scan_interval_hours=int(scheduler.get("scan_interval_hours", 4)),
@@ -362,6 +394,8 @@ def load_config(config_path: str | Path = "config/config.yaml",
         telegram_chat_id=(telegram_cfg.get("chat_id")
                           or os.getenv("TELEGRAM_CHAT_ID", "")),
         retention=retention,
+        schedule=schedule_from_dict(raw.get("schedule") or {}),
+        vision=vision_cfg,
         _raw=raw,
     )
     try:

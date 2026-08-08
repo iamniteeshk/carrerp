@@ -24,8 +24,60 @@ application:
   reports_dir: reports
 
 scheduler:
-  scan_interval_hours: 4          # recurring scans; human windows still apply
+  scan_interval_hours: 4          # recurring scans; schedule windows still apply
   daily_summary_hour: 20          # local PC time
+
+schedule:
+  mode: batches                   # random short sessions; daily budget capped
+  enabled_days: [mon, tue, wed, thu, fri, sat, sun]
+  skip_probability: 0.10
+  daily_min_minutes: 60           # light day ~1h
+  daily_max_minutes: 240          # hard cap 4h total per day
+  batches:
+    morning:
+      enabled: true
+      start: "07:00"
+      end: "10:00"
+      duration_minutes: 30
+      duration_min: 20
+      duration_max: 45
+      run_probability: 0.40
+      portals: [LinkedIn]
+      max_jobs: 20
+      max_jobs_min: 8
+      max_jobs_max: 25
+    evening:
+      enabled: true
+      start: "17:30"
+      end: "19:30"
+      duration_minutes: 35
+      duration_min: 25
+      duration_max: 45
+      run_probability: 0.45
+      portals: [Naukri]
+      max_jobs: 25
+      max_jobs_min: 10
+      max_jobs_max: 30
+    night:
+      enabled: true
+      start: "20:00"
+      end: "23:00"
+      duration_minutes: 75
+      duration_min: 40
+      duration_max: 110
+      run_probability: 0.50
+      portals: [LinkedIn, Naukri]
+      max_jobs: 50
+      max_jobs_min: 20
+      max_jobs_max: 70
+    lunch:
+      enabled: false
+      start: "12:00"
+      end: "13:30"
+      duration_minutes: 30
+      portals: [Naukri]
+      max_jobs: 20
+  fixed: []
 
 candidate:
   full_name: "Your Name"
@@ -45,12 +97,17 @@ candidate:
   preferred_shift: "Any"
 
 ai:
-  active_provider: gemini
-  request_timeout_seconds: 45
-  max_retries: 3
+  active_provider: ollama
+  request_timeout_seconds: 180
+  max_retries: 2
   providers:
-    gemini:
+    ollama:
       enabled: true
+      base_url: http://127.0.0.1:11434/v1
+      discover_models: true
+      preferred_model: qwen3:8b
+    gemini:
+      enabled: false
       kind: gemini
       api_key_envs: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
       discover_models: true
@@ -63,6 +120,12 @@ ai:
       preferred_model: ""
   # Doctor also reads this legacy list — keep in sync with providers.gemini.
   gemini_key_env_vars: [GEMINI_API_KEY_1, GEMINI_API_KEY_2, GEMINI_API_KEY_3]
+
+vision:
+  login_check: true
+  base_url: http://127.0.0.1:11434/v1
+  model: qwen3-vl:8b
+  timeout_seconds: 90
 
 browser:
   open_jobs: true
@@ -107,7 +170,10 @@ rules:
   # Prefer Chennai first; Remote allowed. Add cities only if explicitly allowed.
   search_locations: [Chennai, Remote]
   search_nationwide: false
-  search_include_recommended: false
+  # Feeds BEFORE keyword/category searches: Easy Apply → Recommended → All.
+  search_include_easy_apply_feed: true
+  search_include_recommended: true
+  search_include_all_feed: true
   search_keywords:
     - Head IT
     - Director IT
@@ -170,6 +236,7 @@ apply:
   retry_limit: 2
   easy_apply_only: true
   require_final_confirmation: true   # NEVER auto-submit without human OK
+  step_screenshots: true
   require_preferred_location: true   # block apply outside Chennai/preferred
 
 maintenance:

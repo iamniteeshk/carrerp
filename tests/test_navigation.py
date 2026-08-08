@@ -100,18 +100,22 @@ def test_navigate_goes_when_url_differs():
 def test_linkedin_plan_recommended_first_then_preferred_then_all():
     page = FakePage(start="https://www.linkedin.com/feed/")
     portal = LinkedInPortal(FakeSession(page), candidate=None, easy_apply_only=True)
+    portal.search_include_easy_apply_feed = True
     portal.search_include_recommended = True
+    portal.search_include_all_feed = True
     portal.search_nationwide = True
     portal.search(["Director", "Head"], ["Chennai", "Bangalore"])
     gotos = page.gotos
-    # 1) recommended jobs is FIRST
-    assert "collections/recommended" in gotos[0], gotos
-    # 2) preferred-location searches (with location=) come before all-locations
+    # Priority feeds FIRST: Easy Apply → Recommended → All, then categories.
+    assert "f_AL=true" in gotos[0] and "keywords=" not in gotos[0], gotos
+    assert "collections/recommended" in gotos[1], gotos
+    assert gotos[2].rstrip("/").endswith("/jobs"), gotos
+    # preferred-location searches (with location=) come before nationwide
     loc_searches = [u for u in gotos if "location=" in u]
     all_searches = [u for u in gotos if "keywords=" in u and "location=" not in u]
     assert loc_searches and all_searches
     assert gotos.index(loc_searches[-1]) < gotos.index(all_searches[0])
-    # easy-apply filter preserved; no duplicate URLs
+    # easy-apply filter preserved on category searches; no duplicate URLs
     assert any("f_AL=true" in u for u in gotos)
     assert len(set(gotos)) == len(gotos)
 
@@ -119,6 +123,8 @@ def test_linkedin_plan_recommended_first_then_preferred_then_all():
 def test_linkedin_plan_dedupes_identical_pairs():
     page = FakePage(start="https://www.linkedin.com/feed/")
     portal = LinkedInPortal(FakeSession(page), candidate=None, easy_apply_only=False)
+    portal.search_include_easy_apply_feed = False
+    portal.search_include_all_feed = False
     portal.search_include_recommended = True
     portal.search_nationwide = True
     portal.search(["Director", "Director"], ["Chennai"])
@@ -131,12 +137,14 @@ def test_linkedin_plan_dedupes_identical_pairs():
 def test_naukri_search_does_not_reload_same_page():
     page = FakePage(start="https://www.naukri.com/mnjuser/homepage")
     portal = NaukriPortal(FakeSession(page), candidate=None)
+    portal.search_include_easy_apply_feed = True
     portal.search_include_recommended = True
+    portal.search_include_all_feed = False
     portal.search_nationwide = True
     portal.search(["Director"], ["Chennai", "Bangalore"])
-    # recommended + 2 preferred-location searches + 1 all-locations = 4 distinct.
+    # Easy-apply URL == recommended URL → deduped to one feed, then locations + nationwide.
     assert len(page.gotos) == len(set(page.gotos)) == 4, page.gotos
-    # recommended jobs first; no bare homepage reload loop.
+    # recommended / easy-apply feed first; no bare homepage reload loop.
     assert "recommendedjobs" in page.gotos[0]
     assert "https://www.naukri.com/" not in page.gotos
     # preferred-location searches use the -jobs-in- slug pattern.
@@ -144,9 +152,12 @@ def test_naukri_search_does_not_reload_same_page():
 
 
 def test_naukri_chennai_only_quality_search_plan():
-    """v2.9.4: default is quality-first -- no recommended feed, no nationwide."""
+    """Category-only plan when all priority feeds are disabled."""
     page = FakePage(start="https://www.naukri.com/mnjuser/homepage")
     portal = NaukriPortal(FakeSession(page), candidate=None)
+    portal.search_include_easy_apply_feed = False
+    portal.search_include_recommended = False
+    portal.search_include_all_feed = False
     portal.search(["Director", "Head"], ["Chennai"])
     gotos = page.gotos
     assert len(gotos) == 2

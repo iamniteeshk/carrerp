@@ -189,6 +189,11 @@ def test_ai_json_extraction_and_fallback():
 
     assert _extract_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert _extract_json('garbage') == {}
+    # Qwen3 thinking wrappers must not break scoring JSON parse.
+    assert _extract_json(
+        '<think>step by step</think>\n```json\n{"a": 2}\n```') == {"a": 2}
+    assert _extract_json(
+        '<thinking>reason</thinking>{"match_score": 91}') == {"match_score": 91}
 
     class Failing(AIProvider):
         name = "Failing"

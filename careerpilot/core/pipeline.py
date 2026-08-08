@@ -16,10 +16,10 @@ from ..collectors.manager import CollectorManager
 from ..core.config import AppConfig
 from ..core.enums import ApplyMode, JobStatus
 from ..core.logging_setup import get_logger
-from ..core.models import Job
+from ..core.models import AIEvaluation, Job
 from ..core.state import StateMachine, WorkflowState
 from ..db.services import FailedJobService
-from ..db.services import JobService, ScanService
+from ..db.services import JobService, ScanService, material_field_changes
 from ..reports.csv_reporter import CSVReporter
 from ..reports.streaming_csv import StreamingCSVReporter
 from ..rules.rule_engine import RuleEngine
@@ -136,8 +136,37 @@ class ScanPipeline:
                             "all portals) | portals=%s", self.session_plan.portals)
                 return
 
-            # ---- AUTOMATED: full human time-of-day session planning ----
-            plan = plan_daily_session(rng, now or datetime.now(), kws)
+            # ---- AUTOMATED: operator schedule (batches/fixed) or human_random ----
+            from .schedule_config import plan_from_schedule, schedule_from_dict
+            cfg = getattr(self, "cfg", None)
+            schedule = getattr(cfg, "schedule", None) if cfg is not None else None
+            settings = getattr(self, "settings", None)
+            if settings is not None:
+                override = settings.get_json("schedule_json")
+                if isinstance(override, dict) and override:
+                    schedule = schedule_from_dict(override)
+            # Tests / minimal harnesses without AppConfig keep legacy random windows.
+            if schedule is None and cfg is None:
+                plan = plan_daily_session(rng, now or datetime.now(), kws)
+            else:
+                if schedule is None:
+                    schedule = schedule_from_dict({})
+                used = 0
+                hist = getattr(self, "session_history", None)
+                if hist is not None and hasattr(hist, "all"):
+                    try:
+                        from .schedule_config import minutes_used_today
+                        used = minutes_used_today(hist.all(), now or datetime.now())
+                    except Exception:  # noqa: BLE001
+                        used = 0
+                if schedule.mode == "human_random":
+                    plan = plan_daily_session(
+                        rng, now or datetime.now(), kws,
+                        skip_probability=float(schedule.skip_probability or 0.12))
+                else:
+                    plan = plan_from_schedule(
+                        schedule, now or datetime.now(), rng, keywords=kws,
+                        used_minutes_today=used)
             self.session_plan = plan
             self.session_max_jobs = plan.max_jobs
             self.session_deadline = (time.time() + plan.duration_minutes * 60
@@ -156,8 +185,9 @@ class ScanPipeline:
             else:
                 # Off-hours / skip-day: a human is not searching -> no portal.
                 self.collector.portals = []
-            logger.info("Session plan: window=%s duration=%smin max_jobs=%s "
-                        "portals=%s keyword_order=%s", plan.window,
+            logger.info("Session plan: mode=%s window=%s duration=%smin max_jobs=%s "
+                        "portals=%s keyword_order=%s",
+                        getattr(schedule, "mode", "legacy"), plan.window,
                         plan.duration_minutes, plan.max_jobs, plan.portals,
                         plan.keywords[:5])
         except Exception as exc:  # noqa: BLE001 - planning must never crash a scan
@@ -172,6 +202,66 @@ class ScanPipeline:
         if deadline and time.time() >= deadline:
             return True
         return False
+
+    def _process_manual_approvals(self, counts: dict[str, int], dry_run: bool) -> None:
+        """Apply jobs the operator approved from the dashboard (was REJECTED).
+
+        Skips Rule/AI re-scoring — the human override is the decision. Uses the
+        stored resume profile when present, otherwise the configured default.
+        """
+        list_fn = getattr(self.jobs, "list_by_status", None)
+        if not callable(list_fn):
+            return
+        from_row = getattr(self.jobs, "job_from_row", None)
+        rows = list_fn(JobStatus.APPROVED)
+        if not rows:
+            return
+        default_profile = (
+            getattr(self.cfg, "default_career_profile", None)
+            or getattr(getattr(self.cfg, "profiles", None), "default", None)
+            or "General"
+        )
+        logger.info("Manual approvals pending: %s", len(rows))
+        for row in rows:
+            if self._session_limit_reached():
+                break
+            job = (from_row(row) if callable(from_row)
+                   else JobService.job_from_row(row))
+            if not (job.job_description or "").strip():
+                logger.warning("Approved job #%s has no JD stored — skipping "
+                               "apply until re-read", job.job_id)
+                continue
+            self._job_seq += 1
+            n = self._job_seq
+            tag = f"{job.portal}:{job.job_title}".strip()
+            profile = (job.selected_resume or default_profile or "General")
+            score = float(job.match_score) if job.match_score is not None else 100.0
+            evaluation = AIEvaluation(
+                match_score=score,
+                career_profile=str(profile),
+                confidence=1.0,
+                reason="manual dashboard approval",
+                apply=True,
+                provider="manual",
+                model="dashboard",
+            )
+            self.jobs.update_status(job.job_id, JobStatus.MATCHED,
+                                    match_score=score, selected_resume=str(profile))
+            counts["matched"] = counts.get("matched", 0) + 1
+            counts["found"] = counts.get("found", 0) + 1
+            self._found = counts["found"]
+            self._stage(n, "MANUAL_APPROVED", f"id={job.job_id} | {tag}")
+            result = (self.apply_engine.dry_run(job, evaluation) if dry_run
+                      else self.apply_engine.apply_to_job(job, evaluation))
+            if result.success:
+                counts["applied"] = counts.get("applied", 0) + 1
+                self.stream.applied(job, dry_run)
+            self._stage(n, "JOB_FINISHED",
+                        "MANUAL APPROVED + "
+                        + ("DRY-RUN" if dry_run else (
+                            "APPLIED" if result.success else "APPLY-PENDING")))
+            logger.info("Job #%s manual approval apply done success=%s dry_run=%s "
+                        "| %s", n, result.success, dry_run, tag)
 
     def run_once(self) -> dict[str, int]:
         scan_id = self.scans.start()
@@ -208,6 +298,12 @@ class ScanPipeline:
                               portals=0, duration=time.time() - start,
                               status="SKIPPED")
             return counts
+
+        # Dashboard manual overrides: apply APPROVED (was REJECTED) jobs first.
+        try:
+            self._process_manual_approvals(counts, dry_run)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Manual-approval pass failed (continuing scan): %s", exc)
 
         def _should_open(job) -> bool:
             # Stop opening new jobs once the human-like session budget is spent.
@@ -437,19 +533,41 @@ class ScanPipeline:
             if existing is not None:
                 status = (existing.get("status") or "").upper()
                 from ..db.services import RETRIABLE_STATUSES
-                if status not in RETRIABLE_STATUSES:
+                # REJECTED: skip unless title/salary/JD/etc. materially changed.
+                if status == JobStatus.REJECTED.value:
+                    changed = material_field_changes(existing, job)
+                    if not changed:
+                        counts["skipped"] += 1
+                        logger.info("Job #%s SKIPPED (already REJECTED, unchanged) "
+                                    "| %s", n, tag)
+                        return
+                    job.job_id = existing["job_id"]
+                    if hasattr(self.jobs, "update_material_fields"):
+                        self.jobs.update_material_fields(job.job_id, job)
+                    if hasattr(self.jobs, "update_status"):
+                        self.jobs.update_status(job.job_id, JobStatus.FOUND,
+                                                rejection_reason=None)
+                    counts["found"] += 1
+                    self._found = counts["found"]
+                    self._recoveries = getattr(self, "_recoveries", 0) + 1
+                    self._stage(n, "REJECTED_RECHECK",
+                                f"id={job.job_id} changed={','.join(changed)}")
+                    logger.info("Job #%s RECHECK (was REJECTED; changed %s) | %s",
+                                n, ",".join(changed), tag)
+                elif status not in RETRIABLE_STATUSES:
                     counts["skipped"] += 1
                     logger.info("Job #%s SKIPPED (duplicate -- terminal status "
                                 "%s already in database) | %s", n, status, tag)
                     return
-                # Retriable: reuse the existing row and continue the pipeline.
-                job.job_id = existing["job_id"]
-                counts["found"] += 1
-                self._found = counts["found"]
-                self._recoveries = getattr(self, "_recoveries", 0) + 1
-                self._stage(n, "RETRY_RESUMED",
-                            f"id={job.job_id} prior_status={status}")
-                logger.info("Job #%s RETRY (prior status=%s) | %s", n, status, tag)
+                else:
+                    # Retriable: reuse the existing row and continue the pipeline.
+                    job.job_id = existing["job_id"]
+                    counts["found"] += 1
+                    self._found = counts["found"]
+                    self._recoveries = getattr(self, "_recoveries", 0) + 1
+                    self._stage(n, "RETRY_RESUMED",
+                                f"id={job.job_id} prior_status={status}")
+                    logger.info("Job #%s RETRY (prior status=%s) | %s", n, status, tag)
             else:
                 self._stage(n, "CARD_DETECTED", tag)
                 job.job_id = self.jobs.insert(job)          # INSERT + commit
