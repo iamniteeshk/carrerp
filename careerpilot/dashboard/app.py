@@ -120,8 +120,22 @@ def create_dashboard(
         dry = conn.execute(
             "SELECT COUNT(*) c FROM applications WHERE dry_run=1").fetchone()["c"]
         failed = conn.execute("SELECT COUNT(*) c FROM failed_jobs").fetchone()["c"]
+        from ..core.activity import read_activity
+        activity = read_activity()
+        sessions = {"present": False, "linkedin": False, "naukri": False, "path": ""}
+        if config is not None:
+            root = __import__("pathlib").Path(
+                getattr(getattr(config, "browser", None), "profiles_path",
+                        "profiles_browser"))
+            sessions = {
+                "path": str(root),
+                "present": root.exists(),
+                "linkedin": (root / "linkedin").exists(),
+                "naukri": (root / "naukri").exists(),
+            }
         return jsonify({"by_status": by_status, "applications": applied,
-                        "dry_runs": dry, "failed": failed})
+                        "dry_runs": dry, "failed": failed,
+                        "activity": activity, "sessions": sessions})
 
     @app.route("/api/emergency")
     def emergency():
@@ -154,6 +168,34 @@ def create_dashboard(
         )
         return jsonify(rows)
 
+    def _learn(action: str, row: dict) -> None:
+        if config is None:
+            return
+        try:
+            from pathlib import Path
+            from ..core.decision_memory import DecisionMemory
+            path = Path(config.database_path).parent / "decision_memory.json"
+            DecisionMemory(path).record(
+                action=action,
+                job_title=row.get("job_title") or "",
+                company=row.get("company") or "",
+                portal=row.get("portal") or "",
+                reason=row.get("rejection_reason") or "",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store manual decision: %s", exc)
+
+    @app.route("/api/review")
+    def review_jobs():
+        rows = q(
+            "SELECT job_id, portal, company, job_title, location, salary, "
+            "experience, job_description, match_score, rejection_reason, "
+            "job_url, status, discovered_at, updated_at "
+            "FROM jobs WHERE status IN ('CONFUSED', 'QUEUED', 'MANUAL_REVIEW') "
+            "ORDER BY updated_at DESC LIMIT 300"
+        )
+        return jsonify(rows)
+
     @app.route("/api/jobs/<int:job_id>/approve", methods=["POST"])
     @require_admin
     def approve_job(job_id: int):
@@ -164,13 +206,36 @@ def create_dashboard(
                 return jsonify({"ok": False, "error": "job not found"}), 404
             return jsonify({
                 "ok": False,
-                "error": f"job status is {row.get('status')}, only REJECTED can be approved",
+                "error": (f"job status is {row.get('status')}; approve works for "
+                          "rejected, confused, queued, or matched jobs"),
             }), 400
+        _learn("apply", updated)
         logger.info("Dashboard manual approve job_id=%s title=%s",
                     job_id, updated.get("job_title"))
         return jsonify({"ok": True, "job": {
             "job_id": updated.get("job_id"),
             "job_title": updated.get("job_title"),
+            "status": updated.get("status"),
+            "rejection_reason": updated.get("rejection_reason"),
+        }})
+
+    @app.route("/api/jobs/<int:job_id>/reject", methods=["POST"])
+    @require_admin
+    def reject_job(job_id: int):
+        body = request.get_json(silent=True) or {}
+        reason = str(body.get("reason") or "manual reject")
+        updated = jobs_svc.reject_manual(job_id, reason)
+        if updated is None:
+            row = jobs_svc.get(job_id)
+            if row is None:
+                return jsonify({"ok": False, "error": "job not found"}), 404
+            return jsonify({
+                "ok": False,
+                "error": f"job status is {row.get('status')}; cannot reject from here",
+            }), 400
+        _learn("reject", updated)
+        return jsonify({"ok": True, "job": {
+            "job_id": updated.get("job_id"),
             "status": updated.get("status"),
             "rejection_reason": updated.get("rejection_reason"),
         }})
@@ -278,7 +343,8 @@ def create_dashboard(
         if "debug_visual_mode" in body:
             settings_svc.set("debug_visual_mode",
                              "true" if body["debug_visual_mode"] else "false")
-        if "apply_mode" in body and body["apply_mode"] in ("dry_run", "live"):
+        if "apply_mode" in body and body["apply_mode"] in (
+                "dry_run", "approval", "auto", "live"):
             # Deploy posture: allow setting but default stays dry_run in config.
             settings_svc.set("apply_mode", body["apply_mode"])
         _notify_change()

@@ -165,18 +165,36 @@ class JobService:
     def list_rejected(self, *, limit: int = 200) -> list[dict]:
         return self.list_by_status(JobStatus.REJECTED, limit=limit)
 
-    def approve(self, job_id: int) -> dict[str, Any] | None:
-        """Mark a REJECTED job APPROVED so the next scan applies it.
+    _OPENABLE = {
+        JobStatus.REJECTED.value,
+        JobStatus.CONFUSED.value,
+        JobStatus.QUEUED.value,
+        JobStatus.MATCHED.value,
+        JobStatus.MANUAL_REVIEW.value,
+    }
 
-        Keeps ``rejection_reason`` for history. Returns the updated row or None
-        if the job is missing / not REJECTED.
+    def approve(self, job_id: int) -> dict[str, Any] | None:
+        """Mark a reviewed job APPROVED so the next scan applies it.
+
+        Accepted from Rejected, Confused, Queued, Matched, or Manual Review.
         """
         row = self.get(job_id)
         if row is None:
             return None
-        if (row.get("status") or "").upper() != JobStatus.REJECTED.value:
+        if (row.get("status") or "").upper() not in self._OPENABLE:
             return None
         self.update_status(job_id, JobStatus.APPROVED)
+        return self.get(job_id)
+
+    def reject_manual(self, job_id: int, reason: str = "manual reject") -> dict[str, Any] | None:
+        """Record an operator Reject. The bot treats this as a learned no."""
+        row = self.get(job_id)
+        if row is None:
+            return None
+        status = (row.get("status") or "").upper()
+        if status not in self._OPENABLE and status != JobStatus.APPROVED.value:
+            return None
+        self.update_status(job_id, JobStatus.REJECTED, rejection_reason=reason)
         return self.get(job_id)
 
     def count_by_status(self) -> dict[str, int]:

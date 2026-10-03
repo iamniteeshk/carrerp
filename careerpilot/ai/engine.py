@@ -73,7 +73,10 @@ How to decide match_score (0-100), weigh ALL of these, not just the title:
 - Relevance to IT infrastructure, End User Computing, Digital Workplace, IT
   Service Delivery, Managed Services and GCC environments.
 - Technologies & responsibilities: overlap with what the candidate actually did.
-- Organisational/industry fit, location, and salary (if stated).
+- Organisational/industry fit, location, and salary when the posting states it.
+  If salary is missing, do NOT reject and do NOT lower the score for that
+  alone. Judge the company, the experience asked for, the responsibilities,
+  the seniority, and whether the role matches the expected roles.
 
 Seniority: BOOST genuine senior leadership (Head, Director, Senior/Associate
 Director, VP/AVP/SVP, CIO/CTO, technology/service-delivery/infrastructure
@@ -93,13 +96,17 @@ Learned from this candidate's past strong matches (use as extra signal):
 {learned}
 
 Set "apply" true ONLY when it is a genuine, high-confidence fit in-domain.
+Stay neutral when you are not sure: set "uncertain" true and "decision" to
+"review". Do not force apply or reject in that case.
 
 Return JSON with this exact shape:
 {{"match_score": <int 0-100, holistic fit per the guide above>,
 "career_profile": "<one profile name from the list>",
 "confidence": <int 0-100, how confident you are in that profile choice>,
 "reason": "<<=3 sentences, cite the domain-fit reasoning>",
-"apply": <true|false>}}
+"apply": <true|false>,
+"uncertain": <true|false>,
+"decision": "<apply|reject|review>"}}
 """
 
 
@@ -176,6 +183,18 @@ class AIEngine:
 
         career_profile = data.get("career_profile", "")
         confidence = float(data.get("confidence", 0))
+        decision = str(data.get("decision", "") or "").strip().lower()
+        uncertain = bool(data.get("uncertain", False)) or decision in (
+            "review", "uncertain", "confused", "needs_review")
+        apply_flag = bool(data.get("apply", False))
+        if decision == "apply":
+            apply_flag = True
+            uncertain = False
+        elif decision == "reject":
+            apply_flag = False
+            uncertain = False
+        elif uncertain:
+            apply_flag = False
         # The engine never invents a profile. If the name is unknown we keep it
         # as-is with the reported confidence; the CareerProfileEngine.select()
         # call downstream maps unknown/low-confidence choices to the default.
@@ -187,7 +206,8 @@ class AIEngine:
             career_profile=career_profile or self.default_profile,
             confidence=confidence,
             reason=str(data.get("reason", ""))[:500],
-            apply=bool(data.get("apply", False)),
+            apply=apply_flag,
+            uncertain=uncertain,
             provider=provider, model=model, tokens_used=tokens,
             execution_time=elapsed, raw_response=text,
         )

@@ -6,12 +6,12 @@ engine, scores fit with an AI engine, selects the right **Career Profile**
 (resume + cover letter + keywords + documents), and—when you enable it—applies on
 your behalf, pausing for you whenever a security checkpoint needs a human.
 
-> **Status: v4.0.0 production hardening.** The decision pipeline
-> (discover → filter → score → select profile → record) is hardened for
-> unattended dry-run operation. Live LinkedIn/Naukri form filling and
-> submission still require live-DOM completion and will **never** claim
-> `submitted=True` until that work is done. Keep `apply.mode: dry_run` and
-> `require_final_confirmation: true`. See `docs/PRODUCTION_READINESS_v4.md`.
+> **Status: three apply modes.** `dry_run` fills the form, records every
+> answer, and stops before Submit. `approval` sends the job title and those
+> answers to Telegram and waits for Proceed or Reject. `auto` submits and
+> only notifies you afterwards. Jobs the model is not sure about stay in
+> Confused / Needs Review. Keep `apply.mode: dry_run` until the fills look
+> right on your machine.
 
 ## What it is — and isn't
 

@@ -143,7 +143,7 @@ browser:
   scroll_passes: 3
 
 dashboard:
-  host: 127.0.0.1
+  host: 0.0.0.0                  # this PC and other devices on the home network
   port: 5000
   refresh_seconds: 30
 
@@ -228,7 +228,7 @@ rules:
   minimum_match_score: 60
 
 apply:
-  mode: dry_run                   # stay dry_run until live apply is validated
+  mode: dry_run                   # dry_run | approval | auto — stay on dry_run until fills look right
   min_apply_score: 90
   first_run_confirmations: 10     # more conservative for production rollout
   max_applications_per_day: 5

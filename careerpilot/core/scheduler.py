@@ -80,12 +80,29 @@ class Scheduler:
             if random.random() < self.SKIP_CYCLE_PROBABILITY:
                 logger.info("Skipping this scan cycle (human-like: not every "
                             "cycle is used)")
+                try:
+                    from .activity import publish_activity
+                    publish_activity(activity="resting", stage="sleeping",
+                                     detail="skipped this cycle")
+                except Exception:  # noqa: BLE001
+                    pass
                 return
         try:
             from ..core.maintenance import write_health_heartbeat
             write_health_heartbeat(status="scanning")
+            try:
+                from .activity import publish_activity
+                publish_activity(activity="searching", stage="scan")
+            except Exception:  # noqa: BLE001
+                pass
             self.pipeline.run_once()
             write_health_heartbeat(status="ok")
+            try:
+                from .activity import publish_activity
+                publish_activity(activity="resting", stage="idle",
+                                 detail="scan finished")
+            except Exception:  # noqa: BLE001
+                pass
             self._consecutive_failures = 0
         except Exception as exc:  # noqa: BLE001
             self._consecutive_failures = getattr(self, "_consecutive_failures", 0) + 1

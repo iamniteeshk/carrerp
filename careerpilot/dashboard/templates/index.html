@@ -167,19 +167,30 @@
     </div>
   </div>
 
+  <div class="card" id="activity-card" style="margin-bottom:1rem;">
+    <h5>Right now</h5>
+    <div id="activity-line" class="muted">Waiting for the first status update.</div>
+  </div>
+
   <div class="grid stats" id="stat-cards"></div>
 
   <div class="layout">
     <div class="card">
       <h5>Mission Controls</h5>
       <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="rejected">Rejected</button>
+        <button class="tab active" data-tab="review">Needs review</button>
+        <button class="tab" data-tab="rejected">Rejected</button>
         <button class="tab" data-tab="schedule">Schedule</button>
         <button class="tab" data-tab="ai">Local AI</button>
         <button class="tab" data-tab="ops">Ops</button>
       </div>
 
-      <div class="panel active" id="panel-rejected">
+      <div class="panel active" id="panel-review">
+        <p class="muted">Confused jobs and applications waiting for Proceed or Reject. Apply teaches the bot to take similar roles. Reject teaches it to pass.</p>
+        <div id="review-list"></div>
+      </div>
+
+      <div class="panel" id="panel-rejected">
         <p class="muted">Title only — expand for full details. Admin can approve for apply on the next run (dry-run still stops before Apply).</p>
         <div id="rejected-list"></div>
       </div>
@@ -252,11 +263,13 @@
         <div class="switch-row">
           <span>Apply mode</span>
           <select id="apply-mode" style="width:auto; min-width:140px;">
-            <option value="dry_run">dry_run (no Apply click)</option>
-            <option value="live">live (press Apply)</option>
+            <option value="dry_run">Dry — fill, stop before Submit</option>
+            <option value="approval">Approval — Telegram Proceed / Reject</option>
+            <option value="auto">Auto — submit and notify</option>
+            <option value="live">Live (older name)</option>
           </select>
         </div>
-        <p class="muted" style="margin-top:.7rem;">Dry vs production differs only by whether the final Apply button is pressed. Keep dry_run until validated on the PC.</p>
+        <p class="muted" style="margin-top:.7rem;">Dry fills the form and stops before Submit. Approval sends the job title and the filled answers to Telegram. Auto submits and only notifies you afterwards. Keep Dry until the fills look right.</p>
         <button class="btn" id="ops-save" {% if not is_admin %}disabled{% endif %}>Save ops</button>
       </div>
     </div>
@@ -315,34 +328,14 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
-function renderRejected(rows) {
-  const el = document.getElementById('rejected-list');
-  if (!rows.length) { el.innerHTML = '<p class="muted mb-0">No rejected jobs.</p>'; return; }
-  el.innerHTML = rows.map(r => {
-    const id = r.job_id;
-    const approveBtn = IS_ADMIN
-      ? `<button class="btn" data-approve="${id}">Approve next run</button>`
-      : `<span class="muted">Admin to approve</span>`;
-    return `<div class="reject-item">
-      <div class="reject-head" data-toggle="${id}">
-        <span class="chev" id="chev-${id}">▸</span>
-        <span class="reject-title">${esc(r.job_title || '(untitled)')}</span>
-        <span class="muted">${esc(r.portal || '')}</span>
-      </div>
-      <div class="reject-body" id="body-${id}">
-        <div class="row2" style="margin-bottom:.5rem;">
-          <div><span class="muted">Company</span><div>${esc(r.company || '—')}</div></div>
-          <div><span class="muted">Salary</span><div>${esc(r.salary || '—')}</div></div>
-        </div>
-        <div style="margin-bottom:.5rem;"><span class="muted">Rejection</span><div>${esc(r.rejection_reason || '—')}</div></div>
-        <div style="margin-bottom:.5rem;"><span class="muted">Job description</span><div class="jd">${esc(r.job_description || '—')}</div></div>
-        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;">
-          <a class="muted" href="${esc(r.job_url || '#')}" target="_blank" rel="noopener">Open posting</a>
-          ${approveBtn}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+function decisionButtons(id) {
+  if (!IS_ADMIN) return '<span class="muted">Admin to decide</span>';
+  return `<span style="display:flex; gap:.4rem;">
+    <button class="btn" data-approve="${id}">Apply</button>
+    <button class="btn danger" data-reject="${id}">Reject</button>
+  </span>`;
+}
+function bindDecisions(el) {
   el.querySelectorAll('[data-toggle]').forEach(head => {
     head.addEventListener('click', () => {
       const id = head.getAttribute('data-toggle');
@@ -357,15 +350,65 @@ function renderRejected(rows) {
       const res = await fetch(`/api/jobs/${btn.dataset.approve}/approve`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok || !data.ok) { toast(data.error || 'Approve failed'); btn.disabled = false; return; }
-      toast('Approved for next run'); load();
+      toast('Will apply on the next run'); load();
     });
   });
+  el.querySelectorAll('[data-reject]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      btn.disabled = true;
+      const res = await fetch(`/api/jobs/${btn.dataset.reject}/reject`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({reason: 'manual reject'})
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { toast(data.error || 'Reject failed'); btn.disabled = false; return; }
+      toast('Rejected and remembered'); load();
+    });
+  });
+}
+function jobCards(rows, empty) {
+  if (!rows.length) return `<p class="muted">${empty}</p>`;
+  return rows.map(r => {
+    const id = r.job_id;
+    return `<div class="reject-item">
+      <div class="reject-head" data-toggle="${id}">
+        <span class="chev" id="chev-${id}">▸</span>
+        <span class="reject-title">${esc(r.job_title || '(untitled)')}</span>
+        <span class="muted">${esc(r.status || '')} · ${esc(r.portal || '')}</span>
+      </div>
+      <div class="reject-body" id="body-${id}">
+        <div class="row2" style="margin-bottom:.5rem;">
+          <div><span class="muted">Company</span><div>${esc(r.company || '—')}</div></div>
+          <div><span class="muted">Salary</span><div>${esc(r.salary || 'not disclosed')}</div></div>
+        </div>
+        <div style="margin-bottom:.5rem;"><span class="muted">Note</span><div>${esc(r.rejection_reason || '—')}</div></div>
+        <div style="margin-bottom:.5rem;"><span class="muted">Job description</span><div class="jd">${esc(r.job_description || '—')}</div></div>
+        <div style="display:flex;justify-content:space-between;gap:.5rem;align-items:center;">
+          <a class="muted" href="${esc(r.job_url || '#')}" target="_blank" rel="noopener">Open posting</a>
+          ${decisionButtons(id)}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderReview(rows) {
+  const el = document.getElementById('review-list');
+  el.innerHTML = jobCards(rows, 'Nothing waiting for a decision.');
+  bindDecisions(el);
+}
+function renderRejected(rows) {
+  const el = document.getElementById('rejected-list');
+  if (!rows.length) { el.innerHTML = '<p class="muted mb-0">No rejected jobs.</p>'; return; }
+  el.innerHTML = jobCards(rows, 'No rejected jobs.');
+  bindDecisions(el);
 }
 
 async function loadConsole() {
   const st = await (await fetch('/api/console/state')).json();
-  document.getElementById('mode-pill').textContent = 'MODE · ' + String(st.apply_mode || 'dry_run').toUpperCase();
-  document.getElementById('mode-pill').className = 'pill ' + (st.apply_mode === 'live' ? 'warn' : 'ok');
+  const mode = String(st.apply_mode || 'dry_run');
+  document.getElementById('mode-pill').textContent = 'MODE · ' + mode.toUpperCase();
+  document.getElementById('mode-pill').className = 'pill ' + ((mode === 'live' || mode === 'auto') ? 'warn' : 'ok');
 
   const em = st.emergency || {};
   const box = document.getElementById('emergency');
@@ -399,18 +442,34 @@ async function loadConsole() {
 async function load() {
   try {
     const stats = await (await fetch('/api/stats')).json();
+    const act = stats.activity || {};
+    const sessions = stats.sessions || {};
+    const loginBits = [
+      'LinkedIn ' + (sessions.linkedin ? 'profile saved' : 'no saved profile'),
+      'Naukri ' + (sessions.naukri ? 'profile saved' : 'no saved profile'),
+    ];
+    document.getElementById('activity-line').textContent = [
+      act.activity || 'resting',
+      act.portal && act.portal !== '-' ? act.portal : '',
+      act.stage || '',
+      act.detail || '',
+      loginBits.join(' · '),
+      sessions.present ? 'browser sessions stored locally' : 'browser sessions not created yet',
+    ].filter(Boolean).join(' · ');
     const cards = [
-      ['Live Apply', stats.applications],
-      ['Dry Runs', stats.dry_runs || 0],
-      ['Matched', stats.by_status.MATCHED || 0],
-      ['Rejected', stats.by_status.REJECTED || 0],
-      ['Approved', stats.by_status.APPROVED || 0],
       ['Found', stats.by_status.FOUND || 0],
+      ['Matched', stats.by_status.MATCHED || 0],
+      ['Applied', stats.applications],
+      ['Dry runs', stats.dry_runs || 0],
+      ['Rejected', stats.by_status.REJECTED || 0],
+      ['Confused', stats.by_status.CONFUSED || 0],
+      ['Waiting', (stats.by_status.QUEUED || 0) + (stats.by_status.APPROVED || 0)],
       ['Failed', stats.failed],
     ];
     document.getElementById('stat-cards').innerHTML = cards.map(([k,v]) =>
       `<div class="card" style="text-align:center;"><div class="stat-val">${v}</div><div class="stat-label">${k}</div></div>`
     ).join('');
+    renderReview(await (await fetch('/api/review')).json());
     renderRejected(await (await fetch('/api/rejected')).json());
     document.getElementById('jobs').innerHTML = table(await (await fetch('/api/jobs')).json());
     document.getElementById('applications').innerHTML = table(await (await fetch('/api/applications')).json());

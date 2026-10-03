@@ -18,6 +18,7 @@ from ..core.logging_setup import get_logger
 from ..core.models import Job, ScreeningAnswer
 from .base_portal import (BasePortal, ExternalATSRedirect, LoginRequired,
                           OTPRequired, ApplyOutcome, navigate)
+from .form_walker import finish_application
 from .session import BrowserSession
 
 logger = get_logger(__name__)
@@ -127,53 +128,16 @@ class LinkedInPortal(BasePortal):
         return self._browse_plan(plan, on_job=on_job, should_open=should_open)
 
     def apply(self, job: Job, resume_path: str, cover_letter: str,
-              answer_fn, dry_run: bool) -> ApplyOutcome:
+              answer_fn, dry_run: bool, confirm_fn=None) -> ApplyOutcome:
         page = self.session.page
         navigate(page, job.job_url, reason=f"open job {job.company}")
         self._detect_challenge(page)
 
         if not job.is_easy_apply:
-            # External application -> out of scope for V1 auto-apply.
             raise ExternalATSRedirect(f"{job.company}: external ATS")
 
-        answers: list[ScreeningAnswer] = []
-        # COMPLETE ON LIVE DOM: click "Easy Apply", then loop the multi-step
-        # modal: upload resume_path, fill contact fields from self.candidate,
-        # answer screening questions (numeric/dropdown from candidate config;
-        # free-text via answer_fn). On any unmapped *knockout* question, abort
-        # and return submitted=False with a note (the confidence gate decides).
-        evidence = getattr(self, "apply_evidence", None)
-        if evidence:
-            evidence.capture(page, job, "01_opened_job")
-            evidence.capture(page, job, "02_resume_ready")
-            evidence.capture(page, job, "03_form_filled")
-
-        if dry_run:
-            if evidence:
-                evidence.capture(page, job, "04_stop_before_apply")
-            shot = self.session.screenshot(
-                f"{self.session.profile_dir}/dryrun_{job.source_id or 'job'}.png")
-            logger.info("DRY RUN: stopped before submit for %s @ %s",
-                        job.job_title, job.company)
-            return ApplyOutcome(submitted=False, screenshot_path=shot,
-                                answers=answers, note="dry_run")
-
-        # LIVE APPLY SAFETY (v4 production): Easy Apply form-fill + final Submit
-        # are not yet completed against live LinkedIn DOM. Never claim
-        # submitted=True. Fill what we can, reach (or simulate) the confirmation
-        # boundary, then WAIT for explicit human confirmation before Submit.
-        if evidence:
-            evidence.capture(page, job, "04_stop_before_apply")
-        shot = self.session.screenshot(
-            f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
-        logger.warning(
-            "LIVE APPLY: LinkedIn Easy Apply form/submit not completed on live "
-            "DOM — stopping at confirmation boundary for %s @ %s (submitted=False)",
-            job.job_title, job.company)
-        return ApplyOutcome(
-            submitted=False, portal_reference="", screenshot_path=shot,
-            answers=answers,
-            note="awaiting_final_confirmation: linkedin_easy_apply_incomplete")
+        return finish_application(
+            self, page, job, resume_path, answer_fn, dry_run, confirm_fn)
 
     def _detect_challenge(self, page) -> None:
         url = page.url.lower()

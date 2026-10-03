@@ -14,7 +14,8 @@ from ..ai.engine import AIEngine, AIUnavailable
 from ..apply.auto_apply import AutoApplyEngine
 from ..collectors.manager import CollectorManager
 from ..core.config import AppConfig
-from ..core.enums import ApplyMode, JobStatus
+from ..apply.modes import is_dry_mode
+from ..core.enums import JobStatus
 from ..core.logging_setup import get_logger
 from ..core.models import AIEvaluation, Job
 from ..core.state import StateMachine, WorkflowState
@@ -252,7 +253,8 @@ class ScanPipeline:
             self._found = counts["found"]
             self._stage(n, "MANUAL_APPROVED", f"id={job.job_id} | {tag}")
             result = (self.apply_engine.dry_run(job, evaluation) if dry_run
-                      else self.apply_engine.apply_to_job(job, evaluation))
+                      else self.apply_engine.apply_to_job(
+                          job, evaluation, operator_approved=True))
             if result.success:
                 counts["applied"] = counts.get("applied", 0) + 1
                 self.stream.applied(job, dry_run)
@@ -273,7 +275,7 @@ class ScanPipeline:
                            "so every job will be marked Partial Data and no fit "
                            "decision will be made. Enable browser.open_jobs to let "
                            "the Rule/AI engines decide on the full JD.")
-        dry_run = self.cfg.apply.mode == ApplyMode.DRY_RUN.value
+        dry_run = is_dry_mode(self.cfg.apply.mode)
         state = StateMachine(WorkflowState.STARTING)
         self.state = state  # exposed for dashboard/diagnostics
         self._job_seq = 0
@@ -498,6 +500,12 @@ class ScanPipeline:
         logger.info(line)
         self._run_log.append(line)
         self._status(job_number=n, stage=stage)
+        try:
+            from .activity import publish_activity
+            publish_activity(activity="working", stage=stage, detail=detail,
+                             job_number=n)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _process_job(self, job: Job, counts: dict[str, int], dry_run: bool) -> None:
         """Run ONE job through the entire pipeline immediately (streaming).
@@ -682,6 +690,25 @@ class ScanPipeline:
                         f"score={evaluation.match_score} "
                         f"confidence={getattr(evaluation, 'confidence', '?')} "
                         f"profile={evaluation.career_profile}")
+
+            # Neutral hold: do not force apply or reject when the model is unsure.
+            if getattr(evaluation, "uncertain", False):
+                reason = "Needs review: " + (evaluation.reason or "AI was not confident")
+                self.jobs.update_status(
+                    job.job_id, JobStatus.CONFUSED,
+                    match_score=evaluation.match_score,
+                    selected_resume=evaluation.career_profile,
+                    rejection_reason=reason)
+                counts["confused"] = counts.get("confused", 0) + 1
+                self._status(ai_status="review", rule_decision="REVIEW",
+                             db_status="confused", csv_status="NeedsReview")
+                review = getattr(self.stream, "review", None)
+                if callable(review):
+                    review(job, reason)
+                self._stage(n, "DECISION_COMPLETED", "CONFUSED (needs review)")
+                self._stage(n, "JOB_FINISHED", "CONFUSED")
+                logger.info("Job #%s CONFUSED (needs review) | %s", n, tag)
+                return
 
             # Match-score gate: a low AI score is a REJECTION, not a match. This
             # is what keeps off-domain roles the Rule Engine let through (e.g.

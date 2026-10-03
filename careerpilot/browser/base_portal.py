@@ -569,6 +569,8 @@ class ApplyOutcome:
     screenshot_path: str = ""
     answers: list[ScreeningAnswer] | None = None
     note: str = ""
+    # What the form walker actually entered, for Telegram and the dashboard.
+    filled: list | None = None
 
 
 class BasePortal(abc.ABC):
@@ -806,10 +808,12 @@ class BasePortal(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, job: Job, resume_path: str, cover_letter: str,
-              answer_fn, dry_run: bool) -> ApplyOutcome:
+              answer_fn, dry_run: bool, confirm_fn=None) -> ApplyOutcome:
         """Complete the application for ``job``.
 
         ``answer_fn(question) -> str`` is called for free-text screening
         questions (the AI engine), so the portal never imports AI itself.
         When ``dry_run`` is True, fill everything but stop before submit.
+        ``confirm_fn(job, filled) -> 'proceed'|'reject'|'wait'`` is used by
+        approval mode after the form is filled and before Submit is clicked.
         """

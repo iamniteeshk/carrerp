@@ -165,7 +165,7 @@ browser:
   scroll_passes: 3               # natural scrolls to trigger lazy-loading
 
 dashboard:
-  host: 127.0.0.1
+  host: 0.0.0.0                 # this PC and other devices on the home network
   port: 5000
   refresh_seconds: 30
 
@@ -217,7 +217,7 @@ rules:
   search_include_all_feed: true
 
 apply:
-  mode: dry_run                   # dry_run | live  -- START IN DRY RUN
+  mode: dry_run                   # dry_run | approval | auto  (live is the older name)
   min_apply_score: 90             # job-fit score required to apply
   first_run_confirmations: 5      # first N live applies need approval
   max_applications_per_day: 5

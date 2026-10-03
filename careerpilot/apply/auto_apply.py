@@ -23,7 +23,8 @@ from ..core.logging_setup import get_logger
 from ..core.models import AIEvaluation, ApplicationResult, Job
 from ..db.services import (ApplicationService, FailedJobService, JobService)
 from ..notify.telegram_service import TelegramService
-from .confidence_gate import ConfidenceGate, GateDecision
+from .confidence_gate import ConfidenceGate
+from .modes import normalize_apply_mode
 from .safety_gate import ApplySafetyGate
 
 logger = get_logger(__name__)
@@ -49,10 +50,12 @@ class AutoApplyEngine:
             config.rules,
             require_preferred_location=bool(
                 getattr(config.apply, "require_preferred_location", False)),
-            chennai_priority=True,
+            chennai_priority=bool(
+                getattr(config.rules, "reject_outside_preferred", True)),
         )
 
-    def apply_to_job(self, job: Job, evaluation: AIEvaluation) -> ApplicationResult:
+    def apply_to_job(self, job: Job, evaluation: AIEvaluation,
+                     operator_approved: bool = False) -> ApplicationResult:
         """Attempt one application, honoring the confidence gate and mode."""
         profile = self.profile_engine.select(
             evaluation.career_profile, evaluation.confidence)
@@ -77,26 +80,24 @@ class AutoApplyEngine:
                                 status=JobStatus.SKIPPED,
                                 failure_reason=safety.reason)
 
-        gate = ConfidenceGate(self.cfg.apply, self.cfg.ai.min_apply_score,
-                              self._lifetime_applied())
-        decision = gate.decide(job, evaluation, self.apps.applied_today_count())
-        if not decision.proceed:
-            logger.info("Gate blocked %s: %s", job.job_title, decision.reason)
-            if job.job_id:
-                self.jobs.update_status(job.job_id, JobStatus.SKIPPED)
-            return self._result(job, evaluation, profile, success=False,
-                                status=JobStatus.SKIPPED)
+        mode = normalize_apply_mode(self.cfg.apply.mode)
+        confirm = None
+        if not operator_approved:
+            gate = ConfidenceGate(self.cfg.apply, self.cfg.ai.min_apply_score,
+                                  self._lifetime_applied())
+            decision = gate.decide(job, evaluation, self.apps.applied_today_count())
+            if not decision.proceed:
+                logger.info("Gate blocked %s: %s", job.job_title, decision.reason)
+                if job.job_id:
+                    self.jobs.update_status(job.job_id, JobStatus.SKIPPED)
+                return self._result(job, evaluation, profile, success=False,
+                                    status=JobStatus.SKIPPED)
+            if decision.needs_approval or mode == "approval":
+                confirm = self._approval_decision
+        elif mode == "dry_run":
+            return self._execute(portal, job, evaluation, dry_run=True)
 
-        if decision.needs_approval:
-            self._request_approval(job, evaluation, profile, decision)
-            # The approval response is handled out-of-band; we stage the job and
-            # stop here rather than submitting unapproved.
-            if job.job_id:
-                self.jobs.update_status(job.job_id, JobStatus.QUEUED)
-            return self._result(job, evaluation, profile, success=False,
-                                status=JobStatus.QUEUED)
-
-        return self._execute(portal, job, evaluation, dry_run=False)
+        return self._execute(portal, job, evaluation, dry_run=False, confirm=confirm)
 
     def dry_run(self, job: Job, evaluation: AIEvaluation) -> ApplicationResult:
         profile = self.profile_engine.select(
@@ -118,7 +119,7 @@ class AutoApplyEngine:
     # ---- internal --------------------------------------------------------
 
     def _execute(self, portal: BasePortal, job: Job, evaluation: AIEvaluation,
-                 dry_run: bool) -> ApplicationResult:
+                 dry_run: bool, confirm=None) -> ApplicationResult:
         if job.job_id:
             self.jobs.update_status(job.job_id, JobStatus.APPLYING)
         # Resolve the Career Profile (confidence-gated default fallback).
@@ -139,32 +140,44 @@ class AutoApplyEngine:
                     break
                 outcome = portal.apply(
                     job, resume_path, cover_letter,
-                    answer_fn=answer_fn, dry_run=dry_run,
+                    answer_fn=answer_fn, dry_run=dry_run, confirm_fn=confirm,
                 )
                 # Live mode must never claim APPLIED unless the portal truly
                 # submitted. Incomplete portal flows return submitted=False.
                 if outcome.submitted and not dry_run:
                     submitted_once = True
-                status = JobStatus.APPLIED if (outcome.submitted and not dry_run) else (
-                    JobStatus.MATCHED if dry_run else JobStatus.QUEUED)
+                note = (outcome.note or "").lower()
+                if outcome.submitted and not dry_run:
+                    status = JobStatus.APPLIED
+                elif note.startswith("approval:reject"):
+                    status = JobStatus.SKIPPED
+                elif note.startswith("needs_review"):
+                    status = JobStatus.CONFUSED
+                elif dry_run:
+                    status = JobStatus.MATCHED
+                elif "confirmation" in note or note.startswith("approval:"):
+                    status = JobStatus.QUEUED
+                else:
+                    status = JobStatus.QUEUED
                 # Incomplete live apply (forms filled / confirmation pending)
                 # stays MATCHED or QUEUED — never APPLIED.
-                if (not dry_run and not outcome.submitted
-                        and "confirmation" in (outcome.note or "").lower()):
-                    status = JobStatus.QUEUED
                 result = self._result(
                     job, evaluation, profile,
                     success=bool(outcome.submitted and not dry_run),
                     status=status, portal_reference=outcome.portal_reference,
                     screenshot=outcome.screenshot_path,
                     cover_letter=cover_letter, dry_run=dry_run,
-                    failure_reason=outcome.note or "",
+                    failure_reason=_fill_note(outcome),
                 )
+                if outcome.answers:
+                    result.screening_answers = list(outcome.answers)
                 self.apps.record(result)
                 if job.job_id:
                     self.jobs.update_status(job.job_id, status)
                 if outcome.submitted and not dry_run:
                     self._notify_success(job, evaluation, profile)
+                elif dry_run:
+                    self._notify_dry_run(job, outcome)
                 return result
 
             except ExternalATSRedirect as exc:
@@ -227,14 +240,33 @@ class AutoApplyEngine:
         ).fetchone()
         return row["c"] if row else 0
 
-    def _request_approval(self, job: Job, evaluation: AIEvaluation, profile,
-                          decision: GateDecision) -> None:
+    def _approval_decision(self, job: Job, filled: list) -> str:
+        """Ask Telegram, after the form is filled, and return the reply."""
+        lines = []
+        for item in filled or []:
+            label = item.get("label") or "field"
+            value = item.get("value") or ""
+            lines.append(f"- {label}: {value}")
+        body = "\n".join(lines) if lines else "(no fields were detected on the form)"
         self.telegram.send(
             NotificationType.APPROVAL_REQUEST,
-            f"Approval needed ({decision.reason}):\n"
-            f"{job.job_title} @ {job.company}\n"
-            f"Score: {evaluation.match_score} | Profile: {profile.name}\n"
-            f"{evaluation.reason}\n{job.job_url}")
+            f"Approval needed\n{job.job_title} @ {job.company}\n"
+            f"Portal: {job.portal}\n{job.job_url}\n\n"
+            f"Filled in the application:\n{body}\n\n"
+            f"Reply Proceed to submit, or Reject to stop.")
+        decision = self.telegram.wait_for_reply()
+        logger.info("Approval reply for %s: %s", job.job_title, decision)
+        return decision
+
+    def _notify_dry_run(self, job: Job, outcome) -> None:
+        filled = getattr(outcome, "filled", None) or []
+        if not filled:
+            return
+        lines = [f"- {item.get('label')}: {item.get('value')}" for item in filled[:30]]
+        self.telegram.send(
+            NotificationType.QUEUE,
+            f"Dry run stopped before Submit\n{job.job_title} @ {job.company}\n"
+            + "\n".join(lines))
 
     def _notify_success(self, job: Job, evaluation: AIEvaluation, profile) -> None:
         self.telegram.send(
@@ -267,3 +299,13 @@ class AutoApplyEngine:
             match_score=evaluation.match_score, portal_reference=portal_reference,
             screenshot_path=screenshot, cover_letter=cover_letter,
             failure_reason=failure_reason, dry_run=dry_run)
+
+
+def _fill_note(outcome) -> str:
+    note = outcome.note or ""
+    filled = getattr(outcome, "filled", None) or []
+    if not filled:
+        return note
+    bits = [f"{item.get('label')}={item.get('value')}" for item in filled[:20]]
+    extra = "filled: " + "; ".join(bits)
+    return f"{note} | {extra}" if note else extra

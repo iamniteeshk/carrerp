@@ -32,6 +32,58 @@ class CollectorManager:
         self.settings = settings
         self.screenshot_dir = Path(screenshot_dir)
 
+    def _wait_for_operator(self, portal: BasePortal, kind: str, reason: str,
+                           timeout_s: int = 1200) -> bool:
+        """Pause for a manual login or 2FA, then resume once the page is clear.
+
+        Returns True when the portal no longer looks like a login/checkpoint
+        page. Returns False immediately when there is no browser page to watch.
+        """
+        import time
+
+        self._raise_emergency(portal.portal_name, reason)
+        self._pause(portal, kind, reason)
+        try:
+            from ..core.activity import publish_activity
+            publish_activity(
+                activity="waiting",
+                stage=f"{kind} required",
+                portal=portal.portal_name,
+                detail=reason,
+                login_status=f"{portal.portal_name}: needs you",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        page = getattr(getattr(portal, "session", None), "page", None)
+        if page is None:
+            return False
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            try:
+                url = (page.url or "").lower()
+            except Exception:  # noqa: BLE001
+                url = ""
+            blocked = any(tok in url for tok in (
+                "checkpoint", "login", "authwall", "otp", "challenge", "captcha"))
+            on_portal = ("linkedin.com" in url) or ("naukri.com" in url)
+            if url and on_portal and not blocked:
+                self._clear_emergency(portal.portal_name)
+                logger.info("%s: operator finished %s — continuing",
+                            portal.portal_name, kind)
+                try:
+                    from ..core.activity import publish_activity
+                    publish_activity(
+                        activity="searching",
+                        login_status=f"{portal.portal_name}: signed in",
+                        portal=portal.portal_name,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+                return True
+            time.sleep(10)
+        logger.warning("%s: timed out waiting for %s", portal.portal_name, kind)
+        return False
+
     def _pause(self, portal: BasePortal, kind: str, reason: str) -> None:
         if not self.human:
             return
@@ -148,22 +200,22 @@ class CollectorManager:
                                 portal.portal_name, len(jobs))
                     break
                 except LoginRequired as exc:
-                    logger.warning("Collector %s paused: login required -- skipping",
+                    logger.warning("Collector %s paused: login required",
                                    portal.portal_name)
-                    self._raise_emergency(portal.portal_name, str(exc))
-                    self._pause(portal, "login", str(exc))
+                    if self._wait_for_operator(portal, "login", str(exc)):
+                        continue
                     break
                 except OTPRequired as exc:
-                    logger.warning("Collector %s paused: OTP required -- skipping",
+                    logger.warning("Collector %s paused: OTP/2FA required",
                                    portal.portal_name)
-                    self._raise_emergency(portal.portal_name, str(exc))
-                    self._pause(portal, "otp", str(exc))
+                    if self._wait_for_operator(portal, "otp", str(exc)):
+                        continue
                     break
                 except CaptchaRequired as exc:
-                    logger.warning("Collector %s paused: CAPTCHA detected -- skipping",
+                    logger.warning("Collector %s paused: CAPTCHA detected",
                                    portal.portal_name)
-                    self._raise_emergency(portal.portal_name, str(exc))
-                    self._pause(portal, "captcha", str(exc))
+                    if self._wait_for_operator(portal, "captcha", str(exc)):
+                        continue
                     break
                 except Exception as exc:  # noqa: BLE001 - isolate per-portal failure
                     logger.warning("Collector %s failed (attempt %s): %s",

@@ -137,7 +137,11 @@ class CareerPilot:
         self.pipeline.session_history = self.session_history
         # Feed past strong matches into the AI prompt so scoring improves.
         try:
-            self.ai.learned_summary = self.good_jobs.summary()
+            from .core.decision_memory import DecisionMemory
+            self.decision_memory = DecisionMemory(db_dir / "decision_memory.json")
+            learned = self.good_jobs.summary()
+            choices = self.decision_memory.summary()
+            self.ai.learned_summary = " ".join(p for p in (learned, choices) if p)
         except Exception:  # noqa: BLE001
             self.ai.learned_summary = ""
 
@@ -174,7 +178,7 @@ class CareerPilot:
             self.cfg.debug.visual_mode = str(dbg).lower() in (
                 "1", "true", "yes", "on")
         mode = s.get("apply_mode")
-        if mode in ("dry_run", "live"):
+        if mode in ("dry_run", "approval", "auto", "live"):
             self.cfg.apply.mode = mode
 
     def _apply_ai_overrides(self) -> None:

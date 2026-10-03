@@ -125,10 +125,11 @@ def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
         report.error(_loc("config.apply.min_apply_score must be 0-100 — "
                           "Fix: set a number between 0 and 100",
                           fname, apply_cfg, "min_apply_score"))
-    mode = apply_cfg.get("mode", "dry_run")
-    if mode not in ("dry_run", "live"):
-        report.error(_loc("config.apply.mode must be 'dry_run' or 'live' — "
-                          "Fix: use dry_run until live apply is validated",
+    mode = str(apply_cfg.get("mode", "dry_run") or "dry_run").strip().lower()
+    mode = {"dry": "dry_run", "automatic": "auto"}.get(mode, mode)
+    if mode not in ("dry_run", "approval", "auto", "live"):
+        report.error(_loc("config.apply.mode must be dry_run, approval, auto, or live — "
+                          "Fix: start with dry_run",
                           fname, apply_cfg, "mode"))
 
     ct = profiles_cfg.get("confidence_threshold")

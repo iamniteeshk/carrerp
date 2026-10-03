@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from ..core.candidate import Candidate
 from ..core.logging_setup import get_logger
-from ..core.models import Job, ScreeningAnswer
+from ..core.models import Job
 from .base_portal import BasePortal, LoginRequired, ApplyOutcome, navigate
+from .form_walker import finish_application
 from .session import BrowserSession
 
 logger = get_logger(__name__)
@@ -121,43 +122,8 @@ class NaukriPortal(BasePortal):
         return self._browse_plan(plan, on_job=on_job, should_open=should_open)
 
     def apply(self, job: Job, resume_path: str, cover_letter: str,
-              answer_fn, dry_run: bool) -> ApplyOutcome:
+              answer_fn, dry_run: bool, confirm_fn=None) -> ApplyOutcome:
         page = self.session.page
         navigate(page, job.job_url, reason=f"open job {job.company}")
-
-        answers: list[ScreeningAnswer] = []
-        # COMPLETE ON LIVE DOM: click "Apply". Naukri often opens a chatbot
-        # drawer with one question at a time -- detect each, answer numeric/
-        # dropdown from candidate config, free-text via answer_fn. Resume is
-        # usually the saved profile resume; upload only if prompted.
-        evidence = getattr(self, "apply_evidence", None)
-        if evidence:
-            evidence.capture(page, job, "01_opened_job")
-            evidence.capture(page, job, "02_resume_ready")
-            evidence.capture(page, job, "03_form_filled")
-
-        if dry_run:
-            if evidence:
-                evidence.capture(page, job, "04_stop_before_apply")
-            shot = self.session.screenshot(
-                f"{self.session.profile_dir}/dryrun_{job.source_id or 'job'}.png")
-            logger.info("DRY RUN: stopped before submit for %s @ %s",
-                        job.job_title, job.company)
-            return ApplyOutcome(submitted=False, screenshot_path=shot,
-                                answers=answers, note="dry_run")
-
-        # LIVE APPLY SAFETY (v4 production): Naukri Apply / chatbot form-fill +
-        # final Submit are not yet completed against live DOM. Never claim
-        # submitted=True. Stop at the confirmation boundary and wait for an
-        # explicit human confirmation before any real submit.
-        if evidence:
-            evidence.capture(page, job, "04_stop_before_apply")
-        shot = self.session.screenshot(
-            f"{self.session.profile_dir}/confirm_{job.source_id or 'job'}.png")
-        logger.warning(
-            "LIVE APPLY: Naukri apply form/submit not completed on live DOM — "
-            "stopping at confirmation boundary for %s @ %s (submitted=False)",
-            job.job_title, job.company)
-        return ApplyOutcome(
-            submitted=False, screenshot_path=shot, answers=answers,
-            note="awaiting_final_confirmation: naukri_apply_incomplete")
+        return finish_application(
+            self, page, job, resume_path, answer_fn, dry_run, confirm_fn)
