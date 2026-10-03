@@ -35,6 +35,7 @@ class TelegramService:
         self.max_retries = max_retries
         self.enabled = bool(token and chat_id)
         self._update_offset = 0
+        self._offset_settings = None
         if not self.enabled:
             logger.warning("Telegram disabled: token/chat_id not configured")
 
@@ -66,6 +67,31 @@ class TelegramService:
             logger.warning("Could not store notification: %s", exc)
         return sent
 
+    def attach_offset_store(self, settings) -> None:
+        """Remember the Telegram update cursor in SQLite across restarts."""
+        self._offset_settings = settings
+        raw = settings.get("telegram_update_offset") if settings else None
+        if raw and str(raw).isdigit():
+            self._update_offset = int(raw)
+
+    @staticmethod
+    def _classify_reply(text: str) -> str | None:
+        cleaned = (text or "").strip().lower()
+        if not cleaned:
+            return None
+        word = cleaned.split()[0].strip(".,!")
+        if word in _PROCEED or cleaned in _PROCEED:
+            return "proceed"
+        if word in _REJECT or cleaned in _REJECT:
+            return "reject"
+        return None
+
+    def poll_once(self) -> str | None:
+        """Read one new reply, if any. Does not block."""
+        if not self.enabled:
+            return None
+        return self._classify_reply(self._next_reply() or "")
+
     def wait_for_reply(self, timeout_seconds: int = 900, poll_seconds: int = 3) -> str:
         """Block until this chat replies Proceed or Reject.
 
@@ -76,14 +102,9 @@ class TelegramService:
             return "unavailable"
         deadline = time.time() + max(1, timeout_seconds)
         while time.time() < deadline:
-            text = self._next_reply()
-            if text is not None:
-                word = text.strip().lower().split()[0] if text.strip() else ""
-                word = word.strip(".,!")
-                if word in _PROCEED or text.strip().lower() in _PROCEED:
-                    return "proceed"
-                if word in _REJECT or text.strip().lower() in _REJECT:
-                    return "reject"
+            decision = self._classify_reply(self._next_reply() or "")
+            if decision:
+                return decision
             time.sleep(poll_seconds)
         return "timeout"
 
@@ -102,7 +123,14 @@ class TelegramService:
             return None
         found = None
         for update in payload.get("result") or []:
-            self._update_offset = max(self._update_offset, int(update.get("update_id", 0)) + 1)
+            self._update_offset = max(
+                self._update_offset, int(update.get("update_id", 0)) + 1)
+            if self._offset_settings is not None:
+                try:
+                    self._offset_settings.set(
+                        "telegram_update_offset", str(self._update_offset))
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Could not store Telegram offset: %s", exc)
             message = update.get("message") or update.get("edited_message") or {}
             chat = message.get("chat") or {}
             if str(chat.get("id", "")) != str(self.chat_id):

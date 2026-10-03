@@ -197,6 +197,15 @@ class JobService:
         self.update_status(job_id, JobStatus.REJECTED, rejection_reason=reason)
         return self.get(job_id)
 
+    def set_salary_status(self, job_id: int, salary_status: str) -> None:
+        """salary_known or salary_unknown. Never a rejection by itself."""
+        conn = self.db.connect()
+        conn.execute(
+            "UPDATE jobs SET salary_status=?, updated_at=? WHERE job_id=?",
+            (salary_status, _now(), job_id),
+        )
+        conn.commit()
+
     def count_by_status(self) -> dict[str, int]:
         conn = self.db.connect()
         rows = conn.execute(
@@ -324,6 +333,65 @@ class FailedJobService:
             "INSERT INTO failed_jobs (job_id, reason, retry_count, screenshot, "
             "last_attempt) VALUES (?,?,?,?,?)",
             (job_id, reason, retry_count, screenshot, _now()),
+        )
+        conn.commit()
+
+
+class PendingApplicationService:
+    """Approval holds that must survive a process restart.
+
+    The open browser dialog cannot be frozen across a reboot. On resume,
+    CareerPilot re-opens the same job URL, fills it again from the saved
+    answers, and only then clicks Submit if the saved decision is proceed.
+    """
+
+    def __init__(self, db: Database):
+        self.db = db
+
+    def get(self, job_id: int) -> dict[str, Any] | None:
+        conn = self.db.connect()
+        row = conn.execute(
+            "SELECT * FROM pending_applications WHERE job_id=?", (job_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def list_open(self) -> list[dict]:
+        conn = self.db.connect()
+        rows = conn.execute(
+            "SELECT * FROM pending_applications WHERE state IN "
+            "('waiting', 'proceed', 'reject') ORDER BY updated_at"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def upsert(self, job: Job, *, state: str, resume_used: str = "",
+               profile_name: str = "", filled: list | None = None,
+               unanswered: list | None = None, note: str = "") -> None:
+        conn = self.db.connect()
+        conn.execute(
+            """INSERT INTO pending_applications
+               (job_id, portal, company, job_title, resume_used, profile_name,
+                filled_json, unanswered_json, state, note, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(job_id) DO UPDATE SET
+                 portal=excluded.portal, company=excluded.company,
+                 job_title=excluded.job_title, resume_used=excluded.resume_used,
+                 profile_name=excluded.profile_name,
+                 filled_json=excluded.filled_json,
+                 unanswered_json=excluded.unanswered_json,
+                 state=excluded.state, note=excluded.note,
+                 updated_at=excluded.updated_at""",
+            (job.job_id, job.portal, job.company, job.job_title, resume_used,
+             profile_name, json.dumps(filled or []), json.dumps(unanswered or []),
+             state, note, _now(), _now()),
+        )
+        conn.commit()
+
+    def set_state(self, job_id: int, state: str, note: str = "") -> None:
+        conn = self.db.connect()
+        conn.execute(
+            """UPDATE pending_applications SET state=?, note=COALESCE(NULLIF(?, ''), note),
+               updated_at=? WHERE job_id=?""",
+            (state, note, _now(), job_id),
         )
         conn.commit()
 

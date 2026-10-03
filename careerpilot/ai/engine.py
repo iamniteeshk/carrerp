@@ -151,6 +151,13 @@ class AIEngine:
             if not provider.is_available():
                 status[provider.name] = "no key configured"
                 continue
+            probe = getattr(provider, "startup_probe", None)
+            if callable(probe):
+                try:
+                    status[provider.name] = probe()
+                except Exception as exc:  # noqa: BLE001
+                    status[provider.name] = f"validation error: {exc}"
+                continue
             resolve = getattr(provider, "resolve_model", None)
             if callable(resolve):
                 try:

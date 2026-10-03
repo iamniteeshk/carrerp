@@ -255,6 +255,59 @@ def test_uncertain_evaluation_flag():
     check("uncertain review", ev.uncertain and not ev.apply, f"uncertain={ev.uncertain} apply={ev.apply}")
 
 
+def test_pending_survives_and_salary_label():
+    from careerpilot.apply.pending_flow import next_pending_action
+    from careerpilot.ai.local_health import classify_provider_failure, prefer_small_local_model
+    check("wait until reply", next_pending_action("waiting", None) == "wait")
+    check("proceed submits", next_pending_action("waiting", "proceed") == "submit")
+    check("reject stops", next_pending_action("waiting", "reject") == "reject")
+    check("saved proceed submits", next_pending_action("proceed", None) == "submit")
+    check("timeout is ollama class",
+          classify_provider_failure(TimeoutError("read timed out")) == "timeout")
+    check("refused is unavailable",
+          classify_provider_failure(ConnectionError("connection refused")) == "ollama_unavailable")
+    check("small model preferred",
+          prefer_small_local_model(["qwen3:70b", "qwen3:8b", "qwen3:32b"]) == "qwen3:8b")
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(str(Path(tmp) / "t.db"))
+        db.initialize()
+        jobs = JobService(db)
+        from careerpilot.db.services import PendingApplicationService
+        jid = jobs.insert(_job(salary=""))
+        jobs.set_salary_status(jid, "salary_unknown")
+        row = jobs.get(jid)
+        check("salary_unknown stored", row["salary_status"] == "salary_unknown")
+        pending = PendingApplicationService(db)
+        job = _job(salary="")
+        job.job_id = jid
+        pending.upsert(job, state="waiting", filled=[{"label": "Email", "value": "a@b.c"}])
+        saved = pending.get(jid)
+        check("pending waiting stored", saved and saved["state"] == "waiting")
+        pending.set_state(jid, "proceed", "telegram proceed")
+        check("pending proceed stored", pending.get(jid)["state"] == "proceed")
+        db.close()
+
+
+def test_dashboard_controls_and_lan_defaults():
+    from careerpilot.dashboard.app import create_dashboard
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(str(Path(tmp) / "t.db"))
+        db.initialize()
+        app = create_dashboard(db, 5)
+        app.config["TESTING"] = True
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess["admin"] = True
+        stopped = client.post("/api/control", json={"action": "stop"})
+        body = stopped.get_json()
+        check("stop control", stopped.status_code == 200 and body["bot_command"] == "stopped",
+              str(body))
+        stats = client.get("/api/stats").get_json()
+        check("stats expose telegram state", stats["telegram"] == "not configured")
+        check("stats bot command", stats["bot_command"] == "stopped")
+        db.close()
+
+
 if __name__ == "__main__":
     print("=== apply modes ===")
     test_mode_names_and_gates()
@@ -262,5 +315,7 @@ if __name__ == "__main__":
     test_salary_hidden_and_grouped_locations()
     test_telegram_proceed_and_manual_memory()
     test_uncertain_evaluation_flag()
+    test_pending_survives_and_salary_label()
+    test_dashboard_controls_and_lan_defaults()
     print(f"\n{passed} passed, {failed} failed")
     sys.exit(1 if failed else 0)

@@ -25,6 +25,7 @@ from ..db.services import (ApplicationService, FailedJobService, JobService)
 from ..notify.telegram_service import TelegramService
 from .confidence_gate import ConfidenceGate
 from .modes import normalize_apply_mode
+from .pending_flow import next_pending_action
 from .safety_gate import ApplySafetyGate
 
 logger = get_logger(__name__)
@@ -81,6 +82,10 @@ class AutoApplyEngine:
                                 failure_reason=safety.reason)
 
         mode = normalize_apply_mode(self.cfg.apply.mode)
+        if not operator_approved:
+            held = self._held_approval(job, evaluation, profile)
+            if held is not None:
+                return held
         confirm = None
         if not operator_approved:
             gate = ConfidenceGate(self.cfg.apply, self.cfg.ai.min_apply_score,
@@ -176,6 +181,8 @@ class AutoApplyEngine:
                     self.jobs.update_status(job.job_id, status)
                 if outcome.submitted and not dry_run:
                     self._notify_success(job, evaluation, profile)
+                    if getattr(self, "pending", None) is not None and job.job_id:
+                        self.pending.set_state(job.job_id, "submitted", "submitted")
                 elif dry_run:
                     self._notify_dry_run(job, outcome)
                 return result
@@ -240,6 +247,92 @@ class AutoApplyEngine:
         ).fetchone()
         return row["c"] if row else 0
 
+    def resume_saved_approvals(self) -> None:
+        """Finish approvals that were decided before a restart."""
+        pending = getattr(self, "pending", None)
+        if pending is None:
+            return
+        for row in pending.list_open():
+            if row.get("state") not in ("proceed", "reject"):
+                continue
+            job_row = self.jobs.get(row["job_id"])
+            if not job_row:
+                pending.set_state(row["job_id"], "failed", "job row missing")
+                continue
+            job = self.jobs.job_from_row(job_row)
+            profile_name = row.get("profile_name") or self.cfg.default_career_profile
+            evaluation = AIEvaluation(
+                match_score=float(job.match_score or 100),
+                career_profile=str(profile_name),
+                confidence=1.0,
+                reason="saved approval",
+                apply=True, provider="manual", model="pending",
+            )
+            action = next_pending_action(row.get("state"), None)
+            if action == "reject":
+                self._learn("reject", job)
+                self.jobs.update_status(
+                    job.job_id, JobStatus.REJECTED,
+                    rejection_reason="Rejected from Telegram")
+                pending.set_state(job.job_id, "done", "rejected")
+                continue
+            if action == "submit":
+                result = self.apply_to_job(job, evaluation, operator_approved=True)
+                if result.success or result.dry_run:
+                    pending.set_state(
+                        job.job_id, "submitted" if result.success else "done",
+                        result.failure_reason or ("dry_run" if result.dry_run else "submitted"))
+                else:
+                    pending.set_state(job.job_id, "proceed", result.failure_reason or "retry")
+                logger.info("Resumed pending apply job=%s success=%s",
+                            job.job_id, result.success)
+
+    def _held_approval(self, job: Job, evaluation: AIEvaluation, profile):
+        pending = getattr(self, "pending", None)
+        if pending is None or not job.job_id:
+            return None
+        row = pending.get(job.job_id)
+        if not row:
+            return None
+        reply = None
+        if row.get("state") == "waiting":
+            reply = self.telegram.poll_once()
+        action = next_pending_action(row.get("state"), reply)
+        if action == "ask":
+            return None
+        if action == "wait":
+            self.jobs.update_status(
+                job.job_id, JobStatus.QUEUED,
+                rejection_reason="waiting for Telegram Proceed or Reject")
+            return self._result(
+                job, evaluation, profile, success=False, status=JobStatus.QUEUED,
+                failure_reason="approval:waiting")
+        if action == "reject":
+            pending.set_state(job.job_id, "done", "rejected")
+            self._learn("reject", job)
+            self.jobs.update_status(
+                job.job_id, JobStatus.REJECTED,
+                rejection_reason="Rejected from Telegram")
+            return self._result(
+                job, evaluation, profile, success=False, status=JobStatus.REJECTED,
+                failure_reason="approval:reject")
+        pending.set_state(job.job_id, "proceed", "reply proceed")
+        self._learn("apply", job)
+        portal = self.portals.get(job.portal)
+        if portal is None:
+            return self._fail(job, evaluation, profile, "no portal handler")
+        return self._execute(portal, job, evaluation, dry_run=False, confirm=None)
+
+    def _learn(self, action: str, job: Job) -> None:
+        memory = getattr(self, "decisions", None)
+        if memory is None:
+            return
+        try:
+            memory.record(action=action, job_title=job.job_title, company=job.company,
+                          portal=job.portal, reason=action)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store learned decision: %s", exc)
+
     def _approval_decision(self, job: Job, filled: list) -> str:
         """Ask Telegram, after the form is filled, and return the reply."""
         lines = []
@@ -248,6 +341,10 @@ class AutoApplyEngine:
             value = item.get("value") or ""
             lines.append(f"- {label}: {value}")
         body = "\n".join(lines) if lines else "(no fields were detected on the form)"
+        pending = getattr(self, "pending", None)
+        if pending is not None and job.job_id:
+            pending.upsert(job, state="waiting", filled=filled,
+                           note="paused before submit")
         self.telegram.send(
             NotificationType.APPROVAL_REQUEST,
             f"Approval needed\n{job.job_title} @ {job.company}\n"
@@ -256,6 +353,15 @@ class AutoApplyEngine:
             f"Reply Proceed to submit, or Reject to stop.")
         decision = self.telegram.wait_for_reply()
         logger.info("Approval reply for %s: %s", job.job_title, decision)
+        if pending is not None and job.job_id:
+            if decision == "proceed":
+                pending.set_state(job.job_id, "proceed", "telegram proceed")
+                self._learn("apply", job)
+            elif decision == "reject":
+                pending.set_state(job.job_id, "reject", "telegram reject")
+                self._learn("reject", job)
+            else:
+                pending.set_state(job.job_id, "waiting", decision)
         return decision
 
     def _notify_dry_run(self, job: Job, outcome) -> None:

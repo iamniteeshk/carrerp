@@ -156,6 +156,25 @@ MIGRATIONS: list[tuple[int, str]] = [
     (3, """
     ALTER TABLE jobs ADD COLUMN reading_ms INTEGER DEFAULT 0;
     """),
+    (4, """
+    ALTER TABLE jobs ADD COLUMN salary_status TEXT DEFAULT '';
+
+    CREATE TABLE IF NOT EXISTS pending_applications (
+        pending_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id          INTEGER UNIQUE,
+        portal          TEXT,
+        company         TEXT,
+        job_title       TEXT,
+        resume_used     TEXT,
+        profile_name    TEXT,
+        filled_json     TEXT,
+        unanswered_json TEXT,
+        state           TEXT NOT NULL,
+        note            TEXT,
+        created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    """),
 ]
 
 

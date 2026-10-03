@@ -37,6 +37,7 @@ def create_dashboard(
     config: Any = None,
     settings: SettingsService | None = None,
     on_settings_change: Callable[[], None] | None = None,
+    control: Any = None,
 ) -> Flask:
     app = Flask(__name__)
     app.secret_key = (
@@ -122,6 +123,30 @@ def create_dashboard(
         failed = conn.execute("SELECT COUNT(*) c FROM failed_jobs").fetchone()["c"]
         from ..core.activity import read_activity
         activity = read_activity()
+        bot_command = settings_svc.get("bot_command") or "running"
+        evaluated = conn.execute(
+            "SELECT COUNT(*) c FROM jobs WHERE match_score IS NOT NULL"
+        ).fetchone()["c"]
+        waiting_approval = 0
+        try:
+            waiting_approval = conn.execute(
+                "SELECT COUNT(*) c FROM pending_applications WHERE state='waiting'"
+            ).fetchone()["c"]
+        except Exception:  # noqa: BLE001 - migration not applied yet
+            waiting_approval = 0
+        telegram = "not configured"
+        ai_provider = ""
+        ai_model = ""
+        if config is not None:
+            token = getattr(config, "telegram_token", "") or ""
+            chat = getattr(config, "telegram_chat_id", "") or ""
+            telegram = "configured" if token and chat else "not configured"
+            ai_provider = getattr(getattr(config, "ai", None), "active_provider", "") or ""
+            ai_model = settings_svc.get("ai_text_model") or ""
+            if not ai_model:
+                for spec in getattr(getattr(config, "ai", None), "providers", []) or []:
+                    if getattr(spec, "name", "") == ai_provider:
+                        ai_model = getattr(spec, "preferred_model", "") or ""
         sessions = {"present": False, "linkedin": False, "naukri": False, "path": ""}
         if config is not None:
             root = __import__("pathlib").Path(
@@ -133,9 +158,50 @@ def create_dashboard(
                 "linkedin": (root / "linkedin").exists(),
                 "naukri": (root / "naukri").exists(),
             }
-        return jsonify({"by_status": by_status, "applications": applied,
-                        "dry_runs": dry, "failed": failed,
-                        "activity": activity, "sessions": sessions})
+        return jsonify({
+            "by_status": by_status, "applications": applied,
+            "dry_runs": dry, "failed": failed, "evaluated": evaluated,
+            "waiting_approval": waiting_approval, "bot_command": bot_command,
+            "telegram": telegram, "ai_provider": ai_provider, "ai_model": ai_model,
+            "apply_mode": settings_svc.get("apply_mode") or (
+                getattr(getattr(config, "apply", None), "mode", "dry_run")
+                if config else "dry_run"),
+            "activity": activity, "sessions": sessions,
+        })
+
+    @app.route("/api/control", methods=["POST"])
+    @require_admin
+    def control_bot():
+        body = request.get_json(silent=True) or {}
+        action = str(body.get("action") or "").strip().lower()
+        allowed = {"start", "stop", "pause", "resume", "scan_now"}
+        if action not in allowed:
+            return jsonify({"ok": False, "error": "unknown action"}), 400
+        if action in ("start", "resume"):
+            settings_svc.set("bot_command", "running")
+        elif action == "pause":
+            settings_svc.set("bot_command", "paused")
+        elif action == "stop":
+            settings_svc.set("bot_command", "stopped")
+        if action == "scan_now" and control is not None:
+            scheduler = getattr(control, "scheduler", None)
+            if scheduler is not None and hasattr(scheduler, "request_scan"):
+                try:
+                    scheduler.request_scan()
+                except Exception as exc:  # noqa: BLE001
+                    return jsonify({"ok": False, "error": str(exc)}), 500
+            else:
+                return jsonify({
+                    "ok": False,
+                    "error": "scheduler is not running in this process",
+                }), 409
+        try:
+            from ..core.activity import publish_activity
+            publish_activity(activity=settings_svc.get("bot_command") or action,
+                             stage=action)
+        except Exception:  # noqa: BLE001
+            pass
+        return jsonify({"ok": True, "bot_command": settings_svc.get("bot_command")})
 
     @app.route("/api/emergency")
     def emergency():
@@ -210,6 +276,11 @@ def create_dashboard(
                           "rejected, confused, queued, or matched jobs"),
             }), 400
         _learn("apply", updated)
+        try:
+            from ..db.services import PendingApplicationService
+            PendingApplicationService(db).set_state(job_id, "proceed", "dashboard apply")
+        except Exception:  # noqa: BLE001
+            pass
         logger.info("Dashboard manual approve job_id=%s title=%s",
                     job_id, updated.get("job_title"))
         return jsonify({"ok": True, "job": {
@@ -234,6 +305,12 @@ def create_dashboard(
                 "error": f"job status is {row.get('status')}; cannot reject from here",
             }), 400
         _learn("reject", updated)
+        try:
+            from ..db.services import PendingApplicationService
+            PendingApplicationService(db).set_state(
+                job_id, "done", "dashboard reject")
+        except Exception:  # noqa: BLE001
+            pass
         return jsonify({"ok": True, "job": {
             "job_id": updated.get("job_id"),
             "status": updated.get("status"),

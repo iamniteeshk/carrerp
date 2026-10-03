@@ -47,6 +47,22 @@ class Scheduler:
     SKIP_CYCLE_PROBABILITY = 0.15
     MAX_BACKOFF_SECONDS = 900  # 15 minutes cap after repeated scan crashes
 
+    def _bot_command(self) -> str:
+        settings = getattr(self.pipeline, "settings", None)
+        if settings is None:
+            return "running"
+        try:
+            return (settings.get("bot_command") or "running").strip().lower()
+        except Exception:  # noqa: BLE001
+            return "running"
+
+    def request_scan(self) -> None:
+        """Run one scan on the scheduler thread (Playwright stays on that thread)."""
+        from datetime import datetime
+        self._scheduler.add_job(
+            self._safe_scan, "date", run_date=datetime.now(),
+            id="manual_scan", replace_existing=True, args=[False])
+
     def start(self, run_immediately: bool = True) -> None:
         self._scheduler.add_job(
             self._safe_scan, "interval", hours=self.interval_hours,
@@ -75,6 +91,16 @@ class Scheduler:
             self.pipeline.honor_session_windows = bool(allow_skip)
         except Exception:  # noqa: BLE001
             pass
+        cmd = self._bot_command()
+        if cmd in ("paused", "stopped") and allow_skip:
+            logger.info("Bot command is %s — skipping scheduled scan", cmd)
+            try:
+                from .activity import publish_activity
+                publish_activity(activity="paused" if cmd == "paused" else "stopped",
+                                 stage=cmd, detail="scheduler holding")
+            except Exception:  # noqa: BLE001
+                pass
+            return
         if allow_skip:
             import random
             if random.random() < self.SKIP_CYCLE_PROBABILITY:

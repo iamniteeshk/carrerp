@@ -571,6 +571,7 @@ class ApplyOutcome:
     note: str = ""
     # What the form walker actually entered, for Telegram and the dashboard.
     filled: list | None = None
+    unanswered: list | None = None
 
 
 class BasePortal(abc.ABC):

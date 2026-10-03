@@ -170,6 +170,13 @@
   <div class="card" id="activity-card" style="margin-bottom:1rem;">
     <h5>Right now</h5>
     <div id="activity-line" class="muted">Waiting for the first status update.</div>
+    <div style="display:flex; flex-wrap:wrap; gap:.45rem; margin-top:.75rem;">
+      <button class="btn" id="ctl-start" {% if not is_admin %}disabled{% endif %}>Start</button>
+      <button class="btn" id="ctl-pause" {% if not is_admin %}disabled{% endif %}>Pause</button>
+      <button class="btn" id="ctl-resume" {% if not is_admin %}disabled{% endif %}>Resume</button>
+      <button class="btn" id="ctl-scan" {% if not is_admin %}disabled{% endif %}>Scan now</button>
+      <button class="btn danger" id="ctl-stop" {% if not is_admin %}disabled{% endif %}>Stop</button>
+    </div>
   </div>
 
   <div class="grid stats" id="stat-cards"></div>
@@ -449,10 +456,12 @@ async function load() {
       'Naukri ' + (sessions.naukri ? 'profile saved' : 'no saved profile'),
     ];
     document.getElementById('activity-line').textContent = [
-      act.activity || 'resting',
+      'bot ' + (stats.bot_command || act.activity || 'running'),
+      'mode ' + (stats.apply_mode || 'dry_run'),
       act.portal && act.portal !== '-' ? act.portal : '',
-      act.stage || '',
-      act.detail || '',
+      act.job_title && act.job_title !== '-' ? act.job_title : (act.stage || ''),
+      'AI ' + (stats.ai_provider || 'n/a') + (stats.ai_model ? ' / ' + stats.ai_model : ''),
+      'Telegram ' + (stats.telegram || 'not configured'),
       loginBits.join(' · '),
       sessions.present ? 'browser sessions stored locally' : 'browser sessions not created yet',
     ].filter(Boolean).join(' · ');
@@ -462,8 +471,9 @@ async function load() {
       ['Applied', stats.applications],
       ['Dry runs', stats.dry_runs || 0],
       ['Rejected', stats.by_status.REJECTED || 0],
+      ['Evaluated', stats.evaluated || 0],
       ['Confused', stats.by_status.CONFUSED || 0],
-      ['Waiting', (stats.by_status.QUEUED || 0) + (stats.by_status.APPROVED || 0)],
+      ['Waiting', stats.waiting_approval || stats.by_status.QUEUED || 0],
       ['Failed', stats.failed],
     ];
     document.getElementById('stat-cards').innerHTML = cards.map(([k,v]) =>
@@ -519,6 +529,21 @@ document.getElementById('ops-save')?.addEventListener('click', async () => {
   toast(res.ok ? 'Ops saved' : 'Failed');
   if (res.ok) loadConsole();
 });
+
+async function sendControl(action) {
+  const res = await fetch('/api/control', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({action})
+  });
+  const data = await res.json().catch(() => ({}));
+  toast(res.ok ? (action + ' ok') : (data.error || 'Control failed'));
+  if (res.ok) load();
+}
+document.getElementById('ctl-start')?.addEventListener('click', () => sendControl('start'));
+document.getElementById('ctl-pause')?.addEventListener('click', () => sendControl('pause'));
+document.getElementById('ctl-resume')?.addEventListener('click', () => sendControl('resume'));
+document.getElementById('ctl-scan')?.addEventListener('click', () => sendControl('scan_now'));
+document.getElementById('ctl-stop')?.addEventListener('click', () => sendControl('stop'));
 
 document.getElementById('clear-emergency')?.addEventListener('click', async () => {
   const res = await fetch('/api/emergency/clear', { method: 'POST' });

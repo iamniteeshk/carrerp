@@ -123,6 +123,7 @@ class FilledField:
 @dataclass
 class WalkResult:
     filled: list[FilledField] = field(default_factory=list)
+    unanswered: list[str] = field(default_factory=list)
     reached_submit: bool = False
     needs_review: bool = False
     note: str = ""
@@ -305,6 +306,7 @@ def walk_application(page, *, candidate, answer_fn, resume_path: str = "",
                     logger.warning("Screening answer failed for %s: %s", label, exc)
                     answer = ""
             if not answer:
+                result.unanswered.append(label)
                 if field_info.get("required"):
                     result.needs_review = True
                     result.note = f"unanswered required field: {label}"
@@ -365,6 +367,8 @@ def finish_application(portal, page, job, resume_path: str, answer_fn,
         ScreeningAnswer(question=item.label, answer=item.value, source=item.source)
         for item in walked.filled
     ]
+    for label in walked.unanswered:
+        answers.append(ScreeningAnswer(question=label, answer="", source="unanswered"))
     filled = walked.as_dicts()
     if evidence:
         evidence.capture(page, job, "03_form_filled")
@@ -403,6 +407,8 @@ def finish_application(portal, page, job, resume_path: str, answer_fn,
         shot = session.screenshot(
             f"{session.profile_dir}/{prefix}_{getattr(job, 'source_id', None) or 'job'}.png")
     submitted = note == "submitted" and not dry_run
+    if walked.unanswered and not note.startswith("needs_review"):
+        note = (note + " | unanswered: " + ", ".join(walked.unanswered[:12])).strip(" |")
     return ApplyOutcome(
         submitted=submitted, screenshot_path=shot or "", answers=answers,
-        note=note, filled=filled)
+        note=note, filled=filled, unanswered=list(walked.unanswered))

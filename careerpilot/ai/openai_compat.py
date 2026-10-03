@@ -155,6 +155,12 @@ class OpenAICompatibleProvider(AIProvider):
         names = [m.name for m in models]
         if self.model and self.model in names:
             return self.model
+        # Local servers keep the configured model. Do not silently swap in a
+        # 70B (or any other) model when the one in config is not installed.
+        if not self.requires_auth and self.model and self.model not in names:
+            raise AIProviderError(
+                f"model_unavailable: '{self.model}' is not installed. "
+                f"Available: {', '.join(names[:12]) or '(none)'}")
         usable = [m for m in models if not m.deprecated and m.supports_chat] \
             or models
         if not usable:
@@ -170,6 +176,32 @@ class OpenAICompatibleProvider(AIProvider):
                        self.name, self.model or "(unset)", pick)
         self.model = pick
         return pick
+
+    def startup_probe(self, timeout: int = 8) -> str:
+        """Check a local server without selecting a 70B stand-in."""
+        from .local_health import classify_provider_failure, prefer_small_local_model
+        if self.requires_auth:
+            try:
+                model = self.resolve_model(timeout=timeout)
+                return f"ready (model={model})"
+            except AIProviderError as exc:
+                return classify_provider_failure(exc)
+        try:
+            models = self.list_models(timeout=timeout, force=True)
+        except AIProviderError as exc:
+            if self.model:
+                return (f"{classify_provider_failure(exc)} "
+                        f"(configured model {self.model} not verified)")
+            return classify_provider_failure(exc)
+        names = [m.name for m in models]
+        if self.model and self.model not in names:
+            return (f"model_unavailable ({self.model} not installed; "
+                    f"have {', '.join(names[:8]) or 'none'})")
+        if not self.model:
+            if not names:
+                return "model_unavailable (no models installed)"
+            self.model = prefer_small_local_model(names)
+        return f"ready (model={self.model})"
 
     def health(self, timeout: int = 15) -> HealthReport:
         return super().health(timeout=timeout)

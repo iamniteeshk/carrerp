@@ -301,6 +301,14 @@ class ScanPipeline:
                               status="SKIPPED")
             return counts
 
+        if not self._operator_hold():
+            resume = getattr(self.apply_engine, "resume_saved_approvals", None)
+            if callable(resume):
+                try:
+                    resume()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Pending-approval resume failed: %s", exc)
+
         # Dashboard manual overrides: apply APPROVED (was REJECTED) jobs first.
         try:
             self._process_manual_approvals(counts, dry_run)
@@ -487,6 +495,30 @@ class ScanPipeline:
         if self.diagnostics is not None:
             self.diagnostics.metrics.incr(field_name, by)
 
+    def _operator_hold(self) -> bool:
+        settings = getattr(self, "settings", None)
+        if settings is None:
+            return False
+        try:
+            cmd = (settings.get("bot_command") or "running").strip().lower()
+        except Exception:  # noqa: BLE001
+            return False
+        return cmd in ("paused", "stopped")
+
+    def _note_salary(self, job: Job) -> None:
+        if not getattr(job, "job_id", None):
+            return
+        setter = getattr(self.jobs, "set_salary_status", None)
+        if not callable(setter):
+            return
+        from ..rules.rule_engine import _parse_salary_to_inr
+        label = ("salary_unknown" if _parse_salary_to_inr(job.salary or "") is None
+                 else "salary_known")
+        try:
+            setter(job.job_id, label)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store salary status: %s", exc)
+
     def _status(self, **kw) -> None:
         if self.status_sink is not None:
             try:
@@ -502,8 +534,10 @@ class ScanPipeline:
         self._status(job_number=n, stage=stage)
         try:
             from .activity import publish_activity
-            publish_activity(activity="working", stage=stage, detail=detail,
-                             job_number=n)
+            publish_activity(
+                activity="working", stage=stage, detail=detail, job_number=n,
+                job_title=getattr(self, "_activity_title", ""),
+                portal=getattr(self, "_activity_portal", ""))
         except Exception:  # noqa: BLE001
             pass
 
@@ -524,9 +558,15 @@ class ScanPipeline:
                         f"{job.portal}:{job.job_title}".strip())
             return
 
+        if self._operator_hold():
+            logger.info("Bot is paused/stopped — not processing %s", job.job_title)
+            return
+
         self._job_seq += 1
         n = self._job_seq
         tag = f"{job.portal}:{job.job_title}".strip()
+        self._activity_title = job.job_title
+        self._activity_portal = job.portal
         try:
             # Crash recovery / AI-retry: terminal rows are skipped; retriable
             # statuses (QUEUED, PARTIAL_DATA, APPLYING, FOUND) are resumed.
@@ -586,6 +626,7 @@ class ScanPipeline:
                 self.stream.found(job)                       # -> FoundJobs.csv (live)
                 self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
 
+            self._note_salary(job)
             rs = getattr(job, "read_status", "UNREAD")
 
             # Card pre-filter outcome: a card deemed not worth opening is a clean
