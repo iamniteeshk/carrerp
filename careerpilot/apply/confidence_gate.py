@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from ..core.config import ApplyConfig
 from ..core.logging_setup import get_logger
 from ..core.models import AIEvaluation, Job
-from .modes import normalize_apply_mode
+from .modes import canonical_apply_mode
 
 logger = get_logger(__name__)
 
@@ -46,17 +46,10 @@ class ConfidenceGate:
         if self.cfg.easy_apply_only and not job.is_easy_apply:
             return GateDecision(False, False, "not Easy Apply / native apply")
 
-        mode = normalize_apply_mode(self.cfg.mode)
+        mode = canonical_apply_mode(self.cfg.mode)
         if mode == "dry_run":
             return GateDecision(True, False, "dry mode — fill and stop before submit")
-        if mode == "approval":
-            return GateDecision(True, True, "approval mode — waiting for Proceed or Reject")
         if mode == "auto":
             return GateDecision(True, False, "auto mode — submit without asking")
-
-        # Legacy live: first-run window, then the confirmation flag.
-        if self._applied_lifetime < self.cfg.first_run_confirmations:
-            return GateDecision(True, True, "first-run confirmation window")
-        if getattr(self.cfg, "require_final_confirmation", True):
-            return GateDecision(True, True, "final confirmation required before submit")
-        return GateDecision(True, False, "auto-submit")
+        # approval, and any value canonical_apply_mode did not recognise as auto
+        return GateDecision(True, True, "approval mode — waiting for Proceed or Reject")

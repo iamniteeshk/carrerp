@@ -14,8 +14,11 @@ in plain language with the file and line to fix.
 - **"no career profiles found"** — each profile folder needs a `profile.yaml`.
 - **"resume not found (profile '…')"** — put `resume.pdf` in that profile folder,
   or fix the `resume:` filename in its `profile.yaml`.
-- **"no AI provider key set"** — set a `GEMINI_API_KEY_*` or `DEEPSEEK_API_KEY`
-  in `.env`.
+- **"no AI provider key set"** — with local Ollama this should not appear
+  (`requires_auth: false`). For a cloud provider, set `GEMINI_API_KEY_*` or
+  `DEEPSEEK_API_KEY` in `.env`.
+- **Dashboard password warning** — `.env` still has the example
+  `DASHBOARD_PASSWORD`. Change it before using the dashboard on the LAN.
 
 ## Browser
 
@@ -35,9 +38,18 @@ in plain language with the file and line to fix.
 
 ## Applications
 
-- **Nothing is ever submitted** — that's correct in `dry_run` mode (the default),
-  and submission also requires the live-DOM selectors to be completed (see
-  `LIVE_TEST_READINESS.md`).
+- **Nothing is ever submitted** — that is correct in `dry_run`. `approval`
+  submits only after an explicit Proceed. Only `auto` submits without asking.
+  A missing or unknown mode stays `dry_run`. Real LinkedIn/Naukri completion
+  is still **REQUIRES LIVE MANUAL TEST** (`LIVE_TEST_READINESS.md`).
+- **Ollama is down or the model is missing** — scoring fails and the job is
+  not marked applied. Start Ollama and confirm the model name in `config.yaml`.
+- **Telegram is down during approval** — the job stays waiting. It is not submitted.
+- **Logged out, 2FA, or CAPTCHA** — CareerPilot pauses and notifies you. Finish
+  the challenge in the open browser. It does not store the portal password and
+  it does not click Submit for you.
+- **Restart during an approval** — the decision is saved. The browser page is
+  not. After Proceed, the same job is opened and filled again, then submitted.
 - **Jobs rejected as "Domain Mismatch"** — they don't match any profile's
   required keywords. Broaden a profile's `keywords.yaml`.
 

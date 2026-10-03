@@ -32,7 +32,7 @@ Career Profile Engine   maps name+confidence -> CareerProfile (default fallback
 Document Manager        resolves resume / cover letter / docs for that profile
    |
    v
-Apply Engine            confidence gate + first-run approval + mode (dry_run/live)
+Apply Engine            confidence gate + mode (dry_run / approval / auto)
    |                    -> Portal.apply()  [live-DOM, currently stubbed]
    v
 Database + Reporter + Telegram   record, summarize, notify

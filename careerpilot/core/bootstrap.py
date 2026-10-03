@@ -34,6 +34,21 @@ RUNTIME_DIRS = (
     "cache", "cache/jobs", "documents", "debug",
 )
 
+# Example-only folder. Production uses the six career profiles; this one is
+# kept under profiles.example/ as a template and is not copied into profiles/.
+SKIP_EXAMPLE_PROFILES = frozenset({"Infrastructure"})
+
+
+def _copy_example_profiles(src: Path, dst: Path) -> None:
+    """Copy example profile folders. Never touches a profiles/ tree that exists."""
+    dst.mkdir(parents=True, exist_ok=False)
+    for child in sorted(src.iterdir()):
+        if not child.is_dir():
+            continue
+        if child.name.startswith(".") or child.name in SKIP_EXAMPLE_PROFILES:
+            continue
+        shutil.copytree(child, dst / child.name)
+
 
 def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
                     *, prefer_production: bool = False) -> list[str]:
@@ -57,11 +72,14 @@ def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
             logger.warning("No %s and no example config to copy from",
                            config_path)
 
-    # 2. profiles/  <-  profiles.example/
+    # 2. profiles/  <-  profiles.example/ (except example-only folders)
+    # Existing profiles/ is left completely alone, including real resumes.
     if not PROFILES_DIR.exists():
         if EXAMPLE_PROFILES.exists():
-            shutil.copytree(EXAMPLE_PROFILES, PROFILES_DIR)
-            actions.append(f"created {PROFILES_DIR}/ from {EXAMPLE_PROFILES}/")
+            _copy_example_profiles(EXAMPLE_PROFILES, PROFILES_DIR)
+            actions.append(
+                f"created {PROFILES_DIR}/ from {EXAMPLE_PROFILES}/ "
+                f"(skipped {', '.join(sorted(SKIP_EXAMPLE_PROFILES))})")
         else:
             logger.warning("No %s/ and no %s/ to copy from",
                            PROFILES_DIR, EXAMPLE_PROFILES)

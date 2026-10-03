@@ -8,7 +8,11 @@ Everything except the items below is implemented and tested. These cannot be
 finalized without a live, logged-in session, because the markup (LinkedIn
 especially) is per-user and A/B-tested. **Do not let anyone fabricate these
 selectors** — fill them in with your browser's inspector against your own
-account, in `dry_run` mode, before enabling `live`.
+account, in `dry_run` mode. Real-site apply status stays
+**REQUIRES LIVE MANUAL TEST** until you confirm it on your own PC. Automated
+tests passing is not the same as the website being tested. Do not switch to
+`auto` until that manual test is done. `approval` still requires an explicit
+Proceed.
 
 Each item below corresponds to a `# COMPLETE ON LIVE DOM` marker in the code.
 
@@ -50,14 +54,17 @@ they are unwritten modules. Each would be a new `BasePortal` subclass:
 - [ ] Greenhouse
 - [ ] Lever / others as needed
 
-## Cross-cutting, before enabling `live`
+## Cross-cutting, before leaving `dry_run`
 
-- [ ] Run `dry_run` end-to-end and confirm the dashboard/CSV/Telegram outputs.
+- [ ] Run `dry_run` on the real site and confirm the dashboard, CSV, and Telegram
+      outputs. This is a manual test, separate from the automated suite.
 - [ ] Verify resume upload uses the **Document Manager** path (already wired) and
       that profile-supplied cover-letter *files* are uploaded (currently only
       AI-generated cover-letter *text* is passed; file upload is a live-DOM task).
-- [ ] Confirm the first-run approval gate fires for the first N live applies.
-- [ ] Keep `apply.mode: dry_run` until every box above is checked.
+- [ ] In `approval`, confirm nothing is submitted until you reply Proceed, and
+      that a restart keeps that decision without submitting on its own.
+- [ ] Keep `apply.mode: dry_run` until every box above is checked. `auto` is the
+      only mode that submits without Proceed.
 
 ## Reminder on scope
 

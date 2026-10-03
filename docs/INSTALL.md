@@ -38,9 +38,18 @@ python3 -m careerpilot.main setup
 Then edit `config/config.yaml`: it is a single file with all settings in clearly
 labelled sections, including a `candidate:` section for your personal data (there
 is no separate `candidate.yaml`; a legacy external file is still honored if
-present). Put your real `resume.pdf` in each `profiles/<Name>/` folder. Add your
-API keys to `.env`. Your real `.env`, `config/config.yaml`, and `profiles/` are
+present). Put your real `resume.pdf` in each of the six profile folders
+(`Default`, `Leadership`, `Digital_Workplace`, `EUC`, `GCC`, `Contact_Centre`).
+`EUC` uses the same Digital Workplace PDF. Setup does not copy
+`profiles.example/Infrastructure` and does not overwrite an existing `profiles/`
+tree. In `.env`, set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_USER`,
+and `DASHBOARD_PASSWORD` (the example password is unsafe). Ollama does not need
+a cloud API key. Your real `.env`, `config/config.yaml`, and `profiles/` are
 gitignored and must never be committed.
+
+Apply modes are `dry_run`, `approval`, and `auto`. Only `auto` submits without
+an explicit Proceed. The dashboard on `0.0.0.0:5000` requires that login. Do
+not expose it to the public internet.
 
 ### Browser on macOS vs Windows
 
@@ -62,5 +71,6 @@ running.
 
 ## AI keys
 
-Set at least one provider key in `.env`: one or more `GEMINI_API_KEY_*`, and/or
-`DEEPSEEK_API_KEY` as a fallback. The doctor fails fast if none is present.
+Local Ollama (`ai.active_provider: ollama`, `requires_auth: false`) does not
+need a cloud key. A cloud provider still needs `GEMINI_API_KEY_*` and/or
+`DEEPSEEK_API_KEY`. The doctor fails if no provider is configured at all.

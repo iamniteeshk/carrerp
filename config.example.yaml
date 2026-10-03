@@ -165,8 +165,8 @@ browser:
   scroll_passes: 3               # natural scrolls to trigger lazy-loading
 
 dashboard:
-  host: 0.0.0.0                 # this PC and other devices on the home network
-  port: 5000
+  host: 0.0.0.0                 # this PC and other devices on the home LAN only
+  port: 5000                    # do not forward this port to the public internet
   refresh_seconds: 30
 
 database:
@@ -179,7 +179,10 @@ telegram:
   # Chat id can be TELEGRAM_CHAT_ID in .env, or pasted here.
   chat_id: ""
 
-# ---- Career Profiles: each specialization is a folder under 'dir' -----------
+# ---- Career Profiles: six folders under 'dir' --------------------------------
+# Default, Leadership, Digital_Workplace, EUC, GCC, Contact_Centre.
+# EUC uses the same Digital Workplace resume PDF as Digital_Workplace.
+# profiles.example/Infrastructure is an extra example and is not copied by setup.
 profiles:
   dir: profiles
   default: Default        # used when AI confidence is below threshold
@@ -219,7 +222,11 @@ rules:
   search_include_all_feed: true
 
 apply:
-  mode: dry_run                   # dry_run | approval | auto  (live is the older name)
+  mode: dry_run                   # dry_run | approval | auto
+                                  # dry_run never clicks Submit
+                                  # approval clicks Submit only after Telegram Proceed
+                                  # auto is the only mode that submits without Proceed
+                                  # a blank or unknown mode stays dry_run (it does not become auto)
   min_apply_score: 90             # job-fit score required to apply
   first_run_confirmations: 5      # first N live applies need approval
   max_applications_per_day: 5

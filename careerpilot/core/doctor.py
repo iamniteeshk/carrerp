@@ -94,6 +94,7 @@ class Doctor:
             self._check_browser_profiles()
             self._check_system_browser()
             self._check_port()
+            self._check_dashboard_password()
             self._check_maintenance_config()
         else:
             self._check_env_file_raw()
@@ -468,6 +469,26 @@ class Doctor:
         port = int(self.config.dashboard_port or 5000)
         ok, msg = wenv.port_available(host, port)
         self._add("Dashboard port", PASS if ok else WARN, msg, mandatory=False)
+
+    def _check_dashboard_password(self) -> None:
+        import os
+        user = (os.environ.get("DASHBOARD_USER") or "Admin").strip()
+        password = (os.environ.get("DASHBOARD_PASSWORD") or "Adming").strip()
+        host = (self.config.dashboard_host or "127.0.0.1") if self.config else ""
+        unsafe = password.lower() in {"adming", "admin", "password", "changeme", ""}
+        lan = host in {"0.0.0.0", "::", "[::]"}
+        if unsafe:
+            where = " The dashboard listens on the home network." if lan else ""
+            self._add(
+                "Dashboard password", WARN,
+                "DASHBOARD_USER / DASHBOARD_PASSWORD in .env are still the "
+                "example values. Change them before anyone else on the LAN "
+                "opens the dashboard." + where +
+                " Do not forward port 5000 to the internet.",
+                mandatory=False)
+        else:
+            self._add("Dashboard password", PASS,
+                      f"custom password set for user {user}", mandatory=False)
 
     def _check_maintenance_config(self) -> None:
         assert self.config

@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from careerpilot.apply.confidence_gate import ConfidenceGate
-from careerpilot.apply.modes import is_dry_mode, normalize_apply_mode
+from careerpilot.apply.modes import canonical_apply_mode, is_dry_mode, normalize_apply_mode
 from careerpilot.browser.form_walker import finish_application
 from careerpilot.core.candidate import Candidate
 from careerpilot.core.config import ApplyConfig, RuleConfig, _location_list, _salary_floor
@@ -130,6 +130,9 @@ class Portal:
 def test_mode_names_and_gates():
     check("dry alias", normalize_apply_mode("dry") == "dry_run")
     check("auto alias", normalize_apply_mode("automatic") == "auto")
+    check("live is approval", normalize_apply_mode("live") == "approval")
+    check("blank is dry", canonical_apply_mode("") == "dry_run")
+    check("unknown is dry", canonical_apply_mode("maybe") == "dry_run")
     check("is dry", is_dry_mode("dry_run") and not is_dry_mode("approval"))
     dry = ConfidenceGate(_apply_cfg("dry_run"), 90, 100).decide(_job(), _eval(), 0)
     check("dry does not ask", dry.proceed and not dry.needs_approval, dry.reason)
@@ -137,6 +140,13 @@ def test_mode_names_and_gates():
     check("approval asks", approval.proceed and approval.needs_approval, approval.reason)
     auto = ConfidenceGate(_apply_cfg("auto"), 90, 100).decide(_job(), _eval(), 0)
     check("auto does not ask", auto.proceed and not auto.needs_approval, auto.reason)
+    legacy = ConfidenceGate(
+        _apply_cfg("live", require_final_confirmation=False), 90, 100).decide(
+            _job(), _eval(), 0)
+    check("legacy live still asks", legacy.proceed and legacy.needs_approval, legacy.reason)
+    unknown = ConfidenceGate(_apply_cfg("mystery"), 90, 100).decide(_job(), _eval(), 0)
+    check("unknown mode is dry", unknown.proceed and not unknown.needs_approval,
+          unknown.reason)
 
 
 def test_form_stops_before_submit_until_allowed():
@@ -296,6 +306,9 @@ def test_dashboard_controls_and_lan_defaults():
         app = create_dashboard(db, 5)
         app.config["TESTING"] = True
         client = app.test_client()
+        anonymous = client.post("/api/control", json={"action": "stop"})
+        check("anonymous control blocked", anonymous.status_code == 401)
+        check("anonymous stats blocked", client.get("/api/stats").status_code == 401)
         with client.session_transaction() as sess:
             sess["admin"] = True
         stopped = client.post("/api/control", json={"action": "stop"})

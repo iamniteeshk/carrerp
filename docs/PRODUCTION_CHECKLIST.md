@@ -21,8 +21,9 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 
 - [ ] Repository cloned to the install root
 - [ ] `.\setup_windows.ps1 -ProductionConfig` completed successfully
-- [ ] `.env` has a real `GEMINI_API_KEY_1`
-- [ ] Telegram configured (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`) — or consciously skipped
+- [ ] Ollama is running and the model in `config.yaml` is installed
+- [ ] `.env` has `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
+- [ ] `.env` dashboard user/password are not the example `Admin` / `Adming`
 - [ ] `config\config.yaml` candidate details filled (no placeholders)
 - [ ] Resume PDF present in each used `profiles\<Name>\`
 - [ ] `python doctor.py` → **RESULT: PASS** (no mandatory FAILs)
@@ -47,9 +48,12 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 - [ ] Restore tested from a backup into a **scratch copy** of the install (or with `-Force` after a deliberate backup)
 - [ ] Update tested: `.\scripts\update_careerpilot.ps1` preserves config/.env/DB
 - [ ] Recovery observed: kill Chrome mid-scan → next cycle recovers (or browser restart logged)
-- [ ] Final confirmation gate working (`require_final_confirmation: true` — applications do **not** auto-submit)
+- [ ] `dry_run` does not click Submit; `approval` waits for Proceed; only `auto` submits without asking
 
-## Live apply (do **not** check until verified on this machine)
+## Live portal test (do **not** check until verified on this machine)
+
+Status until you do this yourself: **REQUIRES LIVE MANUAL TEST**.
+Automated tests passing does not check these boxes.
 
 - [ ] Live validation PASS (Easy Apply / Naukri form fill against live DOM)
 - [ ] Confirmation detection PASS (toast / reference captured)

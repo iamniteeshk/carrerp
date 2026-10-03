@@ -14,23 +14,23 @@ the shipped examples (it never overwrites your edits). Then edit
 
 ## 2. Create your Career Profiles
 
-A Career Profile is one self-contained career specialization. `setup` already
-created `profiles/` from the shipped templates with six folders:
+A Career Profile is one self-contained career specialization. `setup` creates
+`profiles/` from the shipped templates. It copies these six folders and does
+not overwrite a `profiles/` tree you already have:
 
 ```
-Infrastructure  Digital_Workplace  Contact_Centre  GCC  Leadership  Default
+Default  Leadership  Digital_Workplace  EUC  GCC  Contact_Centre
 ```
 
-Add a new specialization by copying any folder:
-
-```bash
-cp -r profiles/Default profiles/Cybersecurity
-```
+`EUC` is meant to use the same Digital Workplace resume as `Digital_Workplace`.
+Put that same PDF in both `profiles/EUC/resume.pdf` and
+`profiles/Digital_Workplace/resume.pdf`. `profiles.example/Infrastructure/` is
+only an extra example; setup does not copy it.
 
 Each profile folder contains:
 
 ```
-profiles/Infrastructure/
+profiles/Default/
   profile.yaml             # name, description, resume filename, optional salary override, documents
   resume.pdf               # your resume for this specialization
   cover_letter.docx        # optional
@@ -40,9 +40,8 @@ profiles/Infrastructure/
   documents/               # optional supporting documents
 ```
 
-Repeat for each specialization (e.g. `GCC`, `Leadership`, `Cybersecurity`).
-Set `default_career_profile:` in `config/config.yaml` to the one to use when the
-AI is unsure.
+Set `profiles.default` in `config/config.yaml` to the folder used when the AI
+is unsure (`Default` in the shipped example).
 
 **Adding a new specialization later is just adding a folder — no code changes.**
 
@@ -52,21 +51,32 @@ AI is unsure.
 python3 -m careerpilot.main doctor
 ```
 
-## 4. Dry run (nothing is submitted)
+## 4. Apply modes
 
-`apply.mode` defaults to `dry_run`. In this mode CareerPilot discovers, filters,
-scores, selects a profile, and records everything — but never submits.
+`apply.mode` is one of:
+
+| Mode | What it does |
+|------|----------------|
+| `dry_run` | Fills the form, records every answer, stops before Submit. Never submits. |
+| `approval` | Same fill, then waits for an explicit Telegram **Proceed**. Reject stops. |
+| `auto` | The only mode that clicks Submit without a Proceed, then notifies you. |
+
+A blank or unknown mode is treated as `dry_run`. The older name `live` is
+treated as `approval`. Neither one becomes `auto`.
+
+On Windows, start with `.\scripts\run_careerpilot.ps1`. On other systems:
 
 ```bash
-python3 -m careerpilot.main scan      # one cycle
 python3 -m careerpilot.main run       # scheduler + dashboard
 ```
 
-Open the dashboard at the host/port in `config.yaml` (default
-`http://127.0.0.1:5000`).
+The dashboard listens on `dashboard.host` / `dashboard.port` (example
+`0.0.0.0:5000`, so other devices on the home network can open it). Log in with
+`DASHBOARD_USER` and `DASHBOARD_PASSWORD` from `.env`. Change the example
+password before you do that. Do not forward port 5000 to the public internet.
 
-## 5. Before going live
+## 5. Before `approval` or `auto`
 
-Live submission needs the browser selectors completed against your logged-in
-session — see `LIVE_TEST_READINESS.md`. Keep `apply.mode: dry_run` until every
-item there is done and verified.
+LinkedIn and Naukri apply flows are **REQUIRES LIVE MANUAL TEST**. Automated
+tests are not a test of the real websites. Stay on `dry_run` until you have
+watched a real fill on your machine. See `LIVE_TEST_READINESS.md`.

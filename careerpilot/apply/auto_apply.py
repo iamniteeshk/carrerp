@@ -24,7 +24,7 @@ from ..core.models import AIEvaluation, ApplicationResult, Job
 from ..db.services import (ApplicationService, FailedJobService, JobService)
 from ..notify.telegram_service import TelegramService
 from .confidence_gate import ConfidenceGate
-from .modes import normalize_apply_mode
+from .modes import canonical_apply_mode
 from .pending_flow import next_pending_action
 from .safety_gate import ApplySafetyGate
 
@@ -81,12 +81,14 @@ class AutoApplyEngine:
                                 status=JobStatus.SKIPPED,
                                 failure_reason=safety.reason)
 
-        mode = normalize_apply_mode(self.cfg.apply.mode)
+        mode = canonical_apply_mode(self.cfg.apply.mode)
         if not operator_approved:
             held = self._held_approval(job, evaluation, profile)
             if held is not None:
                 return held
         confirm = None
+        if mode == "dry_run":
+            return self._execute(portal, job, evaluation, dry_run=True)
         if not operator_approved:
             gate = ConfidenceGate(self.cfg.apply, self.cfg.ai.min_apply_score,
                                   self._lifetime_applied())
@@ -97,10 +99,9 @@ class AutoApplyEngine:
                     self.jobs.update_status(job.job_id, JobStatus.SKIPPED)
                 return self._result(job, evaluation, profile, success=False,
                                     status=JobStatus.SKIPPED)
-            if decision.needs_approval or mode == "approval":
+            # Only auto may reach Submit with confirm left empty.
+            if mode != "auto" or decision.needs_approval:
                 confirm = self._approval_decision
-        elif mode == "dry_run":
-            return self._execute(portal, job, evaluation, dry_run=True)
 
         return self._execute(portal, job, evaluation, dry_run=False, confirm=confirm)
 

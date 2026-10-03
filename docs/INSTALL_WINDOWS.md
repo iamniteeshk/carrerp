@@ -10,8 +10,10 @@ After setup, the machine should:
 3. Browse LinkedIn / Naukri with a dedicated Chrome profile
 4. Score jobs with Gemini, write reports, and keep running for weeks
 
-Live auto-submit stays **off** until you explicitly enable it after validation.
-Keep `apply.mode: dry_run` and `require_final_confirmation: true`.
+Leave `apply.mode: dry_run` until you have watched a real fill. `approval`
+submits only after Telegram Proceed. `auto` is the only mode that submits
+without asking. LinkedIn and Naukri form completion on the real sites is
+**REQUIRES LIVE MANUAL TEST** (automated tests are not that test).
 
 ---
 
@@ -31,9 +33,11 @@ Inferred from this repository (not guessed):
 | Node.js / npm | **No** | Not used |
 | Visual C++ Build Tools | **No** | Wheels cover all pinned deps |
 | SQLite server | **No** | Embedded via Python stdlib |
-| Gemini API key | Yes (for scoring) | `.env` → `GEMINI_API_KEY_1` |
-| Telegram bot | Recommended | Notifications / approvals |
-| Resume PDF(s) | Yes | Under `profiles/<Name>/resume.pdf` |
+| Ollama + the model in `config.yaml` | Yes (local scoring) | This deployment does not need a cloud AI key |
+| Gemini / DeepSeek keys | Optional | Only if you switch `ai.active_provider` off Ollama |
+| Telegram bot | Yes for approval and notices | `.env` → `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
+| Dashboard password | Yes | `.env` → `DASHBOARD_USER`, `DASHBOARD_PASSWORD` (change the example) |
+| Resume PDF(s) | Yes | Six folders under `profiles\` (see below) |
 
 Disk: keep **≥ 2 GB free** (browser binaries, cache, reports, DB backups).
 
@@ -162,14 +166,14 @@ Equivalent entry points:
 ### 1. `.env`
 
 ```env
-GEMINI_API_KEY_1=your_real_key_here
-# optional rotation:
-# GEMINI_API_KEY_2=
-# GEMINI_API_KEY_3=
-
 TELEGRAM_BOT_TOKEN=123456:ABCDEF...
 TELEGRAM_CHAT_ID=your_chat_id
+DASHBOARD_USER=choose-a-name
+DASHBOARD_PASSWORD=choose-a-long-password
 ```
+
+The values shipped in `.env.example` (`Admin` / `Adming`) are **unsafe**. Change
+them. Gemini keys stay empty when you use Ollama.
 
 ### 2. `config\config.yaml`
 
@@ -181,8 +185,8 @@ Edit at least:
 - `rules.blacklist_companies`
 - `rules.search_locations` (Chennai-first in the production template)
 - `browser.channel: chrome` (or `""` for bundled Chromium only)
-- Keep `apply.mode: dry_run` until live apply is validated
-- Keep `apply.require_final_confirmation: true`
+- Leave `apply.mode: dry_run` until a real fill looks right
+- `approval` and `auto` are dashboard choices after that
 
 ### 3. Resumes
 
@@ -190,9 +194,15 @@ Copy your real PDF:
 
 ```text
 profiles\Default\resume.pdf
-profiles\Infrastructure\resume.pdf
-... (each profile folder you use)
+profiles\Leadership\resume.pdf
+profiles\Digital_Workplace\resume.pdf
+profiles\EUC\resume.pdf              ← same PDF as Digital_Workplace
+profiles\GCC\resume.pdf
+profiles\Contact_Centre\resume.pdf
 ```
+
+Setup does not copy `profiles.example\Infrastructure` into `profiles\`, and it
+does not replace a `profiles\` folder that already exists.
 
 ### 4. Re-check
 

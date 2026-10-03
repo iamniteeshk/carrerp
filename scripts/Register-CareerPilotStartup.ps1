@@ -21,7 +21,7 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $Python = Join-Path $Root ".venv\Scripts\python.exe"
-$LogOut = Join-Path $Root "logs\startup.out.log"
+$Starter = Join-Path $Root "scripts\run_careerpilot.ps1"
 $LogErr = Join-Path $Root "logs\startup.err.log"
 
 if ($Remove) {
@@ -34,12 +34,18 @@ if (-not (Test-Path $Python)) {
     Write-Host "ERROR: $Python not found. Run setup_windows.ps1 first." -ForegroundColor Red
     exit 1
 }
+if (-not (Test-Path $Starter)) {
+    Write-Host "ERROR: $Starter not found." -ForegroundColor Red
+    exit 1
+}
 
 New-Item -ItemType Directory -Force -Path (Join-Path $Root "logs") | Out-Null
 
+# The starter script uses the venv, the repo folder, writes startup.err.log,
+# and refuses to launch a second copy while careerpilot.pid is still alive.
 $action = New-ScheduledTaskAction `
-    -Execute $Python `
-    -Argument "-m careerpilot.main run" `
+    -Execute "powershell.exe" `
+    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$Starter`"" `
     -WorkingDirectory $Root
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn
@@ -61,5 +67,8 @@ Register-ScheduledTask `
 
 Write-Host "Registered scheduled task '$TaskName'." -ForegroundColor Green
 Write-Host "  WorkingDirectory: $Root"
+Write-Host "  Python: $Python"
+Write-Host "  Failure log: $LogErr"
 Write-Host "  Starts at user logon; restarts up to 3 times on failure."
+Write-Host "  A second CareerPilot process is refused while one is already running."
 Write-Host "Remove later with: .\scripts\Register-CareerPilotStartup.ps1 -Remove"

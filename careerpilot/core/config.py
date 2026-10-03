@@ -316,7 +316,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
     )
     if apply_obj.mode not in VALID_APPLY_MODES:
         raise ConfigError(
-            "apply.mode must be dry_run, approval, auto, or live, "
+            "apply.mode must be dry_run, approval, or auto, "
             f"got '{apply_obj.mode}'")
 
     # ---- retention / long-running maintenance ----

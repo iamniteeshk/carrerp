@@ -1,7 +1,8 @@
-"""Jarvis-style Flask console — public stats; Admin for all controls.
+"""Jarvis-style Flask console.
 
-Anyone on the LAN can view stats + emergency banner. Mutating actions require
-``DASHBOARD_USER`` / ``DASHBOARD_PASSWORD`` from ``.env``.
+The dashboard binds to the home LAN (``0.0.0.0``). Every page and API,
+including status, requires ``DASHBOARD_USER`` / ``DASHBOARD_PASSWORD``.
+Do not publish port 5000 on the public internet.
 """
 
 from __future__ import annotations
@@ -45,6 +46,13 @@ def create_dashboard(
         or os.environ.get("DASHBOARD_SECRET_KEY")
         or secrets.token_hex(32)
     )
+    # Home LAN is plain HTTP. HttpOnly + SameSite stop casual cookie theft
+    # from another site; Secure would break http:// on the local network.
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=False,
+    )
     jobs_svc = JobService(db)
     settings_svc = settings or SettingsService(db)
 
@@ -61,6 +69,19 @@ def create_dashboard(
                 return redirect(url_for("login", next=request.path))
             return view(*args, **kwargs)
         return wrapped
+
+    @app.before_request
+    def _lan_login_required():
+        if request.endpoint in ("login", "static"):
+            return None
+        if request.path.startswith("/static/"):
+            return None
+        if session.get("admin"):
+            return None
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "admin login required"}), 401
+        nxt = request.path if request.path.startswith("/") else "/"
+        return redirect(url_for("login", next=nxt))
 
     def _notify_change() -> None:
         if on_settings_change:
@@ -97,6 +118,8 @@ def create_dashboard(
                 session["admin"] = True
                 session.permanent = True
                 nxt = request.args.get("next") or url_for("home")
+                if not nxt.startswith("/") or nxt.startswith("//"):
+                    nxt = url_for("home")
                 return redirect(nxt)
             error = "Invalid username or password"
             logger.warning("Dashboard admin login failed for user=%r", got_user)
@@ -420,10 +443,9 @@ def create_dashboard(
         if "debug_visual_mode" in body:
             settings_svc.set("debug_visual_mode",
                              "true" if body["debug_visual_mode"] else "false")
-        if "apply_mode" in body and body["apply_mode"] in (
-                "dry_run", "approval", "auto", "live"):
-            # Deploy posture: allow setting but default stays dry_run in config.
-            settings_svc.set("apply_mode", body["apply_mode"])
+        if "apply_mode" in body:
+            from ..apply.modes import canonical_apply_mode
+            settings_svc.set("apply_mode", canonical_apply_mode(body["apply_mode"]))
         _notify_change()
         return jsonify({"ok": True})
 

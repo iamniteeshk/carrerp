@@ -273,7 +273,6 @@
             <option value="dry_run">Dry — fill, stop before Submit</option>
             <option value="approval">Approval — Telegram Proceed / Reject</option>
             <option value="auto">Auto — submit and notify</option>
-            <option value="live">Live (older name)</option>
           </select>
         </div>
         <p class="muted" style="margin-top:.7rem;">Dry fills the form and stops before Submit. Approval sends the job title and the filled answers to Telegram. Auto submits and only notifies you afterwards. Keep Dry until the fills look right.</p>
@@ -415,7 +414,7 @@ async function loadConsole() {
   const st = await (await fetch('/api/console/state')).json();
   const mode = String(st.apply_mode || 'dry_run');
   document.getElementById('mode-pill').textContent = 'MODE · ' + mode.toUpperCase();
-  document.getElementById('mode-pill').className = 'pill ' + ((mode === 'live' || mode === 'auto') ? 'warn' : 'ok');
+  document.getElementById('mode-pill').className = 'pill ' + (mode === 'auto' ? 'warn' : 'ok');
 
   const em = st.emergency || {};
   const box = document.getElementById('emergency');

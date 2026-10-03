@@ -229,6 +229,7 @@ rules:
 
 apply:
   mode: dry_run                   # dry_run | approval | auto — stay on dry_run until fills look right
+                                  # only auto submits without an explicit Proceed
   min_apply_score: 90
   first_run_confirmations: 10     # more conservative for production rollout
   max_applications_per_day: 5

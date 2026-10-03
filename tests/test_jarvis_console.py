@@ -137,6 +137,10 @@ def test_settings_and_console_schedule():
         settings = SettingsService(db)
         app = create_dashboard(db, refresh_seconds=5, settings=settings)
         client = app.test_client()
+        assert client.get("/api/console/state").status_code == 401
+        os.environ["DASHBOARD_USER"] = "Admin"
+        os.environ["DASHBOARD_PASSWORD"] = "Adming"
+        client.post("/login", data={"username": "Admin", "password": "Adming"})
         r = client.get("/api/console/state")
         assert r.status_code == 200
         assert "schedule" in r.get_json()
@@ -174,6 +178,10 @@ def test_emergency_banner_api():
         })
         app = create_dashboard(db, settings=settings)
         client = app.test_client()
+        assert client.get("/api/emergency").status_code == 401
+        os.environ["DASHBOARD_USER"] = "Admin"
+        os.environ["DASHBOARD_PASSWORD"] = "Adming"
+        client.post("/login", data={"username": "Admin", "password": "Adming"})
         r = client.get("/api/emergency").get_json()
         assert r["active"] is True
         os.environ["DASHBOARD_USER"] = "Admin"

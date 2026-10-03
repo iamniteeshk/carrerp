@@ -7,11 +7,13 @@ engine, scores fit with an AI engine, selects the right **Career Profile**
 your behalf, pausing for you whenever a security checkpoint needs a human.
 
 > **Status: three apply modes.** `dry_run` fills the form, records every
-> answer, and stops before Submit. `approval` sends the job title and those
-> answers to Telegram and waits for Proceed or Reject. `auto` submits and
-> only notifies you afterwards. Jobs the model is not sure about stay in
-> Confused / Needs Review. Keep `apply.mode: dry_run` until the fills look
-> right on your machine.
+> answer, and never clicks Submit. `approval` sends the job title and those
+> answers to Telegram and submits only after Proceed. `auto` is the only mode
+> that submits without asking, then notifies you. A missing or unknown mode
+> stays `dry_run`. Jobs the model is not sure about stay in Confused / Needs
+> Review. LinkedIn and Naukri on the real websites are **REQUIRES LIVE MANUAL
+> TEST** — automated tests are not that test. Keep `apply.mode: dry_run`
+> until the fills look right on your machine.
 
 ## What it is — and isn't
 

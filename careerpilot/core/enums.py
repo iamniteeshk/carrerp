@@ -81,4 +81,4 @@ class ApplyMode(str, Enum):
     DRY_RUN = "dry_run"    # fill, record, stop before Submit
     APPROVAL = "approval"  # Telegram Proceed / Reject after the form is filled
     AUTO = "auto"          # submit, then notify
-    LIVE = "live"          # legacy: approval if confirmation required, else auto
+    LIVE = "approval"      # legacy name; always approval, never unattended submit

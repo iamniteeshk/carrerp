@@ -183,8 +183,9 @@ class CareerPilot:
             self.cfg.debug.visual_mode = str(dbg).lower() in (
                 "1", "true", "yes", "on")
         mode = s.get("apply_mode")
-        if mode in ("dry_run", "approval", "auto", "live"):
-            self.cfg.apply.mode = mode
+        if mode:
+            from .apply.modes import canonical_apply_mode
+            self.cfg.apply.mode = canonical_apply_mode(mode)
 
     def _apply_ai_overrides(self) -> None:
         prov = self.settings.get("ai_active_provider")
