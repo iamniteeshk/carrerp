@@ -332,8 +332,8 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 2. Clone / copy the app tree  
 3. Restore the files listed above  
 4. `.\setup_windows.ps1`  
-5. `python doctor.py`  
-6. `python -m careerpilot.main run`
+5. `.\.venv\Scripts\python.exe -m careerpilot.main doctor`  
+6. `.\scripts\run_careerpilot.ps1`
 
 ---
 
@@ -344,7 +344,7 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 | `python` not found | Re-install Python with PATH + py launcher; open a **new** PowerShell |
 | `playwright install` fails | Check internet; re-run `doctor --fix` |
 | Chrome channel errors | Install Chrome, or set `browser.channel: ""` |
-| Doctor FAIL: no AI key | Edit `.env` — `--fix` cannot invent keys |
+| Doctor FAIL: no AI provider | Ollama must be the active provider with `requires_auth: false`, or set a cloud key in `.env`. `--fix` cannot invent keys |
 | Doctor WARN: LinkedIn/Naukri login | Run a headed `scan` and log in once |
 | Port 5000 in use | Stop the other CareerPilot (`careerpilot.pid`) or change `dashboard.port` |
 | Sleep kills browser | Disable sleep/hibernate (Phase A) |
@@ -358,15 +358,16 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 Only treat the machine as **Production Ready** when **all** of these are true:
 
 - [ ] `setup_windows.ps1` completed without install errors  
-- [ ] `python doctor.py` → **RESULT: PASS** (warnings only for optional Telegram if you chose to skip it)  
-- [ ] Gemini key works (`python -m careerpilot.main ai-health` or a dry scan that scores a job)  
-- [ ] Telegram delivers a test notification (if enabled)  
-- [ ] Headed browser launches; LinkedIn + Naukri sessions persist across restart  
-- [ ] Database file exists; reports directory writable  
-- [ ] `maintenance` runs cleanly  
-- [ ] Scheduler starts via `run` or Task Scheduler  
-- [ ] A dry-run scan completes and writes session reports under `reports\sessions\`  
-- [ ] Sleep/hibernate disabled; time zone correct  
+- [ ] `.\.venv\Scripts\python.exe -m careerpilot.main doctor` → **RESULT: PASS**
+- [ ] Ollama is running and the configured model answers (a cloud key is optional)
+- [ ] Telegram delivers a test notification
+- [ ] Dashboard login is not the example password; port 5000 is not exposed to the internet
+- [ ] Headed browser launches; LinkedIn + Naukri sessions persist across restart
+- [ ] Database file exists; reports directory writable
+- [ ] Scheduler starts via `.\scripts\run_careerpilot.ps1` or `.\scripts\Register-CareerPilotStartup.ps1`
+- [ ] A dry-run scan completes and writes session reports under `reports\sessions\`
+- [ ] LinkedIn and Naukri apply on the real site are still **REQUIRES LIVE MANUAL TEST**
+- [ ] Sleep/hibernate disabled; time zone correct
 
 If any mandatory doctor check fails, **do not** call the box production-ready.
 
