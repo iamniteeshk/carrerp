@@ -252,9 +252,19 @@ class ScanPipeline:
             counts["found"] = counts.get("found", 0) + 1
             self._found = counts["found"]
             self._stage(n, "MANUAL_APPROVED", f"id={job.job_id} | {tag}")
-            result = (self.apply_engine.dry_run(job, evaluation) if dry_run
-                      else self.apply_engine.apply_to_job(
-                          job, evaluation, operator_approved=True))
+            from ..apply.modes import canonical_apply_mode
+            apply_cfg = getattr(self.cfg, "apply", None)
+            mode = canonical_apply_mode(
+                getattr(apply_cfg, "mode", "dry_run") if apply_cfg is not None
+                else "dry_run")
+            if dry_run or mode == "dry_run":
+                result = self.apply_engine.dry_run(job, evaluation)
+            elif mode == "approval":
+                # Dashboard Apply only queues the job. Submit waits for Telegram.
+                result = self.apply_engine.apply_to_job(job, evaluation)
+            else:
+                result = self.apply_engine.apply_to_job(
+                    job, evaluation, operator_approved=True)
             if result.success:
                 counts["applied"] = counts.get("applied", 0) + 1
                 self.stream.applied(job, dry_run)

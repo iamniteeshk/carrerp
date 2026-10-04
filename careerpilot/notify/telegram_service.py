@@ -20,8 +20,20 @@ logger = get_logger(__name__)
 
 _API = "https://api.telegram.org/bot{token}/{method}"
 
-_PROCEED = {"proceed", "yes", "approve", "approved", "ok", "submit", "go"}
-_REJECT = {"reject", "rejected", "no", "stop", "cancel", "skip"}
+
+def telegram_text_decision(text: str | None) -> str | None:
+    """Exact approval commands only.
+
+    The whole message must be ``Proceed`` or ``Reject`` (case-insensitive).
+    ``yes``, ``ok``, ``go``, ``submit``, and ``approve`` do not authorize
+    anything.
+    """
+    cleaned = (text or "").strip().lower().strip(".,!")
+    if cleaned == "proceed":
+        return "proceed"
+    if cleaned == "reject":
+        return "reject"
+    return None
 
 
 class TelegramService:
@@ -76,15 +88,7 @@ class TelegramService:
 
     @staticmethod
     def _classify_reply(text: str) -> str | None:
-        cleaned = (text or "").strip().lower()
-        if not cleaned:
-            return None
-        word = cleaned.split()[0].strip(".,!")
-        if word in _PROCEED or cleaned in _PROCEED:
-            return "proceed"
-        if word in _REJECT or cleaned in _REJECT:
-            return "reject"
-        return None
+        return telegram_text_decision(text)
 
     def poll_once(self) -> str | None:
         """Read one new reply, if any. Does not block."""

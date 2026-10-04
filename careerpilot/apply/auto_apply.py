@@ -82,6 +82,10 @@ class AutoApplyEngine:
                                 failure_reason=safety.reason)
 
         mode = canonical_apply_mode(self.cfg.apply.mode)
+        # Approval submits only after Telegram Proceed. A dashboard Apply
+        # click must not skip that wait.
+        if mode == "approval":
+            operator_approved = False
         if not operator_approved:
             held = self._held_approval(job, evaluation, profile)
             if held is not None:
@@ -269,7 +273,10 @@ class AutoApplyEngine:
                 reason="saved approval",
                 apply=True, provider="manual", model="pending",
             )
-            action = next_pending_action(row.get("state"), None)
+            action = next_pending_action(row.get("state"), None, row.get("note") or "")
+            if action == "wait":
+                pending.set_state(job.job_id, "waiting", "waiting for Telegram Proceed")
+                continue
             if action == "reject":
                 self._learn("reject", job)
                 self.jobs.update_status(
@@ -298,7 +305,7 @@ class AutoApplyEngine:
         reply = None
         if row.get("state") == "waiting":
             reply = self.telegram.poll_once()
-        action = next_pending_action(row.get("state"), reply)
+        action = next_pending_action(row.get("state"), reply, row.get("note") or "")
         if action == "ask":
             return None
         if action == "wait":
@@ -351,7 +358,7 @@ class AutoApplyEngine:
             f"Approval needed\n{job.job_title} @ {job.company}\n"
             f"Portal: {job.portal}\n{job.job_url}\n\n"
             f"Filled in the application:\n{body}\n\n"
-            f"Reply Proceed to submit, or Reject to stop.")
+            f"Reply with exactly Proceed to submit, or exactly Reject to stop.")
         decision = self.telegram.wait_for_reply()
         logger.info("Approval reply for %s: %s", job.job_title, decision)
         if pending is not None and job.job_id:

@@ -87,6 +87,8 @@ class Doctor:
             self._check_gemini_keys()
             self._check_deepseek()
             self._check_telegram()
+            self._check_candidate()
+            self._check_ollama()
             self._check_folders()
             self._check_write_permissions()
             self._check_database()
@@ -311,21 +313,32 @@ class Doctor:
             self._add("DeepSeek key (optional)", SKIP, "not set",
                       mandatory=False)
 
+    def _deployment_strict(self) -> bool:
+        """Home-PC deployment: Ollama and/or a LAN dashboard, or --production."""
+        if self.production:
+            return True
+        if self.config is None:
+            return False
+        host = (self.config.dashboard_host or "")
+        provider = (getattr(self.config.ai, "active_provider", "") or "").lower()
+        return host in {"0.0.0.0", "::", "[::]"} or provider == "ollama"
+
     def _check_telegram(self) -> None:
         assert self.config
         token = self.config.telegram_token
         chat = self.config.telegram_chat_id
+        strict = self._deployment_strict()
         if token and chat:
-            self._add("Telegram", PASS, "token + chat id set", mandatory=False)
+            self._add("Telegram", PASS, "token + chat id set", mandatory=strict)
         elif token or chat:
-            self._add("Telegram", WARN,
+            self._add("Telegram", FAIL if strict else WARN,
                       "only one of TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID set",
-                      mandatory=False)
+                      mandatory=strict)
         else:
-            self._add("Telegram", WARN,
+            self._add("Telegram", FAIL if strict else WARN,
                       "not configured — set TELEGRAM_BOT_TOKEN and "
-                      "TELEGRAM_CHAT_ID in .env for notifications",
-                      mandatory=False)
+                      "TELEGRAM_CHAT_ID in .env",
+                      mandatory=strict)
 
     def _check_folders(self) -> None:
         assert self.config
@@ -383,7 +396,9 @@ class Doctor:
         for name, profile in engine.profiles.items():
             if profile.resume_path is None or not profile.resume_path.exists():
                 missing.append(name)
-        if not missing:
+        if self._deployment_strict():
+            self._check_production_profiles()
+        elif not missing:
             self._add("Resume files", PASS,
                       f"{len(names)} profile(s) have resume.pdf")
             self._add("Career Profiles", PASS,
@@ -400,11 +415,139 @@ class Doctor:
                       + ("OK" if default_ok else "MISSING RESUME"),
                       mandatory=not default_ok)
 
+    def _check_candidate(self) -> None:
+        if not self._deployment_strict():
+            return
+        assert self.config
+        cand = self.config.candidate
+        placeholders = {
+            "", "your name", "your_email", "your_profile", "your company",
+            "your title", "city, country", "+91-xxxxxxxxxx", "changeme",
+            "todo", "tbd",
+        }
+        bad = []
+        for key in ("full_name", "email", "phone"):
+            value = str(getattr(cand, key, "") or "").strip()
+            if value.lower() in placeholders:
+                bad.append(key)
+        if bad:
+            self._add("Candidate details", FAIL,
+                      "still example values for: " + ", ".join(bad) +
+                      " — edit config/config.yaml candidate:")
+        else:
+            self._add("Candidate details", PASS, "name, email, and phone are set")
+
+    def _check_ollama(self) -> None:
+        if not self._deployment_strict():
+            return
+        assert self.config
+        import requests
+        root = "http://127.0.0.1:11434"
+        for spec in getattr(self.config.ai, "providers", []) or []:
+            url = (getattr(spec, "base_url", "") or "").strip()
+            if getattr(spec, "name", "") == "ollama" or "11434" in url:
+                if url:
+                    root = url.rstrip("/")
+                    if root.endswith("/v1"):
+                        root = root[:-3]
+                break
+        try:
+            resp = requests.get(root + "/api/tags", timeout=4)
+            resp.raise_for_status()
+            payload = resp.json()
+        except Exception as exc:  # noqa: BLE001
+            self._add("Ollama", FAIL, f"not reachable at {root} ({exc})")
+            self._add("Ollama model qwen3:8b", FAIL, "Ollama is not reachable")
+            self._add("Ollama model qwen3-vl:8b", FAIL, "Ollama is not reachable")
+            return
+        names = []
+        for item in payload.get("models") or []:
+            name = item.get("name") or item.get("model") or ""
+            if name:
+                names.append(name)
+        self._add("Ollama", PASS, f"reachable at {root}")
+        for wanted in ("qwen3:8b", "qwen3-vl:8b"):
+            found = any(n == wanted or n.startswith(wanted + "-") for n in names)
+            if found:
+                self._add(f"Ollama model {wanted}", PASS, "installed")
+            else:
+                self._add(
+                    f"Ollama model {wanted}", FAIL,
+                    "not installed — run: ollama pull " + wanted +
+                    (f" (have {', '.join(names[:8])})" if names else ""))
+
+    def _resume_is_placeholder(self, path: Path) -> bool:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return True
+        # Shipped examples are a 192-byte empty PDF with no content stream.
+        if len(data) <= 192:
+            return True
+        if len(data) < 1024 and b"stream" not in data:
+            return True
+        return False
+
+    def _check_production_profiles(self) -> None:
+        assert self.config
+        required = (
+            "Default", "Leadership", "Digital_Workplace", "EUC", "GCC",
+            "Contact_Centre",
+        )
+        engine = self.config.profile_engine
+        missing = []
+        placeholders = []
+        ok = []
+        for name in required:
+            profile = engine.profiles.get(name)
+            if profile is None or profile.resume_path is None:
+                missing.append(name)
+                continue
+            path = profile.resume_path
+            if not path.exists():
+                missing.append(name)
+            elif self._resume_is_placeholder(path):
+                placeholders.append(f"{name} ({path.stat().st_size} bytes)")
+            else:
+                ok.append(name)
+        if missing:
+            self._add("Production profiles", FAIL,
+                      "missing folder or resume.pdf: " + ", ".join(missing))
+        else:
+            self._add("Production profiles", PASS,
+                      "six profiles present: " + ", ".join(required))
+        if placeholders:
+            self._add("Real resumes", FAIL,
+                      "placeholder PDF rejected: " + ", ".join(placeholders) +
+                      " — replace each resume.pdf with the real file")
+        elif not missing:
+            self._add("Real resumes", PASS,
+                      f"{len(ok)} real resume.pdf file(s)")
+        self._add("Career Profiles", PASS if not missing else FAIL,
+                  "loaded: " + ", ".join(engine.names()) or "(none)",
+                  mandatory=True)
+
     def _check_browser_profiles(self) -> None:
         assert self.config
         path = Path(self.config.browser_profiles_path)
         linkedin = path / "linkedin"
         naukri = path / "naukri"
+        writable = True
+        for folder in (path, linkedin, naukri):
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+                probe = folder / ".doctor_write"
+                probe.write_text("ok", encoding="utf-8")
+                probe.unlink()
+            except OSError as exc:
+                writable = False
+                self._add("Browser profile directories", FAIL,
+                          f"not usable at {folder}: {exc}")
+                break
+        if writable:
+            self._add("Browser profile directories", PASS,
+                      f"writable under {path}")
+        has_any = path.exists() and any(path.iterdir()) if path.exists() else False
         has_any = path.exists() and any(path.iterdir()) if path.exists() else False
         # Heuristic: a used Playwright profile usually has Default/ or Local State.
         def _looks_used(d: Path) -> bool:
@@ -477,18 +620,23 @@ class Doctor:
         host = (self.config.dashboard_host or "127.0.0.1") if self.config else ""
         unsafe = password.lower() in {"adming", "admin", "password", "changeme", ""}
         lan = host in {"0.0.0.0", "::", "[::]"}
-        if unsafe:
+        strict = self._deployment_strict()
+        if not user or not password:
+            self._add("Dashboard password", FAIL,
+                      "set DASHBOARD_USER and DASHBOARD_PASSWORD in .env",
+                      mandatory=True)
+        elif unsafe:
             where = " The dashboard listens on the home network." if lan else ""
             self._add(
-                "Dashboard password", WARN,
+                "Dashboard password", FAIL if strict else WARN,
                 "DASHBOARD_USER / DASHBOARD_PASSWORD in .env are still the "
                 "example values. Change them before anyone else on the LAN "
                 "opens the dashboard." + where +
                 " Do not forward port 5000 to the internet.",
-                mandatory=False)
+                mandatory=strict)
         else:
             self._add("Dashboard password", PASS,
-                      f"custom password set for user {user}", mandatory=False)
+                      f"custom password set for user {user}", mandatory=strict)
 
     def _check_maintenance_config(self) -> None:
         assert self.config

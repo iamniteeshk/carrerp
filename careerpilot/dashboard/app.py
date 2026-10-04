@@ -257,6 +257,39 @@ def create_dashboard(
         )
         return jsonify(rows)
 
+    def _queue_telegram_approval(row: dict) -> None:
+        """Store a dashboard Apply as waiting. It does not authorize Submit."""
+        from ..apply.modes import canonical_apply_mode
+        from ..core.enums import NotificationType
+        from ..db.services import PendingApplicationService
+        from ..notify.telegram_service import TelegramService
+        try:
+            job = jobs_svc.job_from_row(row)
+            PendingApplicationService(db).upsert(
+                job, state="waiting", note="waiting for Telegram Proceed")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store pending approval: %s", exc)
+            return
+        mode = "dry_run"
+        if config is not None:
+            mode = canonical_apply_mode(
+                settings_svc.get("apply_mode")
+                or getattr(getattr(config, "apply", None), "mode", "dry_run"))
+        if mode != "approval":
+            return
+        try:
+            from ..db.services import NotificationService
+            token = getattr(config, "telegram_token", "") if config else ""
+            chat = getattr(config, "telegram_chat_id", "") if config else ""
+            TelegramService(token or "", chat or "", NotificationService(db)).send(
+                NotificationType.APPROVAL_REQUEST,
+                f"Approval needed\n{row.get('job_title') or ''} @ "
+                f"{row.get('company') or ''}\n"
+                f"Portal: {row.get('portal') or ''}\n{row.get('job_url') or ''}\n\n"
+                f"Reply with exactly Proceed to submit, or exactly Reject to stop.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not send Telegram approval request: %s", exc)
+
     def _learn(action: str, row: dict) -> None:
         if config is None:
             return
@@ -299,12 +332,8 @@ def create_dashboard(
                           "rejected, confused, queued, or matched jobs"),
             }), 400
         _learn("apply", updated)
-        try:
-            from ..db.services import PendingApplicationService
-            PendingApplicationService(db).set_state(job_id, "proceed", "dashboard apply")
-        except Exception:  # noqa: BLE001
-            pass
-        logger.info("Dashboard manual approve job_id=%s title=%s",
+        _queue_telegram_approval(updated)
+        logger.info("Dashboard apply queued for Telegram job_id=%s title=%s",
                     job_id, updated.get("job_title"))
         return jsonify({"ok": True, "job": {
             "job_id": updated.get("job_id"),

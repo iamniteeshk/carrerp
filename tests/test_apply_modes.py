@@ -19,7 +19,8 @@ from careerpilot.core.enums import JobStatus
 from careerpilot.core.models import AIEvaluation, Job
 from careerpilot.db.database import Database
 from careerpilot.db.services import JobService
-from careerpilot.notify.telegram_service import TelegramService
+from careerpilot.apply.pending_flow import next_pending_action
+from careerpilot.notify.telegram_service import TelegramService, telegram_text_decision
 from careerpilot.rules.rule_engine import RuleEngine
 
 
@@ -121,7 +122,8 @@ class Portal:
     def __init__(self, page):
         self.page = page
         self.candidate = Candidate(
-            full_name="Murahari M", email="hari@example.com", phone="9445505850",
+            full_name="Test Candidate", email="test.candidate@example.com",
+            phone="9999999999",
             current_location="Chennai")
         self.session = None
         self.apply_evidence = None
@@ -204,8 +206,19 @@ def test_telegram_proceed_and_manual_memory():
         def record(self, *a, **k):
             return 1
 
+    for word in ("yes", "ok", "go", "submit", "approve", "Proceed now", "yes proceed"):
+        check(f"not an approval word: {word}", telegram_text_decision(word) is None, word)
+    check("exact Proceed", telegram_text_decision("Proceed") == "proceed")
+    check("exact proceed", telegram_text_decision("  proceed  ") == "proceed")
+    check("exact Reject", telegram_text_decision("Reject") == "reject")
+    check("dashboard note cannot submit",
+          next_pending_action("proceed", None, "dashboard apply") == "wait")
+    check("waiting yes does not submit", next_pending_action("waiting", "yes") == "wait")
+    check("waiting Proceed submits", next_pending_action("waiting", "Proceed") == "submit")
+    check("waiting Reject does not submit",
+          next_pending_action("waiting", "Reject") == "reject")
     svc = TelegramService("token", "42", Store(), timeout=1)
-    replies = iter(["not yet", "Proceed now"])
+    replies = iter(["yes", "ok", "approve", "Proceed"])
 
     def _next():
         return next(replies)
@@ -263,6 +276,66 @@ def test_uncertain_evaluation_flag():
     engine.providers = [Prov()]
     ev = engine.evaluate_job(_job())
     check("uncertain review", ev.uncertain and not ev.apply, f"uncertain={ev.uncertain} apply={ev.apply}")
+
+
+def test_dashboard_apply_stays_waiting():
+    from careerpilot.dashboard.app import create_dashboard
+    from careerpilot.db.services import PendingApplicationService
+    with tempfile.TemporaryDirectory() as tmp:
+        db = Database(str(Path(tmp) / "t.db"))
+        db.initialize()
+        jobs = JobService(db)
+        jid = jobs.insert(_job())
+        jobs.update_status(jid, JobStatus.CONFUSED, rejection_reason="Needs review")
+        settings_mod = __import__(
+            "careerpilot.db.services", fromlist=["SettingsService"])
+        settings = settings_mod.SettingsService(db)
+        settings.set("apply_mode", "approval")
+
+        class _Apply:
+            mode = "approval"
+
+        class _Cfg:
+            apply = _Apply()
+            telegram_token = ""
+            telegram_chat_id = ""
+            database_path = str(Path(tmp) / "t.db")
+
+        app = create_dashboard(db, 5, config=_Cfg(), settings=settings)
+        app.config["TESTING"] = True
+        client = app.test_client()
+        os.environ["DASHBOARD_USER"] = "Admin"
+        os.environ["DASHBOARD_PASSWORD"] = "Adming"
+        client.post("/login", data={"username": "Admin", "password": "Adming"})
+        resp = client.post(f"/api/jobs/{jid}/approve")
+        check("dashboard apply accepted", resp.status_code == 200, str(resp.status_code))
+        saved = PendingApplicationService(db).get(jid)
+        check("dashboard apply is waiting",
+              saved and saved["state"] == "waiting", str(saved))
+        check("dashboard apply is not proceed",
+              saved and saved["state"] != "proceed" and "dashboard apply" not in (saved["note"] or ""))
+        db.close()
+
+
+def test_no_candidate_pii_in_tracked_tests():
+    root = Path(__file__).resolve().parents[1]
+    banned = ("Mura" + "hari", "94455" + "05850", "Stats stay " + "public")
+    hits = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if any(part in {".git", ".venv", "profiles", "__pycache__"} for part in path.parts):
+            continue
+        if path.suffix.lower() not in {".py", ".html", ".md", ".yaml", ".yml", ".example", ".txt"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for word in banned:
+            if word in text:
+                hits.append(f"{path.relative_to(root)}:{word}")
+    check("no banned personal or public-stats text", not hits, "; ".join(hits))
 
 
 def test_pending_survives_and_salary_label():
@@ -328,6 +401,8 @@ if __name__ == "__main__":
     test_salary_hidden_and_grouped_locations()
     test_telegram_proceed_and_manual_memory()
     test_uncertain_evaluation_flag()
+    test_dashboard_apply_stays_waiting()
+    test_no_candidate_pii_in_tracked_tests()
     test_pending_survives_and_salary_label()
     test_dashboard_controls_and_lan_defaults()
     print(f"\n{passed} passed, {failed} failed")
