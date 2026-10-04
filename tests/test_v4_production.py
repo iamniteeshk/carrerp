@@ -146,13 +146,21 @@ def test_final_confirmation_always_needs_approval():
 
 def test_confirmation_can_be_disabled():
     cfg = ApplyConfig(
-        mode="live", first_run_confirmations=0, max_applications_per_day=10,
+        mode="auto", first_run_confirmations=0, max_applications_per_day=10,
         delay_between_applications_seconds=0, retry_limit=1, easy_apply_only=True,
         require_final_confirmation=False)
     gate = ConfidenceGate(cfg, min_score=90, applied_so_far_lifetime=100)
     d = gate.decide(_job(), _eval(), applied_today=0)
-    check("live auto-submit when confirmation off",
+    check("auto submits without approval",
           d.proceed and not d.needs_approval, f"reason={d.reason}")
+    legacy = ApplyConfig(
+        mode="live", first_run_confirmations=0, max_applications_per_day=10,
+        delay_between_applications_seconds=0, retry_limit=1, easy_apply_only=True,
+        require_final_confirmation=False)
+    held = ConfidenceGate(legacy, min_score=90, applied_so_far_lifetime=100)
+    h = held.decide(_job(), _eval(), applied_today=0)
+    check("legacy live does not auto-submit",
+          h.proceed and h.needs_approval, f"reason={h.reason}")
 
 
 # ---- DB retriable / already_applied -------------------------------------

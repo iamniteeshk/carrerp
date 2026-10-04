@@ -1,0 +1,550 @@
+name: Leadership
+
+display_name: "Senior Leadership / General Management"
+
+description: >
+  Executive leadership job-search profile for Murahari M targeting Director,
+  Senior Director, Associate Director, AVP, VP, Head and General Manager roles
+  across IT infrastructure, technology operations, global delivery, managed
+  services, transformation, GCC leadership and enterprise technology.
+
+
+candidate:
+  name: "Murahari M"
+  preferred_name: "Hari Madhav"
+  location: "Chennai, India"
+  experience_years: 25
+
+
+target:
+  seniority:
+    - Director
+    - Senior Director
+    - Associate Director
+    - AVP
+    - VP
+    - Head
+    - General Manager
+
+  primary_roles:
+    - IT Director
+    - Director IT
+    - Director Technology
+    - Technology Director
+    - Head IT
+    - Head Technology
+    - Senior Director IT
+    - Senior Director Technology
+    - Associate Director IT
+    - Associate Director Technology
+    - AVP IT
+    - AVP Technology
+    - VP IT
+    - VP Technology
+    - General Manager IT
+    - General Manager Technology
+    - IT Infrastructure Director
+    - Director IT Infrastructure
+    - Head IT Infrastructure
+    - IT Operations Director
+    - Head IT Operations
+    - Technology Operations Director
+    - Head Technology Operations
+    - IT Service Delivery Director
+    - Director Service Delivery
+    - Head IT Service Delivery
+    - Service Delivery Director
+    - Global Delivery Director
+    - Head Global Delivery
+    - Managed Services Director
+    - Head Managed Services
+    - Transformation Director
+    - IT Transformation Director
+    - Digital Transformation Director
+    - Global Technology Director
+    - Global Operations Director
+    - GCC Head
+    - GCC Director
+    - Global Capability Centre Head
+    - Global Capability Center Head
+
+  secondary_roles:
+    - Infrastructure Services Director
+    - Head Infrastructure Services
+    - Infrastructure Operations Director
+    - Enterprise Technology Director
+    - Enterprise IT Director
+    - Operations Director
+    - Head Operations
+    - Regional Operations Director
+    - Site Director
+    - Centre Director
+    - Center Director
+    - Site Head
+    - Centre Head
+    - Center Head
+    - Delivery Head
+    - Delivery Director
+    - Service Management Head
+    - Technology Services Director
+    - Global Managed Services Director
+    - Client Services Director
+    - Client Delivery Director
+    - Customer Operations Director
+    - Strategic Account Director
+    - Digital Workplace Director
+    - Head Digital Workplace
+    - EUC Director
+    - Head EUC
+
+
+experience:
+  minimum_years: 15
+  preferred_years: 20
+  candidate_years: 25
+
+
+compensation:
+  minimum_fixed_ctc:
+    amount: 7000000
+    currency: INR
+    formatted: "₹70 Lakhs"
+
+  expected_ctc:
+    amount: 9000000
+    currency: INR
+    formatted: "₹90 Lakhs"
+    negotiable: true
+
+  reject_if_fixed_below_minimum: true
+  allow_undisclosed_salary: true
+
+
+locations:
+  preferred:
+    - Chennai
+    - Bengaluru
+    - Hyderabad
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+  relocation:
+    willing: true
+
+  nationwide_search: false
+
+  flexible_for_right_role: true
+
+
+work_preferences:
+  employment_type:
+    - Full Time
+    - Permanent
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+  maximum_travel_percent: 50
+
+
+domain_focus:
+
+  primary:
+    - IT Infrastructure
+    - Enterprise IT
+    - Enterprise Technology
+    - IT Operations
+    - Technology Operations
+    - IT Service Delivery
+    - Service Delivery
+    - Global Delivery
+    - Global Operations
+    - Technology Services
+    - Managed Services
+    - Service Management
+    - Business Transformation
+    - IT Transformation
+    - Technology Transformation
+    - Digital Transformation
+    - GCC
+    - Global Capability Centre
+    - Global Capability Center
+
+  secondary:
+    - Digital Workplace
+    - End User Computing
+    - EUC
+    - Unified Endpoint Management
+    - Cloud Operations
+    - Contact Centre
+    - Customer Operations
+    - AI Transformation
+    - Automation
+    - Operational Excellence
+    - Continuous Improvement
+    - Service Transformation
+    - Operating Model
+
+
+leadership_scope:
+
+  p_and_l: true
+
+  maximum_portfolio_usd: 50000000
+
+  maximum_team_size: 1000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+  executive_stakeholder_management: true
+  commercial_governance: true
+  revenue_growth: true
+  margin_management: true
+  strategic_account_management: true
+
+
+enterprise_scale:
+
+  users: 175000
+  devices: 188000
+
+
+genuine_strengths:
+
+  - "25+ years of technology and IT leadership experience"
+  - "15+ years of leadership experience"
+  - "Director-level global technology leadership"
+  - "USD 50M portfolio P&L ownership"
+  - "1,000+ professionals led"
+  - "Global delivery across North America, LATAM, EMEA and APAC"
+  - "IT Infrastructure leadership"
+  - "IT Operations leadership"
+  - "Global Service Delivery"
+  - "Managed Services"
+  - "Digital Workplace leadership"
+  - "End User Computing leadership"
+  - "GCC setup and operationalisation"
+  - "Build-Operate-Transform-Transfer leadership"
+  - "Large-scale transformation"
+  - "Commercial and SOW governance"
+  - "Executive stakeholder management"
+  - "Revenue growth"
+  - "Margin management"
+  - "AI-led transformation"
+  - "Automation"
+  - "Operational excellence"
+
+
+technology_keywords:
+
+  - Microsoft Intune
+  - Microsoft Endpoint Configuration Manager
+  - SCCM
+  - Jamf
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - AWS
+  - Google Cloud
+  - GCP
+  - Microsoft 365
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - AIOps
+  - AI Force
+  - Yellow.ai
+  - Krisp.AI
+  - PowerShell
+  - Power Platform
+  - RPA
+  - Gen AI
+  - ITIL
+
+
+leadership_keywords:
+
+  - P&L
+  - Profit and Loss
+  - P&L Ownership
+  - Revenue Growth
+  - Revenue Management
+  - Margin Management
+  - Commercial Governance
+  - Cost Optimization
+  - Cost Reduction
+  - Budget Ownership
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - SLA
+  - KPI
+  - Go-Live
+  - Transformation
+  - Transition
+  - Transition and Transformation
+  - Global Delivery
+  - Global Operations
+  - Executive Stakeholder Management
+  - Executive Stakeholder
+  - CIO
+  - C-Suite
+  - CXO
+  - QBR
+  - Operational Excellence
+  - Crisis Management
+  - Business Continuity
+  - Strategic Account Management
+  - Client Advisory
+  - Customer Success
+
+
+gcc_keywords:
+
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Captive Centre
+  - Captive Center
+  - BOTT
+  - Build Operate Transform Transfer
+  - GCC Setup
+  - GCC Build
+  - GCC Build-Out
+  - GCC Operations
+  - Operating Model
+  - Centre Build-Out
+  - Center Build-Out
+  - Centre Setup
+  - Center Setup
+  - Talent Ramp-Up
+  - Transition Readiness
+  - Multi-Tower Delivery
+  - Global Capability
+
+
+transformation_keywords:
+
+  - Transformation
+  - Business Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Technology Transformation
+  - Service Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Agentic AI
+  - AIOps
+  - RPA
+  - Modernisation
+  - Modernization
+  - Transition
+  - Transition and Transformation
+  - T&T
+  - Service Modernisation
+  - Service Modernization
+  - Operational Excellence
+  - Continuous Improvement
+  - Business Process Transformation
+
+
+global_delivery_keywords:
+
+  - Global Delivery
+  - Global Operations
+  - Global Service Delivery
+  - Global Technology Operations
+  - Global Infrastructure
+  - Global Managed Services
+  - Multi-region
+  - Multi-country
+  - Multi-tower
+  - Global Delivery Model
+  - Global Operating Model
+  - Follow-the-Sun
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+
+
+rejection_rules:
+
+  rejected_title_terms:
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - Desktop Support
+    - Technical Support
+    - L1
+    - L2
+    - L3
+    - Helpdesk
+
+  rejected_roles:
+    - Desktop Support Engineer
+    - Technical Support Engineer
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+    - Helpdesk Engineer
+
+  rejected_employment_types:
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+    - Part Time
+    - Part-Time
+
+  rejected_experience:
+    maximum_years_required: 15
+
+  reject_if_salary_below_minimum: true
+  reject_if_fixed_salary_below_minimum: true
+  reject_if_salary_undisclosed: false
+
+
+matching:
+
+  minimum_match_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+
+  scoring_priority:
+    title: 40
+    leadership: 25
+    domain: 20
+    experience: 8
+    location: 4
+    compensation: 3
+
+
+mandatory:
+
+  - seniority
+  - relevant_leadership_experience
+  - employment_type
+
+
+preferred:
+
+  - P&L
+  - global_delivery
+  - global_operations
+  - GCC
+  - digital_workplace
+  - IT_infrastructure
+  - transformation
+  - managed_services
+  - executive_stakeholder_management
+  - commercial_governance
+  - revenue_growth
+  - margin_management
+  - AI
+  - automation
+
+
+resume:
+  file: "resume.pdf"
+  source_resume: "Leadership / General Management resume"
+
+
+positioning:
+
+  - "Senior Leadership"
+  - "General Management"
+  - "Technology Leadership"
+  - "Global Delivery Leadership"
+  - "Transformation Leadership"
+  - "P&L Leadership"
+  - "Managed Services Leadership"
+  - "Site / Centre Leadership"
+  - "Executive Client Advisory"
+  - "Commercial Governance"
+
+
+search:
+
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+  include_recommended: true
+  include_all_feed: true
+
+
+keywords:
+
+  - IT Director
+  - Director IT
+  - Director Technology
+  - Technology Director
+  - Head IT
+  - Head Technology
+  - IT Infrastructure Director
+  - Director IT Infrastructure
+  - Head IT Infrastructure
+  - IT Operations Director
+  - Head IT Operations
+  - IT Service Delivery Director
+  - Director Service Delivery
+  - Head IT Service Delivery
+  - Global Delivery Director
+  - Head Global Delivery
+  - Managed Services Director
+  - Head Managed Services
+  - Transformation Director
+  - IT Transformation Director
+  - Digital Transformation Director
+  - GCC Head
+  - GCC Director
+  - Global Capability Centre Head
+  - Global Technology Director
+  - Global Operations Director
+
+
+application:
+
+  eligible: true
+  minimum_score: 90
+  easy_apply_only: true
+  require_preferred_location: false
+  require_final_confirmation: true

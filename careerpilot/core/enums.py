@@ -22,8 +22,10 @@ class JobStatus(str, Enum):
     SKIPPED = "SKIPPED"
     PARTIAL_DATA = "PARTIAL_DATA"  # JD could not be fully read; never auto-decided
     MANUAL_REVIEW = "MANUAL_REVIEW"  # e.g. LinkedIn -> external ATS redirect
-    # Operator overrode a REJECTED decision in the dashboard; apply on next run.
+    # Operator overrode a decision in the dashboard; apply on next run.
     APPROVED = "APPROVED"
+    # AI would not commit. Waiting for a person. Never a forced apply/reject.
+    CONFUSED = "CONFUSED"
 
 
 class Portal(str, Enum):
@@ -76,5 +78,7 @@ class NotificationType(str, Enum):
 
 
 class ApplyMode(str, Enum):
-    DRY_RUN = "dry_run"
-    LIVE = "live"
+    DRY_RUN = "dry_run"    # fill, record, stop before Submit
+    APPROVAL = "approval"  # Telegram Proceed / Reject after the form is filled
+    AUTO = "auto"          # submit, then notify
+    LIVE = "approval"      # legacy name; always approval, never unattended submit

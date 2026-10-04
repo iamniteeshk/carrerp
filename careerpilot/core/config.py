@@ -23,6 +23,7 @@ from ..browser.visual_debug import DebugConfig, DEFAULT_COLORS
 from ..browser.humanize import HumanConfig
 from .candidate import Candidate, candidate_from_dict
 from .career_profile import CareerProfileEngine
+from ..apply.modes import VALID_APPLY_MODES, normalize_apply_mode
 from .yaml_utils import load_yaml, strip_line_meta
 
 
@@ -80,6 +81,10 @@ class RuleConfig:
     search_include_all_feed: bool = True
     # When set, ONLY these cities are searched (overrides profile location union).
     search_locations: list[str] = field(default_factory=list)
+    # False: a job outside the preferred cities is still evaluated.
+    reject_outside_preferred: bool = True
+    # False: a posting that hides salary is not rejected for that alone.
+    reject_undisclosed_salary: bool = False
 
 
 @dataclass
@@ -261,14 +266,15 @@ def load_config(config_path: str | Path = "config/config.yaml",
     union_locations = engine.all_preferred_locations()
     extra_keywords = rules.get("extra_required_keywords", []) or []
     extra_locations = rules.get("extra_preferred_locations", []) or []
-    search_locs = rules.get("search_locations", []) or []
+    search_locs = _location_list(rules.get("search_locations", []) or [])
     if search_locs:
         search_locations = _dedupe(search_locs)
     else:
         search_locations = _dedupe(union_locations + extra_locations)
+    salary_amount, salary_currency, reject_undisclosed = _salary_floor(rules)
     rule_cfg = RuleConfig(
-        minimum_salary=int((rules.get("minimum_salary", {}) or {}).get("amount", 0)),
-        salary_currency=(rules.get("minimum_salary", {}) or {}).get("currency", "INR"),
+        minimum_salary=salary_amount,
+        salary_currency=salary_currency,
         minimum_experience=int(rules.get("minimum_experience", 15)),
         accepted_employment_types=rules.get("accepted_employment_types", ["Full Time"]),
         rejected_shifts=rules.get("rejected_shifts", []) or [],
@@ -288,10 +294,14 @@ def load_config(config_path: str | Path = "config/config.yaml",
             rules.get("search_include_easy_apply_feed", True)),
         search_include_all_feed=bool(rules.get("search_include_all_feed", True)),
         search_locations=search_locs,
+        reject_outside_preferred=bool(
+            rules.get("reject_if_outside_preferred_locations", True)),
+        reject_undisclosed_salary=reject_undisclosed,
     )
 
+    apply_mode = normalize_apply_mode(apply_cfg.get("mode", "dry_run"))
     apply_obj = ApplyConfig(
-        mode=apply_cfg.get("mode", "dry_run"),
+        mode=apply_mode,
         first_run_confirmations=int(apply_cfg.get("first_run_confirmations", 3)),
         max_applications_per_day=int(apply_cfg.get("max_applications_per_day", 10)),
         delay_between_applications_seconds=int(
@@ -304,8 +314,10 @@ def load_config(config_path: str | Path = "config/config.yaml",
             apply_cfg.get("require_preferred_location", False)),
         step_screenshots=bool(apply_cfg.get("step_screenshots", True)),
     )
-    if apply_obj.mode not in ("dry_run", "live"):
-        raise ConfigError(f"apply.mode must be 'dry_run' or 'live', got '{apply_obj.mode}'")
+    if apply_obj.mode not in VALID_APPLY_MODES:
+        raise ConfigError(
+            "apply.mode must be dry_run, approval, or auto, "
+            f"got '{apply_obj.mode}'")
 
     # ---- retention / long-running maintenance ----
     maint_cfg = raw.get("maintenance", {}) or {}
@@ -373,7 +385,7 @@ def load_config(config_path: str | Path = "config/config.yaml",
         log_path=log_path,
         log_level=str(logging_cfg.get("level", "INFO")).upper(),
         report_path=report_path,
-        dashboard_host=dash.get("host", "127.0.0.1"),
+        dashboard_host=dash.get("host", "0.0.0.0"),
         dashboard_port=int(dash.get("port", 5000)),
         dashboard_refresh_seconds=int(dash.get("refresh_seconds", 30)),
         profiles_dir=profiles_dir,
@@ -490,6 +502,41 @@ def _build_debug(d: dict) -> DebugConfig:
         log_first_n_jobs=int(d.get("log_first_n_jobs", 5)),
         colors=colors,
     )
+
+
+def _salary_floor(rules: dict) -> tuple[int, str, bool]:
+    """Accept amount or fixed_amount. Undisclosed salary is kept by default."""
+    block = rules.get("minimum_salary", {}) or {}
+    if isinstance(block, (int, float)):
+        return int(block), "INR", False
+    if isinstance(block, str) and block.strip().isdigit():
+        return int(block.strip()), "INR", False
+    if not isinstance(block, dict):
+        return 0, "INR", False
+    raw = block.get("amount", block.get("fixed_amount", 0)) or 0
+    try:
+        amount = int(raw)
+    except (TypeError, ValueError):
+        amount = 0
+    und = block.get("salary_undisclosed") or {}
+    reject_undisclosed = bool(und.get("reject", False)) if isinstance(und, dict) else False
+    return amount, str(block.get("currency") or "INR"), reject_undisclosed
+
+
+def _location_list(value) -> list[str]:
+    """Accept a flat list or the grouped primary/secondary/remote map."""
+    if isinstance(value, list):
+        return [str(item) for item in value if str(item).strip()]
+    if isinstance(value, dict):
+        out: list[str] = []
+        for key in ("primary", "secondary", "other_metros", "remote"):
+            bucket = value.get(key) or []
+            if isinstance(bucket, list):
+                out.extend(str(item) for item in bucket if str(item).strip())
+            elif isinstance(bucket, str) and bucket.strip():
+                out.append(bucket.strip())
+        return out
+    return []
 
 
 def _dedupe(items: list[str]) -> list[str]:

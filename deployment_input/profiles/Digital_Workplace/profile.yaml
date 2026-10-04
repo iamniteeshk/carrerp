@@ -1,0 +1,492 @@
+name: Digital_Workplace
+
+display_name: "Digital Workplace & Modern Endpoint Leadership"
+
+description: >
+  Specialized executive job-search profile for Murahari M targeting
+  Director, Senior Director, Associate Director, AVP, VP and Head-level
+  roles across Digital Workplace, Modern Workplace, End User Computing,
+  Unified Endpoint Management, Endpoint Services, Workplace Technology,
+  IT Service Delivery and workplace transformation.
+
+candidate:
+  name: "Murahari M"
+  preferred_name: "Hari Madhav"
+  location: "Chennai, India"
+  experience_years: 25
+
+target:
+  seniority:
+    - Director
+    - Senior Director
+    - Associate Director
+    - AVP
+    - VP
+    - Head
+    - General Manager
+
+  primary_roles:
+    - Director Digital Workplace
+    - Head Digital Workplace
+    - Digital Workplace Director
+    - Director Digital Workplace Services
+    - Head Digital Workplace Services
+    - Digital Workplace Services Director
+    - Modern Workplace Director
+    - Head Modern Workplace
+    - Modern Workplace Services Director
+    - Workplace Technology Director
+    - Head Workplace Technology
+    - Workplace Services Director
+    - Head Workplace Services
+    - Director EUC
+    - Head EUC
+    - EUC Director
+    - End User Computing Director
+    - Head End User Computing
+    - Director End User Computing
+    - Endpoint Services Director
+    - Head Endpoint Services
+    - Modern Endpoint Director
+    - Head Modern Endpoint
+    - Modern Device Management Director
+    - Head Modern Device Management
+    - UEM Director
+    - Head UEM
+    - Unified Endpoint Management Director
+    - Head Unified Endpoint Management
+    - Endpoint Management Director
+    - Head Endpoint Management
+    - IT Infrastructure Director
+    - Director IT Infrastructure
+    - Head IT Infrastructure
+    - Infrastructure Services Director
+    - Head Infrastructure Services
+    - IT Operations Director
+    - Head IT Operations
+    - IT Service Delivery Director
+    - Head IT Service Delivery
+    - Director Service Delivery
+
+  secondary_roles:
+    - Managed Services Director
+    - Head Managed Services
+    - Workplace Operations Director
+    - Head Workplace Operations
+    - Endpoint Operations Director
+    - Head Endpoint Operations
+    - Service Management Head
+    - Technology Operations Head
+    - IT Operations Head
+    - Global Delivery Director
+    - Head Global Delivery
+    - Digital Employee Experience Director
+    - Head Digital Employee Experience
+    - DEX Director
+    - Employee Experience Technology Director
+    - Workplace Transformation Director
+    - Digital Transformation Director
+    - IT Transformation Director
+    - Service Transformation Director
+    - Automation Director
+    - AI Transformation Director
+
+experience:
+  minimum_years: 15
+  preferred_years: 20
+  candidate_years: 25
+
+compensation:
+  minimum_fixed_ctc: 7000000
+  expected_ctc: 9000000
+  currency: INR
+  negotiable: true
+
+locations:
+  preferred:
+    primary:
+      - Chennai
+    secondary:
+      - Bengaluru
+      - Hyderabad
+    other_metros:
+      - Pune
+      - Mumbai
+      - Delhi NCR
+      - Gurgaon
+      - Noida
+
+  remote:
+    - India
+
+  relocation:
+    willing: true
+
+  nationwide_search: false
+
+work_preferences:
+  employment_type:
+    - Full Time
+    - Permanent
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+domain_focus:
+  primary:
+    - Digital Workplace
+    - Digital Workplace Services
+    - Modern Workplace
+    - Workplace Technology
+    - Workplace Services
+    - End User Computing
+    - EUC
+    - Unified Endpoint Management
+    - UEM
+    - Endpoint Management
+    - Endpoint Operations
+    - Modern Endpoint
+    - Modern Device Management
+    - IT Service Delivery
+    - Service Delivery
+    - Managed Services
+    - IT Operations
+    - Global Delivery
+    - Workplace Transformation
+    - Digital Employee Experience
+
+  secondary:
+    - Service Management
+    - Service Desk
+    - Endpoint Security
+    - Vulnerability Management
+    - Security Compliance
+    - Cloud Operations
+    - Virtual Desktop Infrastructure
+    - VDI
+    - Desktop as a Service
+    - DaaS
+    - AI Transformation
+    - Automation
+    - AIOps
+    - Digital Transformation
+    - IT Transformation
+    - Contact Centre
+    - Customer Operations
+
+technology_focus:
+  endpoint_management:
+    - Microsoft Intune
+    - Intune
+    - Microsoft Endpoint Configuration Manager
+    - MECM
+    - SCCM
+    - Jamf
+    - Unified Endpoint Management
+    - UEM
+    - Endpoint Management
+    - Modern Device Management
+    - Mobile Device Management
+    - MDM
+    - Endpoint Compliance
+    - Patch Management
+    - Application Packaging
+
+  virtual_desktop:
+    - Azure Virtual Desktop
+    - AVD
+    - Cloud PC
+    - Windows 365
+    - Virtual Desktop
+    - VDI
+    - DaaS
+
+  digital_experience:
+    - Workblaze
+    - SysTrack
+    - Nexthink
+    - PredictX
+    - Digital Employee Experience
+    - DEX
+    - Experience Analytics
+    - Predictive AIOps
+    - IT Digital Twin
+    - Proactive Service Management
+    - Shift-Left
+    - Self-Service
+
+  collaboration:
+    - Microsoft 365
+    - Microsoft Teams
+    - Teams
+    - Exchange
+    - SharePoint
+    - Google Workspace
+    - Collaboration Services
+
+  service_management:
+    - ServiceNow
+    - BMC Remedy
+    - ITIL
+    - Incident Management
+    - Change Management
+    - Release Management
+    - Problem Management
+    - Major Incident Management
+    - SLA Governance
+    - KPI Governance
+    - Service Governance
+
+  security:
+    - Endpoint Security
+    - Endpoint Protection
+    - Vulnerability Management
+    - Security Compliance
+    - CrowdStrike
+    - McAfee
+    - Symantec
+
+  automation_ai:
+    - AI Transformation
+    - AI-led Transformation
+    - Generative AI
+    - Gen AI
+    - Agentic AI
+    - AIOps
+    - Automation
+    - RPA
+    - PowerShell
+    - Power Platform
+    - AI Force
+    - Yellow.ai
+    - Krisp.AI
+    - Predictive Analytics
+    - Autonomous Operations
+
+leadership_scope:
+  p_and_l: true
+  maximum_portfolio_usd: 50000000
+  maximum_team_size: 1000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+enterprise_scale:
+  users: 175000
+  devices: 188000
+
+  additional_scale:
+    - "100K+ endpoints"
+    - "175K+ users"
+    - "188K devices"
+    - "50+ technology domains"
+    - "6 datacentres"
+    - "6.5K servers"
+
+genuine_strengths:
+  - "25+ years of technology and IT leadership experience"
+  - "Director-level Digital Workplace leadership"
+  - "Digital Workplace as a current core domain"
+  - "End User Computing leadership"
+  - "Unified Endpoint Management"
+  - "Modern endpoint transformation"
+  - "Large-scale endpoint operations"
+  - "175K users supported"
+  - "188K devices supported"
+  - "1,000+ professionals led"
+  - "Global delivery across North America, LATAM, EMEA and APAC"
+  - "USD 50M portfolio P&L ownership"
+  - "Microsoft Intune and endpoint management"
+  - "SCCM / MECM"
+  - "Jamf"
+  - "Azure Virtual Desktop"
+  - "Cloud PC"
+  - "Digital Employee Experience"
+  - "DEX analytics"
+  - "Workblaze / SysTrack / Nexthink / PredictX"
+  - "ServiceNow and BMC Remedy"
+  - "Endpoint security and compliance"
+  - "AI-led transformation"
+  - "Automation"
+  - "AIOps"
+  - "Managed services"
+  - "Service delivery"
+  - "Operational excellence"
+  - "Executive stakeholder management"
+
+leadership_keywords:
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Go-Live
+  - Transformation
+  - Transition
+  - Global Delivery
+  - Executive Stakeholder Management
+  - CIO
+  - C-Suite
+  - QBR
+  - SLA
+  - KPI
+  - Operational Excellence
+  - Crisis Management
+  - Business Continuity
+  - Service Governance
+  - Portfolio Management
+
+transformation_keywords:
+  - Digital Workplace Transformation
+  - Modern Workplace Transformation
+  - Endpoint Transformation
+  - UEM Transformation
+  - IT Transformation
+  - Digital Transformation
+  - Service Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - AIOps
+  - Modernisation
+  - Modernization
+  - Evergreen Management
+  - Continuous Improvement
+  - Operational Excellence
+  - Shift-Left
+  - Self-Service
+  - Autonomous Operations
+
+rejection_rules:
+  rejected_title_terms:
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Associate
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - Desktop Support
+    - Technical Support
+    - L1
+    - L2
+    - L3
+    - Helpdesk
+
+  rejected_roles:
+    - Desktop Support Engineer
+    - Technical Support Engineer
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+    - Helpdesk Analyst
+
+  rejected_employment_types:
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+    - Part Time
+    - Part-Time
+
+  rejected_experience:
+    maximum_years_required: 15
+
+  reject_if_salary_below_minimum_fixed: true
+
+matching:
+  minimum_match_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+
+  weighting:
+    title: 35
+    domain: 30
+    technology: 15
+    leadership: 10
+    experience: 5
+    location: 3
+    compensation: 2
+
+mandatory:
+  - seniority
+  - relevant_leadership_experience
+  - relevant_digital_workplace_experience
+  - location
+  - employment_type
+
+preferred:
+  - digital_workplace
+  - modern_workplace
+  - EUC
+  - UEM
+  - endpoint_management
+  - endpoint_operations
+  - digital_employee_experience
+  - IT_infrastructure
+  - IT_service_delivery
+  - managed_services
+  - global_delivery
+  - transformation
+  - AI
+  - automation
+  - AIOps
+  - P&L
+
+resume:
+  file: "resume.pdf"
+  source_resume: "Digital Workplace resume"
+
+positioning:
+  - "Digital Workplace Leadership"
+  - "Modern Workplace Leadership"
+  - "End User Computing Leadership"
+  - "Unified Endpoint Management"
+  - "Modern Endpoint Transformation"
+  - "Workplace Technology"
+  - "Digital Employee Experience"
+  - "Global Service Delivery"
+  - "Managed Services"
+  - "IT Infrastructure Leadership"
+  - "AI-led Transformation"
+  - "Automation"
+  - "Executive Stakeholder Management"
+
+search:
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+  include_recommended: true
+  include_all_feed: true
+
+  keyword_strategy:
+    primary_keywords: "Digital Workplace / Modern Workplace / EUC / UEM"
+    secondary_keywords: "Endpoint / Workplace Technology / Service Delivery"
+    supporting_keywords: "Infrastructure / Transformation / AI / Automation"
+
+application:
+  eligible: true
+  minimum_score: 90
+  easy_apply_only: true
+  require_preferred_location: false
+  require_final_confirmation: true

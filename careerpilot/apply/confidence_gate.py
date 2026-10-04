@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from ..core.config import ApplyConfig
 from ..core.logging_setup import get_logger
 from ..core.models import AIEvaluation, Job
+from .modes import canonical_apply_mode
 
 logger = get_logger(__name__)
 
@@ -45,17 +46,10 @@ class ConfidenceGate:
         if self.cfg.easy_apply_only and not job.is_easy_apply:
             return GateDecision(False, False, "not Easy Apply / native apply")
 
-        # First-run confirmation window: the first N live applications require
-        # a human tap before the system is trusted unattended.
-        if self._applied_lifetime < self.cfg.first_run_confirmations:
-            return GateDecision(True, True, "first-run confirmation window")
-
-        # Production default: always stop before final Submit and wait for an
-        # explicit human confirmation. Set require_final_confirmation: false
-        # only after sufficient live validation.
-        if getattr(self.cfg, "require_final_confirmation", True):
-            return GateDecision(True, True, "final confirmation required before submit")
-
-        if self.cfg.mode == "live":
-            return GateDecision(True, False, "auto-submit")
-        return GateDecision(True, True, "dry-run mode")
+        mode = canonical_apply_mode(self.cfg.mode)
+        if mode == "dry_run":
+            return GateDecision(True, False, "dry mode — fill and stop before submit")
+        if mode == "auto":
+            return GateDecision(True, False, "auto mode — submit without asking")
+        # approval, and any value canonical_apply_mode did not recognise as auto
+        return GateDecision(True, True, "approval mode — waiting for Proceed or Reject")

@@ -15,7 +15,7 @@ subsystem detail.
 |------|--------|--------|
 | Config / bootstrap / doctor | **Ready** | Paths, YAML, Windows ops solid |
 | Schedule (random + 3–4h day cap) | **Ready** | Needs live day to prove budget tracking |
-| Jarvis dashboard + Admin auth | **Ready** | Stats public; edits gated |
+| Jarvis dashboard + Admin auth | **Ready** | Login required for pages, statistics, and controls |
 | Local AI (Ollama) + API optional | **Ready** | Config default = Qwen 3; live Ollama required |
 | Vision login hold + emergency | **Ready (code)** | Needs live `qwen3-vl:8b` + real screenshots |
 | Rules / AI scoring / CSV / DB | **Ready** | Offline tests green |

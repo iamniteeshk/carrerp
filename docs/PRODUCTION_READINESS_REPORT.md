@@ -164,8 +164,9 @@ layers (queue/state recovery) are not built. Calling this beta or production
 ready would be dishonest. It is a solid alpha foundation: safe to run in
 `dry_run`, not ready to submit real applications.
 
-**Do not enable `apply.mode: live` until** the LinkedIn live-DOM checklist is
-complete and verified in dry-run, the Human Interaction state machine exists, and
-the first-run approval gate has been confirmed against the real flow.
+Current apply modes are `dry_run`, `approval`, and `auto`. Do not set `auto`
+until a real LinkedIn/Naukri session has been tested by hand. That live-site
+status remains **REQUIRES LIVE MANUAL TEST**. An older `live` setting is
+approval, not unattended submit.
 EOF
 echo "PRODUCTION_READINESS_REPORT.md written ($(wc -l < docs/PRODUCTION_READINESS_REPORT.md) lines)"

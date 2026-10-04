@@ -19,9 +19,11 @@ editing Python.
 
 ## Start / stop / restart
 
-- **Windows:** `scripts\run_careerpilot.bat`, `scripts\stop_careerpilot.bat`,
+- **Windows:** `scripts\run_careerpilot.ps1` (or `.bat`), `scripts\stop_careerpilot.bat`,
   `scripts\restart_careerpilot.bat`, `scripts\update_project.bat`,
   `scripts\doctor.bat`, `scripts\install_requirements.bat`.
+  Logon start: `scripts\Register-CareerPilotStartup.ps1` (uses the project
+  `.venv`, the repo folder, and writes `logs\startup.err.log`).
 - **macOS / Linux:** `scripts/run.sh`, `scripts/stop.sh`, `scripts/restart.sh`,
   `scripts/update.sh`, `scripts/doctor.sh`, `scripts/install.sh`.
 
@@ -31,10 +33,15 @@ prerequisites and print meaningful errors.
 
 ## Windows
 
-- Use Task Scheduler to launch `scripts\run_careerpilot.bat` at logon, set to
-  restart on failure.
+- Register logon start once: `.\scripts\Register-CareerPilotStartup.ps1`.
+  It launches `scripts\run_careerpilot.ps1` with the project `.venv` and the
+  repository as the working directory. A second start is refused while
+  `careerpilot.pid` belongs to a running process. Failures are appended to
+  `logs\startup.err.log`.
 - `scripts\doctor.bat` for pre-flight; `scripts\update_project.bat` to pull
   updates.
+- Daily operation is the dashboard (Start, Pause, Resume, Stop, Scan now).
+  Those buttons require the dashboard login.
 
 ## macOS / Linux
 
@@ -75,3 +82,37 @@ prerequisites and print meaningful errors.
 Automating a site may violate its Terms of Service and risk your account. That
 risk exists regardless of scan volume and is your decision. Start in `dry_run`,
 go slow, and keep `max_applications_per_day` conservative.
+
+## Apply modes
+
+| Mode | Submit |
+|------|--------|
+| `dry_run` | Never. |
+| `approval` | Only after an explicit Proceed (Telegram or a saved Proceed decision). |
+| `auto` | Without asking. This is the only mode that does that. |
+
+If the mode is missing or not one of those three names, CareerPilot stays on
+`dry_run`. An old config that says `live` is treated as `approval`.
+
+## When something fails
+
+CareerPilot records the job and does not mark it submitted unless the apply
+flow reports a real Submit click in `auto`, or in `approval` after Proceed.
+
+- Ollama offline, model missing, timeout, or a bad model reply: the job stays
+  queued or needs review. It is not marked applied.
+- Telegram unavailable during approval: the job stays `waiting`. It is not submitted.
+- LinkedIn or Naukri logged out, 2FA, or CAPTCHA: the run pauses for you and
+  sends a notice. It does not submit.
+- Browser crash, page timeout, a changed selector, a form change, a required
+  question with no answer, or a Submit button that cannot be identified: the
+  attempt is recorded as not submitted.
+- A short network drop: that cycle fails and is retried later. A failed cycle
+  is not an application.
+- Restart (including Windows logon) while an approval is open: the saved row
+  stays `waiting` or `proceed`. The old page cannot be restored. After Proceed,
+  the same job URL is opened again, filled again, and only then submitted.
+  A restart by itself does not click Submit.
+
+The dashboard on `0.0.0.0:5000` is for the home LAN. Log in is required for
+every page. Do not forward that port to the internet.

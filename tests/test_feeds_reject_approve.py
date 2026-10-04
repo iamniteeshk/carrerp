@@ -294,19 +294,18 @@ def test_dashboard_approve_requires_admin():
         svc.update_status(jid, JobStatus.REJECTED, rejection_reason="test")
         app = create_dashboard(db, refresh_seconds=5)
         client = app.test_client()
-        # Public can list rejected
-        r = client.get("/api/rejected")
-        assert r.status_code == 200
-        assert r.get_json()[0]["job_title"] == "Director EUC"
-        # Approve without login → 401
+        # LAN dashboard requires login before any job list or control
+        assert client.get("/api/rejected").status_code == 401
         r = client.post(f"/api/jobs/{jid}/approve")
         assert r.status_code == 401
-        # Login then approve
         os.environ["DASHBOARD_USER"] = "Admin"
         os.environ["DASHBOARD_PASSWORD"] = "Adming"
         r = client.post("/login", data={"username": "Admin", "password": "Adming"},
                         follow_redirects=False)
         assert r.status_code in (302, 200)
+        r = client.get("/api/rejected")
+        assert r.status_code == 200
+        assert r.get_json()[0]["job_title"] == "Director EUC"
         r = client.post(f"/api/jobs/{jid}/approve")
         assert r.status_code == 200
         body = r.get_json()

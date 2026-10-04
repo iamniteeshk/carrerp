@@ -89,6 +89,7 @@ class AIEvaluation:
     confidence: float
     reason: str
     apply: bool
+    uncertain: bool = False
     provider: str = ""
     model: str = ""
     tokens_used: int = 0

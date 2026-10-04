@@ -1,0 +1,618 @@
+
+name: Default
+
+display_name: "Executive Technology Leadership"
+
+description: >
+  Default executive job-search profile for Murahari M targeting senior
+  IT infrastructure, end-to-end infrastructure services, digital workplace,
+  EUC, IT operations, service delivery, transformation, GCC and selected
+  contact centre leadership roles.
+
+
+candidate:
+
+  name: "Murahari M"
+
+  preferred_name: "Hari Madhav"
+
+  location: "Chennai, India"
+
+  experience_years: 25
+
+  leadership_experience_years: 15
+
+  infrastructure_experience_years: 25
+
+
+role_priority:
+
+  1:
+    category: "IT Infrastructure / End-to-End Infrastructure Services"
+    weight: 1.00
+
+  2:
+    category: "Digital Workplace / Modern Endpoint / EUC"
+    weight: 0.95
+
+  3:
+    category: "Senior Leadership / Transformation / General Management"
+    weight: 0.85
+
+  4:
+    category: "GCC / Global Capability Centre Head or Setup"
+    weight: 0.80
+
+  5:
+    category: "Contact Centre / BPO / CX Operations"
+    weight: 0.70
+
+
+target:
+
+  seniority:
+
+    accepted:
+      - Director
+      - Senior Director
+      - Associate Director
+      - AVP
+      - VP
+      - Head
+      - General Manager
+
+    rejected:
+      - SVP
+      - CIO
+      - CTO
+
+
+  primary_roles:
+
+    # Priority 1 - IT Infrastructure
+
+    - IT Director
+    - IT Infrastructure Director
+    - Director IT Infrastructure
+    - Head IT
+    - Head IT Infrastructure
+    - Director Infrastructure
+    - Head Infrastructure
+    - Infrastructure Director
+    - Director IT Operations
+    - Head IT Operations
+    - IT Operations Director
+    - Director Service Delivery
+    - Head IT Service Delivery
+    - IT Service Delivery Director
+    - Infrastructure Services Director
+    - Infrastructure Operations Director
+
+    # Priority 2 - Digital Workplace / EUC
+
+    - Head Digital Workplace
+    - Director Digital Workplace
+    - Digital Workplace Director
+    - Head EUC
+    - Director EUC
+    - End User Computing Director
+    - Workplace Services Director
+    - Workplace Services Head
+    - Modern Workplace Director
+    - Modern Endpoint Director
+    - Unified Endpoint Management Director
+
+    # Priority 3 - Leadership / Transformation
+
+    - Global IT Director
+    - Enterprise IT Director
+    - Technology Director
+    - Head Technology
+    - Enterprise Technology Director
+    - Transformation Director
+    - IT Transformation Director
+    - Digital Transformation Director
+    - Technology Transformation Director
+
+    # Priority 4 - GCC / Global Delivery
+
+    - Global Delivery Director
+    - Head Global Delivery
+    - GCC Head
+    - GCC Director
+    - Global Capability Centre Head
+    - Global Capability Center Head
+    - Global Capability Centre Director
+    - Global Capability Center Director
+
+
+  secondary_roles:
+
+    - Managed Services Director
+    - Head Managed Services
+    - Service Management Head
+    - Technology Operations Head
+    - IT Operations Head
+    - Operations Director
+    - Global Delivery Head
+    - Service Transformation Director
+    - Business Transformation Director
+
+    # Priority 5 - Contact Centre / CX
+
+    - Contact Centre Director
+    - Contact Center Director
+    - Contact Centre Head
+    - Contact Center Head
+    - BPO Operations Head
+    - CX Operations Head
+    - Customer Operations Director
+
+
+experience:
+
+  minimum_years: 15
+
+  preferred_years: 20
+
+  candidate_years: 25
+
+  infrastructure_years: 25
+
+  leadership_years: 15
+
+
+compensation:
+
+  current_ctc:
+    total: 7700000
+    fixed: 5000000
+    variable: 1050000
+    psu_rsu: 1650000
+    currency: INR
+
+  minimum_fixed_ctc:
+    amount: 7000000
+    currency: INR
+    hard_floor: true
+
+  expected_ctc:
+    amount: 9000000
+    currency: INR
+    negotiable: true
+
+  salary_rule:
+    fixed_salary_below_minimum: reject
+    total_ctc_below_expected: do_not_automatically_reject
+    undisclosed_salary: allow_if_strong_match: true
+
+
+locations:
+
+  primary:
+    - Chennai
+
+  secondary:
+    - Bengaluru
+    - Hyderabad
+
+  other_metros:
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+  relocation:
+    willing: true
+
+  nationwide_search: true
+
+  flexible_for_right_role: true
+
+
+work_preferences:
+
+  employment_type:
+
+    accepted:
+      - Full Time
+      - Permanent
+
+    rejected:
+      - Contract
+      - Consulting
+      - Interim
+      - Temporary
+      - Freelance
+      - Internship
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+  maximum_travel_percent: 50
+
+
+domain_focus:
+
+  primary:
+
+    # Priority 1
+
+    - IT Infrastructure
+    - End-to-End Infrastructure Services
+    - Infrastructure Services
+    - Infrastructure Operations
+    - IT Operations
+    - IT Service Delivery
+    - Service Delivery
+
+    # Priority 2
+
+    - Digital Workplace
+    - Modern Workplace
+    - Modern Endpoint
+    - End User Computing
+    - EUC
+    - Unified Endpoint Management
+    - UEM
+
+    # Priority 3
+
+    - Enterprise IT
+    - Enterprise Technology
+    - Technology Operations
+    - Technology Transformation
+    - Digital Transformation
+
+    # Priority 4
+
+    - Global Delivery
+    - GCC
+    - GIC
+    - Global Capability Centre
+    - Global Capability Center
+
+  secondary:
+
+    - Managed Services
+    - Service Management
+    - Cloud Operations
+    - AI Transformation
+    - Automation
+    - Operational Excellence
+    - Continuous Improvement
+
+    # Priority 5
+
+    - Contact Centre
+    - Contact Center
+    - Customer Operations
+    - BPO Operations
+    - CX Operations
+
+
+leadership_scope:
+
+  p_and_l: true
+
+  maximum_portfolio_usd: 50000000
+
+  maximum_team_size: 1000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+  executive_stakeholder_management: true
+
+  commercial_governance: true
+
+
+enterprise_scale:
+
+  users: 175000
+
+  devices: 188000
+
+
+genuine_strengths:
+
+  - "25+ years of technology and infrastructure experience"
+  - "15+ years of leadership experience"
+  - "Director-level global technology leadership"
+  - "USD 50M portfolio P&L ownership"
+  - "1,000+ professionals led"
+  - "Global delivery across North America, LATAM, EMEA and APAC"
+  - "Digital Workplace leadership"
+  - "End User Computing leadership"
+  - "IT Infrastructure leadership"
+  - "End-to-end IT Infrastructure Services"
+  - "IT Operations and Service Delivery"
+  - "GCC setup and operationalisation"
+  - "Build-Operate-Transform-Transfer leadership"
+  - "Large-scale transformation"
+  - "Managed services"
+  - "Commercial and SOW governance"
+  - "Executive stakeholder management"
+  - "AI-led transformation"
+  - "Automation"
+  - "Operational excellence"
+
+
+technology_keywords:
+
+  - Microsoft Intune
+  - Microsoft Endpoint Configuration Manager
+  - SCCM
+  - Jamf
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - AWS
+  - Google Cloud
+  - GCP
+  - Microsoft 365
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - AIOps
+  - AI Force
+  - Yellow.ai
+  - Krisp.AI
+  - PowerShell
+  - Power Platform
+  - RPA
+  - Gen AI
+  - Generative AI
+  - ITIL
+
+
+leadership_keywords:
+
+  - P&L
+  - Profit and Loss
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Go-Live
+  - Transformation
+  - Transition
+  - Transition and Transformation
+  - Global Delivery
+  - Executive Stakeholder Management
+  - QBR
+  - SLA
+  - KPI
+  - Operational Excellence
+  - Crisis Management
+  - Business Continuity
+
+
+gcc_keywords:
+
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Captive Centre
+  - Captive Center
+  - BOTT
+  - Build Operate Transform Transfer
+  - GCC Setup
+  - GCC Build
+  - GCC Build-Out
+  - Operating Model
+  - Centre Build-Out
+  - Center Build-Out
+  - Centre Setup
+  - Center Setup
+  - Talent Ramp-Up
+  - Transition Readiness
+  - Multi-Tower Delivery
+  - Global Capability
+
+
+transformation_keywords:
+
+  - Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Service Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Agentic AI
+  - AIOps
+  - Modernisation
+  - Modernization
+  - Transition
+  - Transition and Transformation
+  - T&T
+  - Service Modernisation
+  - Service Modernization
+  - Operational Excellence
+  - Continuous Improvement
+  - Business Transformation
+  - Technology Transformation
+
+
+rejection_rules:
+
+  rejected_title_terms:
+
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - Desktop Support
+    - Technical Support
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+    - L1
+    - L2
+    - L3
+    - Helpdesk
+    - Service Desk
+
+  rejected_roles:
+
+    - Desktop Support Engineer
+    - Technical Support Engineer
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+
+  rejected_employment_types:
+
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+    - Consulting
+    - Interim
+
+  rejected_experience:
+    maximum_years_required: 15
+
+  reject_if_fixed_salary_below_minimum: true
+
+  reject_if_outside_preferred_locations: false
+
+
+matching:
+
+  minimum_match_score: 60
+
+  strong_match_score: 75
+
+  excellent_match_score: 85
+
+  application_score: 90
+
+  scoring_weights:
+
+    title: 35
+    domain: 25
+    leadership: 20
+    experience: 10
+    location: 5
+    compensation: 5
+
+
+mandatory:
+
+  - seniority
+  - relevant_leadership_experience
+  - employment_type
+
+
+preferred:
+
+  - P&L
+  - global_delivery
+  - GCC
+  - digital_workplace
+  - EUC
+  - IT_infrastructure
+  - transformation
+  - managed_services
+  - AI
+  - automation
+  - executive_stakeholder_management
+  - commercial_governance
+
+
+resume:
+
+  file: "resume.pdf"
+
+  source_resume: "Leadership / General Management resume"
+
+
+positioning:
+
+  - "Senior Leadership"
+  - "IT Infrastructure Leadership"
+  - "Digital Workplace Leadership"
+  - "General Management"
+  - "Transformation Advisory"
+  - "P&L Leadership"
+  - "GCC / Centre Leadership"
+  - "Site / Centre Leadership"
+  - "Executive Client Advisory"
+
+
+search:
+
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+
+  include_recommended: true
+
+  include_all_feed: true
+
+  nationwide: true
+
+  relocation_allowed: true
+
+  remote_allowed: true
+
+
+application:
+
+  eligible: true
+
+  minimum_score: 90
+
+  easy_apply_only: true
+
+  require_preferred_location: false
+
+  require_final_confirmation: true
+
+  require_verified_screening_answers: true
+
+  never_guess_screening_answers: true
+
+  ask_before_unknown_answers: true
+
+  ask_before_sensitive_answers: true

@@ -1,0 +1,412 @@
+primary:
+
+  # Digital Workplace / Modern Workplace
+  - Digital Workplace Director
+  - Director Digital Workplace
+  - Head Digital Workplace
+  - Digital Workplace Head
+  - Digital Workplace Services Director
+  - Head Digital Workplace Services
+  - Director Digital Workplace Services
+  - Modern Workplace Director
+  - Head Modern Workplace
+  - Modern Workplace Services Director
+  - Workplace Technology Director
+  - Head Workplace Technology
+  - Workplace Services Director
+  - Head Workplace Services
+
+  # End User Computing / Endpoint
+  - Director EUC
+  - Head EUC
+  - EUC Director
+  - End User Computing Director
+  - Head End User Computing
+  - Director End User Computing
+  - Endpoint Director
+  - Head Endpoint
+  - Endpoint Services Director
+  - Head Endpoint Services
+  - Modern Endpoint Director
+  - Head Modern Endpoint
+  - Modern Device Management Director
+  - Head Modern Device Management
+
+  # UEM
+  - UEM Director
+  - Head UEM
+  - Unified Endpoint Management Director
+  - Head Unified Endpoint Management
+  - Endpoint Management Director
+  - Head Endpoint Management
+
+  # Infrastructure roles with strong Workplace scope
+  - IT Infrastructure Director
+  - Director IT Infrastructure
+  - Head IT Infrastructure
+  - IT Infrastructure Head
+  - Infrastructure Services Director
+  - Head Infrastructure Services
+  - IT Operations Director
+  - Head IT Operations
+  - Service Delivery Director
+  - Director Service Delivery
+  - IT Service Delivery Director
+  - Head IT Service Delivery
+
+
+secondary:
+
+  # Service / Delivery
+  - Managed Services Director
+  - Head Managed Services
+  - Workplace Operations Director
+  - Head Workplace Operations
+  - Endpoint Operations Director
+  - Head Endpoint Operations
+  - Service Management Head
+  - Technology Operations Head
+  - IT Operations Head
+  - Global Delivery Director
+  - Head Global Delivery
+
+  # Experience / Transformation
+  - Digital Employee Experience Director
+  - Head Digital Employee Experience
+  - DEX Director
+  - Employee Experience Technology Director
+  - Digital Transformation Director
+  - IT Transformation Director
+  - Workplace Transformation Director
+  - Service Transformation Director
+  - Automation Director
+  - AI Transformation Director
+
+
+domain:
+
+  # Core domain
+  - Digital Workplace
+  - Digital Workplace Services
+  - Modern Workplace
+  - Workplace Technology
+  - Workplace Services
+  - End User Computing
+  - EUC
+  - Endpoint Management
+  - Endpoint Operations
+  - Modern Endpoint
+  - Modern Device Management
+  - Unified Endpoint Management
+  - UEM
+
+  # Service delivery
+  - IT Service Delivery
+  - Service Delivery
+  - Managed Services
+  - Service Management
+  - IT Operations
+  - Global Delivery
+  - Service Desk
+  - Endpoint Operations
+
+  # Experience
+  - Digital Employee Experience
+  - DEX
+  - Employee Experience
+  - Experience Management
+  - Shift-Left
+  - Self-Service
+  - Continuous Service Improvement
+  - CSI
+
+  # Transformation
+  - Workplace Transformation
+  - IT Transformation
+  - Digital Transformation
+  - Service Transformation
+  - AI Transformation
+  - Automation
+  - AIOps
+
+  # Supporting domains
+  - Endpoint Security
+  - Vulnerability Management
+  - Security Compliance
+  - Cloud Operations
+  - Virtual Desktop Infrastructure
+  - VDI
+  - Desktop as a Service
+  - DaaS
+
+
+endpoint:
+
+  - Microsoft Intune
+  - Intune
+  - Microsoft Endpoint Configuration Manager
+  - MECM
+  - SCCM
+  - System Center Configuration Manager
+  - Jamf
+  - Unified Endpoint Management
+  - UEM
+  - Endpoint Management
+  - Modern Device Management
+  - Windows Endpoint
+  - macOS Management
+  - Mobile Device Management
+  - MDM
+  - Application Packaging
+  - Patch Management
+  - Patch Orchestration
+  - Endpoint Compliance
+  - Endpoint Security
+
+
+virtual_desktop:
+
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - Windows 365
+  - Virtual Desktop
+  - VDI
+  - Desktop as a Service
+  - DaaS
+  - VDI Transformation
+  - Virtual Workspace
+
+
+dex:
+
+  - Digital Employee Experience
+  - DEX
+  - DEX Analytics
+  - Employee Experience Analytics
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - IT Digital Twin
+  - Predictive AIOps
+  - Experience Analytics
+  - Proactive Service Management
+  - Shift-Left
+
+
+collaboration:
+
+  - Microsoft 365
+  - Microsoft Teams
+  - Teams
+  - Exchange
+  - SharePoint
+  - Google Workspace
+  - Seamless Collaboration
+  - Collaboration Services
+  - Digital Collaboration
+
+
+service_management:
+
+  - ITIL
+  - Incident Management
+  - Change Management
+  - Release Management
+  - Problem Management
+  - Major Incident Management
+  - Crisis Management
+  - Escalation Management
+  - Evergreen Management
+  - Release Management
+  - SLA Governance
+  - KPI Governance
+  - Service Governance
+  - ServiceNow
+  - BMC Remedy
+
+
+security:
+
+  - Endpoint Security
+  - Endpoint Protection
+  - Vulnerability Management
+  - Security Compliance
+  - Compliance Standards
+  - CrowdStrike
+  - McAfee
+  - Symantec
+
+
+ai_automation:
+
+  - AI Transformation
+  - AI-led Transformation
+  - Generative AI
+  - Gen AI
+  - Agentic AI
+  - AI Force
+  - AIOps
+  - Automation
+  - RPA
+  - PowerShell
+  - Power Platform
+  - iAutomate
+  - iObserve
+  - Yellow.ai
+  - Krisp.AI
+  - Smart Support Hub
+  - Predictive Analytics
+  - Autonomous Operations
+
+
+leadership:
+
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+
+  - P&L
+  - Profit and Loss
+  - Portfolio Management
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Go-Live
+  - QBR
+  - SLA
+  - KPI
+  - Executive Stakeholder Management
+  - Global Team Leadership
+  - Global Delivery
+  - Managed Services
+
+
+scale_indicators:
+
+  - 25+ years
+  - 20+ years
+  - 15+ years
+  - 1000+ professionals
+  - 1000+ employees
+  - 175K users
+  - 175,000 users
+  - 188K devices
+  - 188,000 devices
+  - 100K devices
+  - 130K devices
+  - 44K users
+  - 38K devices
+  - 50+ technology domains
+  - 6 datacentres
+  - 6.5K servers
+  - Global
+  - Enterprise
+  - Multi-region
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+  - USD 50M
+  - $50M
+  - 11-18% margins
+
+
+positive_terms:
+
+  - Global
+  - Enterprise
+  - Strategic
+  - Executive
+  - Leadership
+  - Digital Workplace
+  - Modern Workplace
+  - EUC
+  - UEM
+  - Endpoint
+  - Transformation
+  - Operations
+  - Delivery
+  - Managed Services
+  - Consulting
+  - Advisory
+  - Governance
+  - Commercial
+  - Customer Experience
+  - Digital Employee Experience
+  - Service Excellence
+  - Operational Excellence
+  - Continuous Improvement
+  - Automation
+  - AI
+  - AIOps
+  - Cloud
+  - Modernisation
+  - Modernization
+  - Security
+  - Compliance
+
+
+negative:
+
+  - Intern
+  - Internship
+  - Trainee
+  - Junior
+  - Engineer
+  - Analyst
+  - Specialist
+  - Technician
+  - Desktop Support
+  - Technical Support
+  - Service Desk Analyst
+  - Desktop Engineer
+  - System Administrator
+  - Network Engineer
+  - Cloud Engineer
+  - Support Analyst
+  - L1
+  - L2
+  - L3
+  - Helpdesk
+  - Service Desk Analyst
+  - Contract
+  - Temporary
+  - Freelance
+  - Part Time
+  - Part-Time
+
+
+scoring:
+
+  title_weight: 35
+
+  domain_weight: 30
+
+  technology_weight: 15
+
+  leadership_weight: 10
+
+  experience_weight: 5
+
+  location_weight: 3
+
+  compensation_weight: 2
+
+  minimum_score: 60
+
+  strong_match_score: 75
+
+  excellent_match_score: 85
+
+  application_score: 90

@@ -1,0 +1,540 @@
+name: GCC
+
+display_name: "GCC / Global Capability Centre Leadership"
+
+description: >
+  GCC-focused executive job-search profile for Murahari M targeting GCC Head,
+  GCC Director, Global Capability Centre leadership, GIC, captive centre,
+  GCC setup and build-out, operating model, transformation, global delivery,
+  technology operations, infrastructure, digital workplace and enterprise
+  technology leadership roles.
+
+candidate:
+  name: "Murahari M"
+  preferred_name: "Hari Madhav"
+  location: "Chennai, India"
+  experience_years: 25
+
+target:
+  seniority:
+    - Director
+    - Senior Director
+    - Associate Director
+    - AVP
+    - VP
+    - Head
+    - General Manager
+
+  primary_roles:
+    - GCC Head
+    - GCC Director
+    - Head of GCC
+    - Director GCC
+    - Global Capability Centre Head
+    - Global Capability Center Head
+    - Global Capability Centre Director
+    - Global Capability Center Director
+    - Head Global Capability Centre
+    - Head Global Capability Center
+    - Global Capability Centre Leader
+    - Global Capability Center Leader
+    - GIC Head
+    - GIC Director
+    - Global In-House Centre Head
+    - Global In-House Center Head
+    - Captive Centre Head
+    - Captive Center Head
+    - GCC Setup Head
+    - GCC Build Head
+    - GCC Transformation Head
+    - GCC Operations Head
+    - GCC Delivery Head
+    - GCC Technology Head
+    - GCC IT Head
+    - GCC Infrastructure Head
+    - GCC Digital Workplace Head
+    - GCC Service Delivery Head
+    - GCC Transformation Director
+    - GCC Operations Director
+    - GCC Technology Director
+    - GCC IT Director
+    - GCC Infrastructure Director
+    - GCC Digital Workplace Director
+    - GCC Service Delivery Director
+
+  secondary_roles:
+    - Global Delivery Director
+    - Head Global Delivery
+    - Global Delivery Head
+    - Global Operations Head
+    - Global Technology Head
+    - Enterprise Technology Director
+    - Technology Director
+    - IT Director
+    - IT Infrastructure Director
+    - Director IT Infrastructure
+    - Director IT Operations
+    - Head IT Operations
+    - IT Operations Director
+    - Director Service Delivery
+    - Head IT Service Delivery
+    - IT Service Delivery Director
+    - Head Digital Workplace
+    - Director Digital Workplace
+    - Head EUC
+    - Director EUC
+    - Transformation Director
+    - IT Transformation Director
+    - Digital Transformation Director
+    - Managed Services Director
+    - Infrastructure Services Director
+    - Workplace Services Director
+
+experience:
+  minimum_years: 15
+  preferred_years: 20
+  candidate_years: 25
+
+compensation:
+  minimum_fixed_ctc: 7000000
+  expected_ctc: 9000000
+  currency: INR
+  negotiable: true
+
+  minimum_fixed_salary_hard_floor: true
+  expected_total_ctc_is_negotiable: true
+
+locations:
+  preferred:
+    - Chennai
+    - Bengaluru
+    - Hyderabad
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+  relocation:
+    willing: true
+
+  nationwide_search: true
+
+work_preferences:
+  employment_type:
+    - Full Time
+    - Permanent
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+  maximum_travel_percent: 50
+
+domain_focus:
+  primary:
+    - Global Capability Centre
+    - Global Capability Center
+    - GCC
+    - GIC
+    - Global In-House Centre
+    - Global In-House Center
+    - Captive Centre
+    - Captive Center
+    - GCC Setup
+    - GCC Build
+    - GCC Build-Out
+    - GCC Operations
+    - GCC Transformation
+    - GCC Operating Model
+    - Global Delivery
+    - Global Operations
+    - IT Infrastructure
+    - Digital Workplace
+    - End User Computing
+    - IT Operations
+    - IT Service Delivery
+    - Managed Services
+
+  secondary:
+    - Enterprise Technology
+    - Technology Operations
+    - Infrastructure Services
+    - Workplace Services
+    - Service Management
+    - Cloud Operations
+    - Digital Transformation
+    - IT Transformation
+    - AI Transformation
+    - Automation
+    - Contact Centre
+    - Customer Operations
+
+gcc_scope:
+  gcc_experience: true
+  gcc_setup: true
+  gcc_build: true
+  gcc_operationalisation: true
+  gcc_transformation: true
+  global_delivery: true
+  operating_model: true
+  multi_tower_delivery: true
+  transition_readiness: true
+  talent_ramp_up: true
+
+  build_operate_transform_transfer: true
+
+leadership_scope:
+  p_and_l: true
+  maximum_portfolio_usd: 50000000
+  maximum_team_size: 1000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+  executive_stakeholder_management: true
+  commercial_governance: true
+  revenue_growth: true
+  margin_management: true
+
+enterprise_scale:
+  users: 175000
+  devices: 188000
+
+career_strengths:
+  - "25+ years of technology and operations experience"
+  - "15+ years of leadership experience"
+  - "GCC setup and operationalisation"
+  - "Build-Operate-Transform-Transfer leadership"
+  - "Global delivery leadership"
+  - "Global operating model development"
+  - "Multi-tower delivery"
+  - "Transition readiness"
+  - "Talent ramp-up and capability build"
+  - "IT Infrastructure leadership"
+  - "Digital Workplace leadership"
+  - "End User Computing leadership"
+  - "Managed services"
+  - "Large-scale transformation"
+  - "AI-led transformation"
+  - "Automation"
+  - "Commercial and SOW governance"
+  - "Executive stakeholder management"
+  - "Operational excellence"
+  - "USD 50M portfolio ownership"
+  - "1,000+ professionals led"
+  - "175,000 users supported"
+  - "188,000 devices supported"
+
+technology_keywords:
+  - Microsoft Intune
+  - Microsoft Endpoint Configuration Manager
+  - SCCM
+  - Jamf
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - AWS
+  - Google Cloud
+  - GCP
+  - Microsoft 365
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - AIOps
+  - AI Force
+  - Yellow.ai
+  - Krisp.AI
+  - PowerShell
+  - Power Platform
+  - RPA
+  - Gen AI
+  - Agentic AI
+  - ITIL
+
+leadership_keywords:
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - GCC Setup
+  - GCC Build
+  - GCC Build-Out
+  - GCC Transformation
+  - GCC Operations
+  - GCC Operating Model
+  - Operating Model
+  - Target Operating Model
+  - TOM
+  - BOTT
+  - Build Operate Transform Transfer
+  - Transition Readiness
+  - Talent Ramp-Up
+  - Capability Build
+  - Multi-Tower
+  - Global Delivery
+  - Global Operations
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Go-Live
+  - Transformation
+  - Transition
+  - Executive Stakeholder Management
+  - CIO
+  - C-Suite
+  - QBR
+  - SLA
+  - KPI
+  - Operational Excellence
+  - Crisis Management
+  - Business Continuity
+
+gcc_keywords:
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Global Capability
+  - Global In-House Centre
+  - Global In-House Center
+  - Captive Centre
+  - Captive Center
+  - Captive Operations
+  - GCC Setup
+  - GCC Build
+  - GCC Build-Out
+  - GCC Buildout
+  - GCC Establishment
+  - GCC Launch
+  - GCC Expansion
+  - GCC Scale-Up
+  - GCC Operations
+  - GCC Operating Model
+  - GCC Strategy
+  - GCC Transformation
+  - GCC Transition
+  - GCC Delivery
+  - GCC Governance
+  - GCC Leadership
+  - GCC Technology
+  - GCC Infrastructure
+  - GCC Digital Workplace
+  - GCC Service Delivery
+  - GCC Multi-Tower
+  - Build Operate Transform Transfer
+  - BOTT
+  - Operating Model
+  - Target Operating Model
+  - TOM
+  - Multi-Tower
+  - Multi-Region
+  - Global Delivery Model
+  - Talent Ramp-Up
+  - Transition Readiness
+  - Centre Setup
+  - Center Setup
+  - Centre Build
+  - Center Build
+  - Centre Build-Out
+  - Center Build-Out
+
+transformation_keywords:
+  - Transformation
+  - GCC Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Service Transformation
+  - Business Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Agentic AI
+  - AIOps
+  - Modernisation
+  - Modernization
+  - Transition
+  - Transition and Transformation
+  - T&T
+  - Service Modernisation
+  - Service Modernization
+  - Operational Excellence
+  - Continuous Improvement
+
+rejection_rules:
+  rejected_title_terms:
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Associate
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - Desktop Support
+    - Technical Support
+    - L1
+    - L2
+
+  rejected_roles:
+    - Desktop Support Engineer
+    - Technical Support Engineer
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+
+  rejected_employment_types:
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+
+  rejected_experience:
+    maximum_years_required: 15
+
+  reject_if_fixed_salary_below_minimum: true
+
+  reject_if_total_ctc_below_expected: false
+
+  reject_if_salary_undisclosed: false
+
+matching:
+  minimum_match_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+
+mandatory:
+  - seniority
+  - relevant_leadership_experience
+  - GCC_or_global_delivery_relevance
+  - employment_type
+
+preferred:
+  - GCC_setup
+  - GCC_build
+  - GCC_operating_model
+  - GCC_transformation
+  - BOTT
+  - global_delivery
+  - multi_tower
+  - transition_readiness
+  - talent_ramp_up
+  - P_and_L
+  - digital_workplace
+  - IT_infrastructure
+  - transformation
+  - managed_services
+  - AI
+  - automation
+
+resume:
+  file: "resume.pdf"
+
+source_resume: "GCC / Global Capability Centre leadership resume"
+
+positioning:
+  - "GCC Leadership"
+  - "Global Capability Centre Setup"
+  - "GCC Build and Operationalisation"
+  - "Build-Operate-Transform-Transfer"
+  - "Global Operating Model"
+  - "Global Delivery Leadership"
+  - "Multi-Tower Operations"
+  - "Transformation Leadership"
+  - "P&L Leadership"
+  - "Executive Stakeholder Management"
+  - "Technology and Infrastructure Leadership"
+
+search:
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+  include_recommended: true
+  include_all_feed: true
+
+  nationwide: true
+
+  keywords:
+    - GCC Head
+    - GCC Director
+    - Head of GCC
+    - Director GCC
+    - Global Capability Centre Head
+    - Global Capability Center Head
+    - Global Capability Centre Director
+    - Global Capability Center Director
+    - GIC Head
+    - GIC Director
+    - Captive Centre Head
+    - Captive Center Head
+    - GCC Setup Head
+    - GCC Build Head
+    - GCC Transformation Head
+    - GCC Operations Head
+    - GCC Technology Head
+    - GCC IT Head
+    - GCC Infrastructure Head
+    - GCC Digital Workplace Head
+    - GCC Service Delivery Head
+    - Global Delivery Director
+    - Head Global Delivery
+    - Global Operations Head
+    - Enterprise Technology Director
+    - IT Infrastructure Director
+    - Director IT Operations
+    - Head Digital Workplace
+    - Transformation Director
+    - IT Transformation Director
+
+application:
+  eligible: true
+  minimum_score: 90
+  easy_apply_only: true
+  require_preferred_location: false
+  require_final_confirmation: true
+  conditional_auto_submit: true
+
+  salary_rules:
+    minimum_fixed_ctc: 7000000
+    expected_ctc: 9000000
+    expected_ctc_negotiable: true
+    reject_if_fixed_below_minimum: true
+    reject_if_salary_undisclosed: false
+
+  screening_rules:
+    known_verified_answers_auto_answer: true
+    unknown_answers_require_confirmation: true
+    sensitive_answers_require_confirmation: true
+    work_authorization_requires_confirmation: true
+    never_guess: true

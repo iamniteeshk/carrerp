@@ -1,0 +1,4 @@
+# Cached answers to common screening questions (case-insensitive).
+answers:
+  "how many years of experience do you have": "25+ years"
+  "are you willing to relocate": "Yes"

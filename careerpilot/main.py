@@ -75,6 +75,7 @@ class CareerPilot:
 
         self.telegram = TelegramService(
             config.telegram_token, config.telegram_chat_id, self.notif_service)
+        self.telegram.attach_offset_store(self.settings)
 
         self.ai = AIEngine(
             config.ai, candidate_profile=self._candidate_profile(),
@@ -117,6 +118,9 @@ class CareerPilot:
             self.job_service, self.app_service, self.failed_service,
             profile_engine=config.profile_engine,
             document_manager=self.documents)
+        from .db.services import PendingApplicationService
+        self.pending = PendingApplicationService(self.db)
+        self.apply_engine.pending = self.pending
 
         self.pipeline = ScanPipeline(
             config, self.collector, self.rules, self.ai, self.apply_engine,
@@ -137,7 +141,12 @@ class CareerPilot:
         self.pipeline.session_history = self.session_history
         # Feed past strong matches into the AI prompt so scoring improves.
         try:
-            self.ai.learned_summary = self.good_jobs.summary()
+            from .core.decision_memory import DecisionMemory
+            self.decision_memory = DecisionMemory(db_dir / "decision_memory.json")
+            learned = self.good_jobs.summary()
+            choices = self.decision_memory.summary()
+            self.ai.learned_summary = " ".join(p for p in (learned, choices) if p)
+            self.apply_engine.decisions = self.decision_memory
         except Exception:  # noqa: BLE001
             self.ai.learned_summary = ""
 
@@ -174,8 +183,9 @@ class CareerPilot:
             self.cfg.debug.visual_mode = str(dbg).lower() in (
                 "1", "true", "yes", "on")
         mode = s.get("apply_mode")
-        if mode in ("dry_run", "live"):
-            self.cfg.apply.mode = mode
+        if mode:
+            from .apply.modes import canonical_apply_mode
+            self.cfg.apply.mode = canonical_apply_mode(mode)
 
     def _apply_ai_overrides(self) -> None:
         prov = self.settings.get("ai_active_provider")
@@ -271,7 +281,24 @@ class CareerPilot:
                            f"(mode: {self.cfg.apply.mode})")
         # Validate/repair the AI model against the live API before scanning so a
         # stale Gemini model name is auto-corrected rather than 404-ing per job.
-        self.ai.startup_validate()
+        ai_status = self.ai.startup_validate()
+        try:
+            from .core.activity import publish_activity
+            model = ""
+            for p in getattr(self.ai, "providers", []) or []:
+                if p.name.lower() == (self.cfg.ai.active_provider or "").lower():
+                    model = getattr(p, "model", "") or ""
+            publish_activity(
+                activity="starting",
+                stage="startup",
+                apply_mode=self.cfg.apply.mode,
+                ai_provider=self.cfg.ai.active_provider,
+                ai_model=model,
+                ai_status=str(ai_status),
+                telegram="configured" if self.telegram.enabled else "not configured",
+            )
+        except Exception:  # noqa: BLE001
+            pass
         if not self.ai.any_available():
             self.logger.warning("No AI provider is configured/available; jobs "
                                  "that pass the Rule Engine will be QUEUED.")
@@ -280,7 +307,8 @@ class CareerPilot:
         dashboard = create_dashboard(
             self.db, self.cfg.dashboard_refresh_seconds,
             config=self.cfg, settings=self.settings,
-            on_settings_change=self.refresh_runtime_from_settings)
+            on_settings_change=self.refresh_runtime_from_settings,
+            control=self)
         threading.Thread(
             target=lambda: dashboard.run(
                 host=self.cfg.dashboard_host, port=self.cfg.dashboard_port,

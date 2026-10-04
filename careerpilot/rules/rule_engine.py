@@ -214,10 +214,14 @@ class RuleEngine:
         return RuleResult(True)
 
     def _salary_rule(self, job: Job) -> RuleResult:
-        # Missing salary is allowed through (common for leadership roles).
+        # A hidden salary is not a rejection. Judge the role from everything else.
         amount = _parse_salary_to_inr(job.salary)
-        if amount is not None and self.cfg.minimum_salary > 0 \
-                and amount < self.cfg.minimum_salary:
+        if amount is None:
+            if getattr(self.cfg, "reject_undisclosed_salary", False) \
+                    and self.cfg.minimum_salary > 0:
+                return RuleResult(False, RejectionReason.SALARY_BELOW_THRESHOLD)
+            return RuleResult(True)
+        if self.cfg.minimum_salary > 0 and amount < self.cfg.minimum_salary:
             return RuleResult(False, RejectionReason.SALARY_BELOW_THRESHOLD)
         return RuleResult(True)
 
@@ -244,6 +248,8 @@ class RuleEngine:
         return RuleResult(True)
 
     def _location_rule(self, job: Job) -> RuleResult:
+        if not getattr(self.cfg, "reject_outside_preferred", True):
+            return RuleResult(True)
         if not job.location or not self.cfg.preferred_locations:
             return RuleResult(True)  # unknown/unconfigured -> let AI decide
         loc = job.location.lower()

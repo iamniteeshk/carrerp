@@ -61,6 +61,23 @@ def test_bootstrap_is_idempotent_and_never_overwrites():
         assert "realkey" in (root / ".env").read_text()
 
 
+def test_bootstrap_skips_infrastructure_and_keeps_real_profiles():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _fake_clone(root)
+        infra = root / "profiles.example" / "Infrastructure"
+        infra.mkdir()
+        (infra / "profile.yaml").write_text("name: Infrastructure\n")
+        (infra / "resume.pdf").write_bytes(b"%PDF-example")
+        _run_in(root)
+        assert (root / "profiles" / "Sample_Profile" / "resume.pdf").exists()
+        assert not (root / "profiles" / "Infrastructure").exists()
+        real = root / "profiles" / "Sample_Profile" / "resume.pdf"
+        real.write_bytes(b"%PDF-real")
+        _run_in(root)
+        assert real.read_bytes() == b"%PDF-real"
+
+
 def test_bootstrap_without_examples_does_not_crash():
     with tempfile.TemporaryDirectory() as tmp:
         # No example files at all -> should still create runtime dirs, no crash.

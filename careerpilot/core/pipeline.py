@@ -14,7 +14,8 @@ from ..ai.engine import AIEngine, AIUnavailable
 from ..apply.auto_apply import AutoApplyEngine
 from ..collectors.manager import CollectorManager
 from ..core.config import AppConfig
-from ..core.enums import ApplyMode, JobStatus
+from ..apply.modes import is_dry_mode
+from ..core.enums import JobStatus
 from ..core.logging_setup import get_logger
 from ..core.models import AIEvaluation, Job
 from ..core.state import StateMachine, WorkflowState
@@ -251,8 +252,19 @@ class ScanPipeline:
             counts["found"] = counts.get("found", 0) + 1
             self._found = counts["found"]
             self._stage(n, "MANUAL_APPROVED", f"id={job.job_id} | {tag}")
-            result = (self.apply_engine.dry_run(job, evaluation) if dry_run
-                      else self.apply_engine.apply_to_job(job, evaluation))
+            from ..apply.modes import canonical_apply_mode
+            apply_cfg = getattr(self.cfg, "apply", None)
+            mode = canonical_apply_mode(
+                getattr(apply_cfg, "mode", "dry_run") if apply_cfg is not None
+                else "dry_run")
+            if dry_run or mode == "dry_run":
+                result = self.apply_engine.dry_run(job, evaluation)
+            elif mode == "approval":
+                # Dashboard Apply only queues the job. Submit waits for Telegram.
+                result = self.apply_engine.apply_to_job(job, evaluation)
+            else:
+                result = self.apply_engine.apply_to_job(
+                    job, evaluation, operator_approved=True)
             if result.success:
                 counts["applied"] = counts.get("applied", 0) + 1
                 self.stream.applied(job, dry_run)
@@ -273,7 +285,7 @@ class ScanPipeline:
                            "so every job will be marked Partial Data and no fit "
                            "decision will be made. Enable browser.open_jobs to let "
                            "the Rule/AI engines decide on the full JD.")
-        dry_run = self.cfg.apply.mode == ApplyMode.DRY_RUN.value
+        dry_run = is_dry_mode(self.cfg.apply.mode)
         state = StateMachine(WorkflowState.STARTING)
         self.state = state  # exposed for dashboard/diagnostics
         self._job_seq = 0
@@ -298,6 +310,14 @@ class ScanPipeline:
                               portals=0, duration=time.time() - start,
                               status="SKIPPED")
             return counts
+
+        if not self._operator_hold():
+            resume = getattr(self.apply_engine, "resume_saved_approvals", None)
+            if callable(resume):
+                try:
+                    resume()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Pending-approval resume failed: %s", exc)
 
         # Dashboard manual overrides: apply APPROVED (was REJECTED) jobs first.
         try:
@@ -485,6 +505,30 @@ class ScanPipeline:
         if self.diagnostics is not None:
             self.diagnostics.metrics.incr(field_name, by)
 
+    def _operator_hold(self) -> bool:
+        settings = getattr(self, "settings", None)
+        if settings is None:
+            return False
+        try:
+            cmd = (settings.get("bot_command") or "running").strip().lower()
+        except Exception:  # noqa: BLE001
+            return False
+        return cmd in ("paused", "stopped")
+
+    def _note_salary(self, job: Job) -> None:
+        if not getattr(job, "job_id", None):
+            return
+        setter = getattr(self.jobs, "set_salary_status", None)
+        if not callable(setter):
+            return
+        from ..rules.rule_engine import _parse_salary_to_inr
+        label = ("salary_unknown" if _parse_salary_to_inr(job.salary or "") is None
+                 else "salary_known")
+        try:
+            setter(job.job_id, label)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store salary status: %s", exc)
+
     def _status(self, **kw) -> None:
         if self.status_sink is not None:
             try:
@@ -498,6 +542,14 @@ class ScanPipeline:
         logger.info(line)
         self._run_log.append(line)
         self._status(job_number=n, stage=stage)
+        try:
+            from .activity import publish_activity
+            publish_activity(
+                activity="working", stage=stage, detail=detail, job_number=n,
+                job_title=getattr(self, "_activity_title", ""),
+                portal=getattr(self, "_activity_portal", ""))
+        except Exception:  # noqa: BLE001
+            pass
 
     def _process_job(self, job: Job, counts: dict[str, int], dry_run: bool) -> None:
         """Run ONE job through the entire pipeline immediately (streaming).
@@ -516,9 +568,15 @@ class ScanPipeline:
                         f"{job.portal}:{job.job_title}".strip())
             return
 
+        if self._operator_hold():
+            logger.info("Bot is paused/stopped — not processing %s", job.job_title)
+            return
+
         self._job_seq += 1
         n = self._job_seq
         tag = f"{job.portal}:{job.job_title}".strip()
+        self._activity_title = job.job_title
+        self._activity_portal = job.portal
         try:
             # Crash recovery / AI-retry: terminal rows are skipped; retriable
             # statuses (QUEUED, PARTIAL_DATA, APPLYING, FOUND) are resumed.
@@ -578,6 +636,7 @@ class ScanPipeline:
                 self.stream.found(job)                       # -> FoundJobs.csv (live)
                 self._stage(n, "DATABASE_UPDATED", f"id={job.job_id} (FoundJobs.csv)")
 
+            self._note_salary(job)
             rs = getattr(job, "read_status", "UNREAD")
 
             # Card pre-filter outcome: a card deemed not worth opening is a clean
@@ -682,6 +741,25 @@ class ScanPipeline:
                         f"score={evaluation.match_score} "
                         f"confidence={getattr(evaluation, 'confidence', '?')} "
                         f"profile={evaluation.career_profile}")
+
+            # Neutral hold: do not force apply or reject when the model is unsure.
+            if getattr(evaluation, "uncertain", False):
+                reason = "Needs review: " + (evaluation.reason or "AI was not confident")
+                self.jobs.update_status(
+                    job.job_id, JobStatus.CONFUSED,
+                    match_score=evaluation.match_score,
+                    selected_resume=evaluation.career_profile,
+                    rejection_reason=reason)
+                counts["confused"] = counts.get("confused", 0) + 1
+                self._status(ai_status="review", rule_decision="REVIEW",
+                             db_status="confused", csv_status="NeedsReview")
+                review = getattr(self.stream, "review", None)
+                if callable(review):
+                    review(job, reason)
+                self._stage(n, "DECISION_COMPLETED", "CONFUSED (needs review)")
+                self._stage(n, "JOB_FINISHED", "CONFUSED")
+                logger.info("Job #%s CONFUSED (needs review) | %s", n, tag)
+                return
 
             # Match-score gate: a low AI score is a REJECTION, not a match. This
             # is what keeps off-domain roles the Rule Engine let through (e.g.

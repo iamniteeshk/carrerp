@@ -99,6 +99,47 @@ def test_doctor_reports_missing_ai_key_clearly():
                 os.environ["GEMINI_API_KEY_1"] = old_key
 
 
+def test_doctor_production_detects_ollama_and_placeholder_resumes():
+    import shutil
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        cfg, env = make_deployment(tmp)
+        profiles = tmp / "profiles"
+        for name, source in (("Default", "Leadership"), ("EUC", "Digital_Workplace")):
+            dest = profiles / name
+            shutil.copytree(profiles / source, dest)
+            text = (dest / "profile.yaml").read_text(encoding="utf-8")
+            (dest / "profile.yaml").write_text(text.replace(f"name: {source}", f"name: {name}"))
+        old_user = os.environ.get("DASHBOARD_USER")
+        old_pass = os.environ.get("DASHBOARD_PASSWORD")
+        os.environ["DASHBOARD_USER"] = "Admin"
+        os.environ["DASHBOARD_PASSWORD"] = "Adming"
+        old = os.getcwd()
+        try:
+            os.chdir(tmp)
+            doc = Doctor(cfg, env, fix=False, production=True)
+            ok = doc.run()
+            check("production doctor fails closed", ok is False)
+            fails = " ".join(
+                f"{r.name} {r.message}" for r in doc.results if r.status == "FAIL")
+            check("doctor flags Ollama", "Ollama" in fails, fails)
+            check("doctor flags qwen3:8b", "qwen3:8b" in fails, fails)
+            check("doctor flags qwen3-vl:8b", "qwen3-vl:8b" in fails, fails)
+            check("doctor flags placeholder resume",
+                  "placeholder" in fails.lower() or "resume" in fails.lower(), fails)
+            check("doctor flags Telegram", "Telegram" in fails or "TELEGRAM" in fails, fails)
+        finally:
+            os.chdir(old)
+            if old_user is None:
+                os.environ.pop("DASHBOARD_USER", None)
+            else:
+                os.environ["DASHBOARD_USER"] = old_user
+            if old_pass is None:
+                os.environ.pop("DASHBOARD_PASSWORD", None)
+            else:
+                os.environ["DASHBOARD_PASSWORD"] = old_pass
+
+
 def test_ensure_scaffold_prefer_production():
     repo = Path(__file__).resolve().parents[1]
     with tempfile.TemporaryDirectory() as tmp:
@@ -132,6 +173,7 @@ if __name__ == "__main__":
     test_runtime_dirs_include_cache_and_profiles()
     test_doctor_fix_creates_folders_and_db()
     test_doctor_reports_missing_ai_key_clearly()
+    test_doctor_production_detects_ollama_and_placeholder_resumes()
     test_ensure_scaffold_prefer_production()
     test_root_doctor_py_exists()
     print(f"\n{passed} passed, {failed} failed")

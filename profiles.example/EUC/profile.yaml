@@ -1,0 +1,9 @@
+# Career Profile: EUC
+# Same Digital Workplace / End-User Computing resume as Digital_Workplace.
+# Place that PDF here as resume.pdf (or set 'resume:' to your filename).
+name: EUC
+description: Digital Workplace and End-User Computing leadership (same resume as Digital_Workplace)
+resume: resume.pdf
+resume_version: v1
+documents:
+  resume: resume.pdf

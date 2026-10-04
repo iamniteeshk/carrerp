@@ -10,8 +10,10 @@ After setup, the machine should:
 3. Browse LinkedIn / Naukri with a dedicated Chrome profile
 4. Score jobs with Gemini, write reports, and keep running for weeks
 
-Live auto-submit stays **off** until you explicitly enable it after validation.
-Keep `apply.mode: dry_run` and `require_final_confirmation: true`.
+Leave `apply.mode: dry_run` until you have watched a real fill. `approval`
+submits only after Telegram Proceed. `auto` is the only mode that submits
+without asking. LinkedIn and Naukri form completion on the real sites is
+**REQUIRES LIVE MANUAL TEST** (automated tests are not that test).
 
 ---
 
@@ -31,9 +33,11 @@ Inferred from this repository (not guessed):
 | Node.js / npm | **No** | Not used |
 | Visual C++ Build Tools | **No** | Wheels cover all pinned deps |
 | SQLite server | **No** | Embedded via Python stdlib |
-| Gemini API key | Yes (for scoring) | `.env` → `GEMINI_API_KEY_1` |
-| Telegram bot | Recommended | Notifications / approvals |
-| Resume PDF(s) | Yes | Under `profiles/<Name>/resume.pdf` |
+| Ollama + the model in `config.yaml` | Yes (local scoring) | This deployment does not need a cloud AI key |
+| Gemini / DeepSeek keys | Optional | Only if you switch `ai.active_provider` off Ollama |
+| Telegram bot | Yes for approval and notices | `.env` → `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` |
+| Dashboard password | Yes | `.env` → `DASHBOARD_USER`, `DASHBOARD_PASSWORD` (change the example) |
+| Resume PDF(s) | Yes | Six folders under `profiles\` (see below) |
 
 Disk: keep **≥ 2 GB free** (browser binaries, cache, reports, DB backups).
 
@@ -162,14 +166,14 @@ Equivalent entry points:
 ### 1. `.env`
 
 ```env
-GEMINI_API_KEY_1=your_real_key_here
-# optional rotation:
-# GEMINI_API_KEY_2=
-# GEMINI_API_KEY_3=
-
 TELEGRAM_BOT_TOKEN=123456:ABCDEF...
 TELEGRAM_CHAT_ID=your_chat_id
+DASHBOARD_USER=choose-a-name
+DASHBOARD_PASSWORD=choose-a-long-password
 ```
+
+The values shipped in `.env.example` (`Admin` / `Adming`) are **unsafe**. Change
+them. Gemini keys stay empty when you use Ollama.
 
 ### 2. `config\config.yaml`
 
@@ -181,8 +185,8 @@ Edit at least:
 - `rules.blacklist_companies`
 - `rules.search_locations` (Chennai-first in the production template)
 - `browser.channel: chrome` (or `""` for bundled Chromium only)
-- Keep `apply.mode: dry_run` until live apply is validated
-- Keep `apply.require_final_confirmation: true`
+- Leave `apply.mode: dry_run` until a real fill looks right
+- `approval` and `auto` are dashboard choices after that
 
 ### 3. Resumes
 
@@ -190,9 +194,15 @@ Copy your real PDF:
 
 ```text
 profiles\Default\resume.pdf
-profiles\Infrastructure\resume.pdf
-... (each profile folder you use)
+profiles\Leadership\resume.pdf
+profiles\Digital_Workplace\resume.pdf
+profiles\EUC\resume.pdf              ← same PDF as Digital_Workplace
+profiles\GCC\resume.pdf
+profiles\Contact_Centre\resume.pdf
 ```
+
+Setup does not copy `profiles.example\Infrastructure` into `profiles\`, and it
+does not replace a `profiles\` folder that already exists.
 
 ### 4. Re-check
 
@@ -322,8 +332,8 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 2. Clone / copy the app tree  
 3. Restore the files listed above  
 4. `.\setup_windows.ps1`  
-5. `python doctor.py`  
-6. `python -m careerpilot.main run`
+5. `.\.venv\Scripts\python.exe -m careerpilot.main doctor`  
+6. `.\scripts\run_careerpilot.ps1`
 
 ---
 
@@ -334,7 +344,7 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 | `python` not found | Re-install Python with PATH + py launcher; open a **new** PowerShell |
 | `playwright install` fails | Check internet; re-run `doctor --fix` |
 | Chrome channel errors | Install Chrome, or set `browser.channel: ""` |
-| Doctor FAIL: no AI key | Edit `.env` — `--fix` cannot invent keys |
+| Doctor FAIL: no AI provider | Ollama must be the active provider with `requires_auth: false`, or set a cloud key in `.env`. `--fix` cannot invent keys |
 | Doctor WARN: LinkedIn/Naukri login | Run a headed `scan` and log in once |
 | Port 5000 in use | Stop the other CareerPilot (`careerpilot.pid`) or change `dashboard.port` |
 | Sleep kills browser | Disable sleep/hibernate (Phase A) |
@@ -348,15 +358,16 @@ Copy these while CareerPilot is stopped (or after a daily DB backup):
 Only treat the machine as **Production Ready** when **all** of these are true:
 
 - [ ] `setup_windows.ps1` completed without install errors  
-- [ ] `python doctor.py` → **RESULT: PASS** (warnings only for optional Telegram if you chose to skip it)  
-- [ ] Gemini key works (`python -m careerpilot.main ai-health` or a dry scan that scores a job)  
-- [ ] Telegram delivers a test notification (if enabled)  
-- [ ] Headed browser launches; LinkedIn + Naukri sessions persist across restart  
-- [ ] Database file exists; reports directory writable  
-- [ ] `maintenance` runs cleanly  
-- [ ] Scheduler starts via `run` or Task Scheduler  
-- [ ] A dry-run scan completes and writes session reports under `reports\sessions\`  
-- [ ] Sleep/hibernate disabled; time zone correct  
+- [ ] `.\.venv\Scripts\python.exe -m careerpilot.main doctor` → **RESULT: PASS**
+- [ ] Ollama is running and the configured model answers (a cloud key is optional)
+- [ ] Telegram delivers a test notification
+- [ ] Dashboard login is not the example password; port 5000 is not exposed to the internet
+- [ ] Headed browser launches; LinkedIn + Naukri sessions persist across restart
+- [ ] Database file exists; reports directory writable
+- [ ] Scheduler starts via `.\scripts\run_careerpilot.ps1` or `.\scripts\Register-CareerPilotStartup.ps1`
+- [ ] A dry-run scan completes and writes session reports under `reports\sessions\`
+- [ ] LinkedIn and Naukri apply on the real site are still **REQUIRES LIVE MANUAL TEST**
+- [ ] Sleep/hibernate disabled; time zone correct
 
 If any mandatory doctor check fails, **do not** call the box production-ready.
 

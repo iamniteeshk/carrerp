@@ -36,7 +36,7 @@ _Tested = proven against a fixture/unit test. Production Ready = confirmed live 
 - [t] **Job detail extraction**: Tested — open-in-tab + extract + cache proven on fixture
 - [t] **Rule Engine integration**: Tested — parsed jobs -> decisions fixture-proven
 - [t] **AI integration**: Tested — evaluate + graceful degradation unit-tested; live API pending
-- [~] **Apply workflow**: In Progress — orchestration + dry-run built; live Easy-Apply modal is a stub
+- [~] **Apply workflow**: In Progress — orchestration + form walker unit-tested; REQUIRES LIVE MANUAL TEST
 - [~] **Resume upload**: In Progress — resume selection done; file upload scaffolded, not live
 - [~] **Stability**: In Progress — single-thread + recovery built; long run not tested
 - [t] **Recovery**: Tested — cache + dedupe crash-recovery unit/fixture-proven
@@ -52,7 +52,7 @@ _Tested = proven against a fixture/unit test. Production Ready = confirmed live 
 - [t] **Job detail extraction**: Tested — open-in-tab + extract + cache proven on fixture
 - [t] **Rule Engine integration**: Tested — parsed jobs -> decisions fixture-proven
 - [t] **AI integration**: Tested — evaluate + graceful degradation unit-tested; live API pending
-- [~] **Apply workflow**: In Progress — orchestration + dry-run built; live apply is a stub
+- [~] **Apply workflow**: In Progress — orchestration + form walker unit-tested; REQUIRES LIVE MANUAL TEST
 - [~] **Resume upload**: In Progress — resume selection done; file upload scaffolded, not live
 - [~] **Stability**: In Progress — single-thread + recovery built; long run not tested
 - [t] **Recovery**: Tested — cache + dedupe crash-recovery unit/fixture-proven

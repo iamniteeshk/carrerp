@@ -97,6 +97,10 @@ class StreamingCSVReporter:
         self._append(job, "AppliedJobs.csv", _COMMON,
                      _row(job, label, "application recorded"))
 
+    def review(self, job, reason: str) -> None:
+        self._append(job, "NeedsReview.csv", _COMMON,
+                     _row(job, "CONFUSED", reason))
+
     def failed(self, job, reason: str) -> None:
         self._append(job, "FailedJobs.csv", _COMMON,
                      _row(job, "FAILED", reason))

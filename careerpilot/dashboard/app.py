@@ -1,7 +1,8 @@
-"""Jarvis-style Flask console — public stats; Admin for all controls.
+"""Jarvis-style Flask console.
 
-Anyone on the LAN can view stats + emergency banner. Mutating actions require
-``DASHBOARD_USER`` / ``DASHBOARD_PASSWORD`` from ``.env``.
+The dashboard binds to the home LAN (``0.0.0.0``). Every page and API,
+including status, requires ``DASHBOARD_USER`` / ``DASHBOARD_PASSWORD``.
+Do not publish port 5000 on the public internet.
 """
 
 from __future__ import annotations
@@ -37,12 +38,20 @@ def create_dashboard(
     config: Any = None,
     settings: SettingsService | None = None,
     on_settings_change: Callable[[], None] | None = None,
+    control: Any = None,
 ) -> Flask:
     app = Flask(__name__)
     app.secret_key = (
         os.environ.get("FLASK_SECRET_KEY")
         or os.environ.get("DASHBOARD_SECRET_KEY")
         or secrets.token_hex(32)
+    )
+    # Home LAN is plain HTTP. HttpOnly + SameSite stop casual cookie theft
+    # from another site; Secure would break http:// on the local network.
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=False,
     )
     jobs_svc = JobService(db)
     settings_svc = settings or SettingsService(db)
@@ -60,6 +69,19 @@ def create_dashboard(
                 return redirect(url_for("login", next=request.path))
             return view(*args, **kwargs)
         return wrapped
+
+    @app.before_request
+    def _lan_login_required():
+        if request.endpoint in ("login", "static"):
+            return None
+        if request.path.startswith("/static/"):
+            return None
+        if session.get("admin"):
+            return None
+        if request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "admin login required"}), 401
+        nxt = request.path if request.path.startswith("/") else "/"
+        return redirect(url_for("login", next=nxt))
 
     def _notify_change() -> None:
         if on_settings_change:
@@ -96,6 +118,8 @@ def create_dashboard(
                 session["admin"] = True
                 session.permanent = True
                 nxt = request.args.get("next") or url_for("home")
+                if not nxt.startswith("/") or nxt.startswith("//"):
+                    nxt = url_for("home")
                 return redirect(nxt)
             error = "Invalid username or password"
             logger.warning("Dashboard admin login failed for user=%r", got_user)
@@ -120,8 +144,87 @@ def create_dashboard(
         dry = conn.execute(
             "SELECT COUNT(*) c FROM applications WHERE dry_run=1").fetchone()["c"]
         failed = conn.execute("SELECT COUNT(*) c FROM failed_jobs").fetchone()["c"]
-        return jsonify({"by_status": by_status, "applications": applied,
-                        "dry_runs": dry, "failed": failed})
+        from ..core.activity import read_activity
+        activity = read_activity()
+        bot_command = settings_svc.get("bot_command") or "running"
+        evaluated = conn.execute(
+            "SELECT COUNT(*) c FROM jobs WHERE match_score IS NOT NULL"
+        ).fetchone()["c"]
+        waiting_approval = 0
+        try:
+            waiting_approval = conn.execute(
+                "SELECT COUNT(*) c FROM pending_applications WHERE state='waiting'"
+            ).fetchone()["c"]
+        except Exception:  # noqa: BLE001 - migration not applied yet
+            waiting_approval = 0
+        telegram = "not configured"
+        ai_provider = ""
+        ai_model = ""
+        if config is not None:
+            token = getattr(config, "telegram_token", "") or ""
+            chat = getattr(config, "telegram_chat_id", "") or ""
+            telegram = "configured" if token and chat else "not configured"
+            ai_provider = getattr(getattr(config, "ai", None), "active_provider", "") or ""
+            ai_model = settings_svc.get("ai_text_model") or ""
+            if not ai_model:
+                for spec in getattr(getattr(config, "ai", None), "providers", []) or []:
+                    if getattr(spec, "name", "") == ai_provider:
+                        ai_model = getattr(spec, "preferred_model", "") or ""
+        sessions = {"present": False, "linkedin": False, "naukri": False, "path": ""}
+        if config is not None:
+            root = __import__("pathlib").Path(
+                getattr(getattr(config, "browser", None), "profiles_path",
+                        "profiles_browser"))
+            sessions = {
+                "path": str(root),
+                "present": root.exists(),
+                "linkedin": (root / "linkedin").exists(),
+                "naukri": (root / "naukri").exists(),
+            }
+        return jsonify({
+            "by_status": by_status, "applications": applied,
+            "dry_runs": dry, "failed": failed, "evaluated": evaluated,
+            "waiting_approval": waiting_approval, "bot_command": bot_command,
+            "telegram": telegram, "ai_provider": ai_provider, "ai_model": ai_model,
+            "apply_mode": settings_svc.get("apply_mode") or (
+                getattr(getattr(config, "apply", None), "mode", "dry_run")
+                if config else "dry_run"),
+            "activity": activity, "sessions": sessions,
+        })
+
+    @app.route("/api/control", methods=["POST"])
+    @require_admin
+    def control_bot():
+        body = request.get_json(silent=True) or {}
+        action = str(body.get("action") or "").strip().lower()
+        allowed = {"start", "stop", "pause", "resume", "scan_now"}
+        if action not in allowed:
+            return jsonify({"ok": False, "error": "unknown action"}), 400
+        if action in ("start", "resume"):
+            settings_svc.set("bot_command", "running")
+        elif action == "pause":
+            settings_svc.set("bot_command", "paused")
+        elif action == "stop":
+            settings_svc.set("bot_command", "stopped")
+        if action == "scan_now" and control is not None:
+            scheduler = getattr(control, "scheduler", None)
+            if scheduler is not None and hasattr(scheduler, "request_scan"):
+                try:
+                    scheduler.request_scan()
+                except Exception as exc:  # noqa: BLE001
+                    return jsonify({"ok": False, "error": str(exc)}), 500
+            else:
+                return jsonify({
+                    "ok": False,
+                    "error": "scheduler is not running in this process",
+                }), 409
+        try:
+            from ..core.activity import publish_activity
+            publish_activity(activity=settings_svc.get("bot_command") or action,
+                             stage=action)
+        except Exception:  # noqa: BLE001
+            pass
+        return jsonify({"ok": True, "bot_command": settings_svc.get("bot_command")})
 
     @app.route("/api/emergency")
     def emergency():
@@ -154,6 +257,67 @@ def create_dashboard(
         )
         return jsonify(rows)
 
+    def _queue_telegram_approval(row: dict) -> None:
+        """Store a dashboard Apply as waiting. It does not authorize Submit."""
+        from ..apply.modes import canonical_apply_mode
+        from ..core.enums import NotificationType
+        from ..db.services import PendingApplicationService
+        from ..notify.telegram_service import TelegramService
+        try:
+            job = jobs_svc.job_from_row(row)
+            PendingApplicationService(db).upsert(
+                job, state="waiting", note="waiting for Telegram Proceed")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store pending approval: %s", exc)
+            return
+        mode = "dry_run"
+        if config is not None:
+            mode = canonical_apply_mode(
+                settings_svc.get("apply_mode")
+                or getattr(getattr(config, "apply", None), "mode", "dry_run"))
+        if mode != "approval":
+            return
+        try:
+            from ..db.services import NotificationService
+            token = getattr(config, "telegram_token", "") if config else ""
+            chat = getattr(config, "telegram_chat_id", "") if config else ""
+            TelegramService(token or "", chat or "", NotificationService(db)).send(
+                NotificationType.APPROVAL_REQUEST,
+                f"Approval needed\n{row.get('job_title') or ''} @ "
+                f"{row.get('company') or ''}\n"
+                f"Portal: {row.get('portal') or ''}\n{row.get('job_url') or ''}\n\n"
+                f"Reply with exactly Proceed to submit, or exactly Reject to stop.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not send Telegram approval request: %s", exc)
+
+    def _learn(action: str, row: dict) -> None:
+        if config is None:
+            return
+        try:
+            from pathlib import Path
+            from ..core.decision_memory import DecisionMemory
+            path = Path(config.database_path).parent / "decision_memory.json"
+            DecisionMemory(path).record(
+                action=action,
+                job_title=row.get("job_title") or "",
+                company=row.get("company") or "",
+                portal=row.get("portal") or "",
+                reason=row.get("rejection_reason") or "",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not store manual decision: %s", exc)
+
+    @app.route("/api/review")
+    def review_jobs():
+        rows = q(
+            "SELECT job_id, portal, company, job_title, location, salary, "
+            "experience, job_description, match_score, rejection_reason, "
+            "job_url, status, discovered_at, updated_at "
+            "FROM jobs WHERE status IN ('CONFUSED', 'QUEUED', 'MANUAL_REVIEW') "
+            "ORDER BY updated_at DESC LIMIT 300"
+        )
+        return jsonify(rows)
+
     @app.route("/api/jobs/<int:job_id>/approve", methods=["POST"])
     @require_admin
     def approve_job(job_id: int):
@@ -164,13 +328,43 @@ def create_dashboard(
                 return jsonify({"ok": False, "error": "job not found"}), 404
             return jsonify({
                 "ok": False,
-                "error": f"job status is {row.get('status')}, only REJECTED can be approved",
+                "error": (f"job status is {row.get('status')}; approve works for "
+                          "rejected, confused, queued, or matched jobs"),
             }), 400
-        logger.info("Dashboard manual approve job_id=%s title=%s",
+        _learn("apply", updated)
+        _queue_telegram_approval(updated)
+        logger.info("Dashboard apply queued for Telegram job_id=%s title=%s",
                     job_id, updated.get("job_title"))
         return jsonify({"ok": True, "job": {
             "job_id": updated.get("job_id"),
             "job_title": updated.get("job_title"),
+            "status": updated.get("status"),
+            "rejection_reason": updated.get("rejection_reason"),
+        }})
+
+    @app.route("/api/jobs/<int:job_id>/reject", methods=["POST"])
+    @require_admin
+    def reject_job(job_id: int):
+        body = request.get_json(silent=True) or {}
+        reason = str(body.get("reason") or "manual reject")
+        updated = jobs_svc.reject_manual(job_id, reason)
+        if updated is None:
+            row = jobs_svc.get(job_id)
+            if row is None:
+                return jsonify({"ok": False, "error": "job not found"}), 404
+            return jsonify({
+                "ok": False,
+                "error": f"job status is {row.get('status')}; cannot reject from here",
+            }), 400
+        _learn("reject", updated)
+        try:
+            from ..db.services import PendingApplicationService
+            PendingApplicationService(db).set_state(
+                job_id, "done", "dashboard reject")
+        except Exception:  # noqa: BLE001
+            pass
+        return jsonify({"ok": True, "job": {
+            "job_id": updated.get("job_id"),
             "status": updated.get("status"),
             "rejection_reason": updated.get("rejection_reason"),
         }})
@@ -278,9 +472,9 @@ def create_dashboard(
         if "debug_visual_mode" in body:
             settings_svc.set("debug_visual_mode",
                              "true" if body["debug_visual_mode"] else "false")
-        if "apply_mode" in body and body["apply_mode"] in ("dry_run", "live"):
-            # Deploy posture: allow setting but default stays dry_run in config.
-            settings_svc.set("apply_mode", body["apply_mode"])
+        if "apply_mode" in body:
+            from ..apply.modes import canonical_apply_mode
+            settings_svc.set("apply_mode", canonical_apply_mode(body["apply_mode"]))
         _notify_change()
         return jsonify({"ok": True})
 

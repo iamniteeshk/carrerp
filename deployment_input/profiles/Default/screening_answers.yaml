@@ -1,0 +1,713 @@
+```yaml
+candidate:
+
+  full_name: "Murahari M"
+  preferred_name: "Hari Madhav"
+
+  email: "harim@live.in"
+  phone: "+91 94455 05850"
+
+  linkedin: "linkedin.com/in/hari-madhav-8283237"
+  website: "harimadhav.com"
+
+  nationality: "Indian"
+  current_location: "Chennai, India"
+
+
+current_employment:
+
+  company: "HCLTech"
+
+  designation: "Director – End-to-End IT Infrastructure & Digital Workplace Services"
+
+  currently_employed: true
+  serving_notice: false
+
+  notice_period:
+    days: 90
+    answer: "90 days"
+    negotiable: true
+
+
+experience:
+
+  total_it_experience_years: 25
+  total_it_experience: "25+ years"
+
+  leadership_experience_years: 15
+  leadership_experience: "15+ years"
+
+  infrastructure_experience_years: 25
+  infrastructure_experience: "25+ years"
+
+  digital_workplace:
+    experience: true
+    experience_level: "Strong"
+    current_core_domain: true
+
+  euc:
+    experience: true
+    experience_level: "Strong"
+
+  gcc:
+    experience: true
+    experience_level: "Yes"
+
+  contact_centre:
+    experience: true
+    experience_years: 12
+    experience_level: "Site Director level"
+
+
+compensation:
+
+  current:
+
+    total_ctc:
+      amount: 7700000
+      formatted: "₹77 Lakhs"
+      currency: "INR"
+
+    fixed:
+      amount: 5000000
+      formatted: "₹50 Lakhs"
+      currency: "INR"
+
+    variable:
+      amount: 1050000
+      formatted: "₹10.5 Lakhs"
+      currency: "INR"
+
+    psu_rsu:
+      amount: 1650000
+      formatted: "₹16.5 Lakhs"
+      currency: "INR"
+      description: "PSU / RSU - stocks & cash bonus"
+
+
+  expected:
+
+    total_ctc:
+      amount: 9000000
+      formatted: "₹90 Lakhs"
+      currency: "INR"
+      negotiable: true
+
+
+  minimum:
+
+    fixed:
+      amount: 7000000
+      formatted: "₹70 Lakhs"
+      currency: "INR"
+      hard_floor: true
+
+
+  screening_answers:
+
+    current_ctc: "₹77 Lakhs"
+
+    current_fixed_ctc: "₹50 Lakhs"
+
+    expected_ctc: "₹90 Lakhs, negotiable"
+
+    minimum_fixed_ctc: "₹70 Lakhs"
+
+
+  rules:
+
+    evaluate_fixed_and_total_separately: true
+
+    minimum_fixed_is_hard_floor: true
+
+    expected_total_ctc_is_negotiable: true
+
+    reject_if_fixed_below_minimum: true
+
+    reject_if_total_ctc_below_expected: false
+
+    reject_salary_undisclosed: false
+
+    salary_not_disclosed:
+      action: "Do not reject solely because compensation is undisclosed"
+      do_not_assume_salary: true
+
+    salary_below_minimum_fixed:
+      action: "Reject if verified fixed compensation is below ₹70 Lakhs"
+
+    salary_question_with_total_ctc_only:
+      action: "Ask user if the form specifically requires fixed compensation"
+
+
+location:
+
+  primary:
+    - Chennai
+
+  secondary:
+    - Bengaluru
+    - Hyderabad
+
+  other_metros:
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    accepted:
+      - India
+      - Remote
+      - Remote - India
+      - Work From Home
+
+  flexible_for_right_role: true
+
+  willing_to_relocate: true
+
+  nationwide_search: true
+
+  preferred_location_required: false
+
+
+work_modes:
+
+  remote: true
+  hybrid: true
+  onsite: true
+
+  maximum_travel_percent: 50
+
+  travel_flexibility: "Flexible"
+
+
+role_priority:
+
+  1:
+    category: "IT Infrastructure / End-to-End Infrastructure Services"
+    priority: 1
+
+  2:
+    category: "Digital Workplace / Modern Endpoint / EUC"
+    priority: 2
+
+  3:
+    category: "Senior Leadership / Transformation / General Management"
+    priority: 3
+
+  4:
+    category: "GCC / Global Capability Centre Head or Setup"
+    priority: 4
+
+  5:
+    category: "Contact Centre / BPO / CX Operations"
+    priority: 5
+
+  6:
+    category: "Other opportunity fit"
+    priority: 6
+    note: "Open based on opportunity fit"
+
+
+executive_titles:
+
+  Director: true
+  Senior_Director: true
+  Associate_Director: true
+  AVP: true
+  VP: true
+  SVP: false
+  Head: true
+  GM: true
+
+  CIO: false
+  CTO: false
+
+
+employment:
+
+  permanent: true
+  full_time: true
+
+  contract: false
+  consulting: false
+  interim: false
+  temporary: false
+  freelance: false
+
+
+international:
+
+  open_to_jobs_outside_india: true
+
+  preferred_countries:
+    - USA
+    - "Other relevant markets"
+
+
+visa:
+
+  usa:
+
+    current_status: "B1 visa"
+
+    work_authorization: false
+
+    h1b: false
+
+    sponsorship_required_for_employment: true
+
+    screening_answer_work_authorization:
+      answer: "UNKNOWN - REVIEW REQUIRED"
+      auto_answer: false
+
+    screening_answer_sponsorship:
+      answer: "Yes, employment sponsorship would be required unless otherwise legally authorized"
+      auto_answer: false
+
+    rules:
+
+      - "Never claim US work authorization."
+      - "B1 visa must never be treated as employment authorization."
+      - "Do not represent B1 status as H1B status."
+      - "Ask user before answering US work authorization questions."
+      - "Ask user before answering immigration or sponsorship questions."
+
+
+education:
+
+  bachelor:
+    degree: "B.Sc."
+    year: 2000
+
+  masters:
+    degree: "M.A."
+    field: "Public Administration"
+    university: "Annamalai University"
+    year: 2004
+
+  postgraduate:
+    degree: "PGDBA"
+    field: "International Business"
+    university: "Annamalai University"
+    year: 2005
+
+
+travel:
+
+  international_travel: true
+
+  business_travel: true
+
+  maximum_percent: 50
+
+  flexibility: true
+
+
+application:
+
+  automation_level: "conditional_auto_submit"
+
+  conditional_auto_submit:
+
+    enabled: true
+
+    conditions:
+
+      minimum_match_score: 90
+
+      easy_apply_only: true
+
+      verified_profile_match_required: true
+
+      no_unknown_required_answers: true
+
+      no_sensitive_answer_without_confirmation: true
+
+      no_work_authorization_assumptions: true
+
+      no_qualification_assumptions: true
+
+      no_salary_assumptions: true
+
+      no_notice_period_assumptions: true
+
+      minimum_fixed_ctc:
+        amount: 7000000
+        currency: "INR"
+
+      expected_ctc:
+        amount: 9000000
+        currency: "INR"
+        negotiable: true
+
+      salary_undisclosed:
+        allowed: true
+
+      preferred_location:
+        required: false
+
+      relocation:
+        allowed: true
+
+      remote:
+        allowed: true
+
+      hybrid:
+        allowed: true
+
+      onsite:
+        allowed: true
+
+      maximum_travel_percent: 50
+
+      final_confirmation_required_for_exceptions: true
+
+
+screening:
+
+  known_verified_answers:
+
+    auto_answer: true
+
+    condition:
+      - "Answer only when the answer is explicitly present in this file or another approved verified source."
+
+
+  sensitive_answers:
+
+    ask_first: true
+
+
+  unknown_answers:
+
+    ask_first: true
+
+
+  ambiguous_answers:
+
+    ask_first: true
+
+
+  conflicting_answers:
+
+    ask_first: true
+
+
+  never_guess: true
+
+
+  never_invent:
+
+    qualifications: true
+
+    certifications: true
+
+    employment_history: true
+
+    salary: true
+
+    notice_period: true
+
+    visa_status: true
+
+    work_authorization: true
+
+    demographic_information: true
+
+    experience: true
+
+
+standard_answers:
+
+  current_company:
+    answer: "HCLTech"
+
+  current_designation:
+    answer: "Director – End-to-End IT Infrastructure & Digital Workplace Services"
+
+  total_experience:
+    answer: "25+ years"
+
+  leadership_experience:
+    answer: "15+ years"
+
+  infrastructure_experience:
+    answer: "25+ years"
+
+  digital_workplace_experience:
+    answer: "Strong experience, with Digital Workplace as a current core domain"
+
+  euc_experience:
+    answer: "Strong experience"
+
+  gcc_experience:
+    answer: "Yes"
+
+  contact_centre_experience:
+    answer: "Yes, including 12 years at Site Director level"
+
+  people_management:
+    answer: "Yes"
+
+  global_delivery:
+    answer: "Yes"
+
+  p_and_l:
+    answer: "Yes"
+
+  director_experience:
+    answer: "Yes"
+
+  head_of_function_experience:
+    answer: "Yes"
+
+  transformation_experience:
+    answer: "Yes"
+
+  ai_transformation:
+    answer: "Yes"
+
+  automation:
+    answer: "Yes"
+
+  managed_services:
+    answer: "Yes"
+
+  service_delivery:
+    answer: "Yes"
+
+  permanent_employment:
+    answer: "Yes"
+
+  full_time_employment:
+    answer: "Yes"
+
+  contract_employment:
+    answer: "No"
+
+  consulting:
+    answer: "No"
+
+  interim:
+    answer: "No"
+
+  willing_to_relocate:
+    answer: "Yes"
+
+  remote:
+    answer: "Yes"
+
+  hybrid:
+    answer: "Yes"
+
+  onsite:
+    answer: "Yes"
+
+  business_travel:
+    answer: "Yes"
+
+  maximum_business_travel:
+    answer: "Up to 50%, flexible"
+
+  current_ctc:
+    answer: "₹77 Lakhs"
+
+  current_fixed_ctc:
+    answer: "₹50 Lakhs"
+
+  expected_ctc:
+    answer: "₹90 Lakhs, negotiable"
+
+  minimum_fixed_ctc:
+    answer: "₹70 Lakhs"
+
+  notice_period:
+    answer: "90 days, negotiable"
+
+  currently_serving_notice:
+    answer: "No"
+
+  india_work_authorization:
+    answer: "Yes"
+
+  usa_work_authorization:
+    answer: "UNKNOWN - REVIEW REQUIRED"
+    auto_answer: false
+
+  usa_visa:
+    answer: "B1 visa"
+    auto_answer: false
+
+  h1b:
+    answer: "No"
+    auto_answer: false
+
+  usa_sponsorship:
+    answer: "Required for employment unless otherwise legally authorized"
+    auto_answer: false
+
+
+education_answers:
+
+  bachelor:
+    answer: "B.Sc., 2000"
+
+  masters:
+    answer: "M.A. in Public Administration, Annamalai University, 2004"
+
+  postgraduate:
+    answer: "PGDBA in International Business, Annamalai University, 2005"
+
+
+location_answers:
+
+  current_location:
+    answer: "Chennai, India"
+
+  primary_location:
+    answer: "Chennai"
+
+  preferred_locations:
+    answer:
+      - Chennai
+      - Bengaluru
+      - Hyderabad
+
+  other_metros:
+    answer:
+      - Pune
+      - Mumbai
+      - Delhi NCR
+      - Gurgaon
+      - Noida
+
+  relocation:
+    answer: "Yes"
+
+  flexible_for_right_role:
+    answer: "Yes"
+
+  remote:
+    answer: "Yes"
+
+  hybrid:
+    answer: "Yes"
+
+  onsite:
+    answer: "Yes"
+
+
+verification_rules:
+
+  source_priority:
+
+    1: "Verified candidate data"
+
+    2: "Current approved profile"
+
+    3: "Approved resume"
+
+    4: "User confirmation"
+
+
+  prohibited_inference:
+
+    - "Do not infer work authorization from visa possession."
+    - "Do not infer salary from job title."
+    - "Do not infer salary from market estimates."
+    - "Do not infer notice period from employment status."
+    - "Do not infer qualifications from experience."
+    - "Do not infer certification status from technology experience."
+    - "Do not infer willingness to relocate from job location."
+    - "Do not infer demographic information."
+    - "Do not infer US employment eligibility from B1 visa status."
+
+
+  action_on_missing_data:
+    "Ask user"
+
+
+  action_on_sensitive_data:
+    "Ask user before submission"
+
+
+  action_on_legal_or_work_authorization_question:
+    "Ask user before submission"
+
+
+  action_on_conflict:
+    "Stop application and ask user"
+
+
+  action_on_salary_question:
+    "Use verified compensation data"
+
+
+  action_on_undisclosed_salary:
+    "Do not reject solely because salary is undisclosed"
+
+
+  action_on_fixed_salary_below_minimum:
+    "Reject application if verified fixed compensation is below ₹70 Lakhs"
+
+
+  action_on_unknown_screening_question:
+    "Stop application and ask user"
+
+
+  action_on_ambiguous_screening_question:
+    "Stop application and ask user"
+
+
+  action_on_sensitive_screening_question:
+    "Stop application and ask user"
+
+
+  action_on_qualification_question:
+    "Answer only from verified education and experience data"
+
+
+  action_on_work_authorization_question:
+    "Stop application and ask user"
+
+
+  action_on_demographic_question:
+    "Stop application and ask user"
+
+
+final_submission_rules:
+
+  auto_submit_allowed_only_when_all_true:
+
+    - "Match score is at least 90"
+    - "Role is within an accepted seniority level"
+    - "Role is not explicitly rejected"
+    - "Fixed compensation is at least ₹70 Lakhs when compensation is disclosed"
+    - "Employment type is Full Time or Permanent"
+    - "Easy Apply is available"
+    - "All required screening questions have verified answers"
+    - "No unknown answer is required"
+    - "No sensitive answer requires confirmation"
+    - "No work authorization question requires clarification"
+    - "No qualification question requires clarification"
+    - "No contradictory candidate information exists"
+    - "No prohibited inference is required"
+
+  never_auto_submit_when:
+
+    - "US work authorization is asked"
+    - "Immigration eligibility is asked"
+    - "Visa sponsorship response requires interpretation"
+    - "A qualification is asked that is not verified"
+    - "A certification is asked that is not verified"
+    - "Salary information conflicts with verified data"
+    - "Notice period conflicts with verified data"
+    - "A mandatory screening answer is unknown"
+    - "A mandatory screening answer is ambiguous"
+    - "The application requires an answer that would have to be guessed"
+
+  exception_action:
+    "Pause application and ask Hari for confirmation"
+```
