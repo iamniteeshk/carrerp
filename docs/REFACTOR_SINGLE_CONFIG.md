@@ -62,7 +62,7 @@ sandbox has no display and isn't Windows/macOS. The code is correct and
 config-driven; on-device launch is a manual check on each OS.
 
 ## 8. Clone-and-run goal
-A new user: clone → `cp .env.example .env` (add keys) → `cp config.example.yaml
+A new user: clone → `cp examples/.env.example .env` (add keys) → `cp examples/config.example.yaml
 config/config.yaml` (edit the `candidate:` section and rules) → add Career
 Profile folders → `doctor` → `run`. No Python edits, ever.
 
@@ -72,6 +72,6 @@ Profile folders → `doctor` → `run`. No Python edits, ever.
 - `core/candidate.py` (load from dict or legacy file).
 - `core/validation.py` (validate inline candidate + new sections + browser engine).
 - `main.py` (BrowserConfig wiring, configured log level, PID file).
-- New `config.example.yaml` (merged); removed `candidate.example.yaml`.
+- New `examples/config.example.yaml` (merged); removed `candidate.example.yaml`.
 - Added Windows stop/restart and macOS/Linux install/stop/restart/update scripts.
 - New `tests/test_config_merge.py` (9 tests). Docs updated for the single file.

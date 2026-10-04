@@ -21,7 +21,9 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .bootstrap import ensure_scaffold
+from .bootstrap import (
+    PRODUCTION_PROFILES, PROFILE_FILES, ensure_scaffold,
+)
 from .config import AppConfig, ConfigError, load_config
 from .logging_setup import get_logger
 from . import windows_env as wenv
@@ -159,7 +161,10 @@ class Doctor:
         except Exception as exc:  # noqa: BLE001
             self.fixes.append(FixAction("database initialize", False, str(exc)))
 
-        # 6. Install Playwright Chromium if missing.
+        # 6. If Ollama is installed but not running, start it. Never pull models.
+        self._start_ollama_if_safe()
+
+        # 7. Install Playwright Chromium if missing.
         ok, msg = wenv.playwright_browser_installed()
         if not ok:
             self.fixes.append(FixAction(
@@ -188,16 +193,16 @@ class Doctor:
             print()
 
     def _maybe_copy_production_config(self) -> None:
-        """Copy config.production.example.yaml when no real config exists yet."""
+        """Copy examples/config.production.example.yaml when no real config exists yet."""
         target = Path(self.config_path)
-        prod = Path("config.production.example.yaml")
+        prod = Path("examples/config.production.example.yaml")
         if target.exists() or not prod.exists():
             return
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(prod, target)
             self.fixes.append(FixAction(
-                f"created {target} from config.production.example.yaml", True))
+                f"created {target} from examples/config.production.example.yaml", True))
         except OSError as exc:
             self.fixes.append(FixAction("copy production config", False, str(exc)))
 
@@ -269,8 +274,8 @@ class Doctor:
             self._add(".env file", PASS, self.env_path)
         else:
             self._add(".env file", FAIL,
-                      f"{self.env_path} not found (copy .env.example to .env "
-                      f"or run: python -m careerpilot.main doctor --fix)")
+                      f"{self.env_path} not found — the clone ships a blank .env. "
+                      f"Run: python -m careerpilot.main setup")
 
     def _check_env_file_raw(self) -> None:
         if Path(self.env_path).exists():
@@ -437,11 +442,8 @@ class Doctor:
         else:
             self._add("Candidate details", PASS, "name, email, and phone are set")
 
-    def _check_ollama(self) -> None:
-        if not self._deployment_strict():
-            return
+    def _ollama_root(self) -> str:
         assert self.config
-        import requests
         root = "http://127.0.0.1:11434"
         for spec in getattr(self.config.ai, "providers", []) or []:
             url = (getattr(spec, "base_url", "") or "").strip()
@@ -451,21 +453,74 @@ class Doctor:
                     if root.endswith("/v1"):
                         root = root[:-3]
                 break
+        return root
+
+    def _start_ollama_if_safe(self) -> None:
+        """Start `ollama serve` only when the binary exists and nothing is listening."""
+        import socket
+        binary = shutil.which("ollama")
+        if not binary:
+            return
+        sock = socket.socket()
+        sock.settimeout(1)
+        try:
+            sock.connect(("127.0.0.1", 11434))
+            return
+        except OSError:
+            pass
+        finally:
+            sock.close()
+        try:
+            subprocess.Popen(
+                [binary, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            self.fixes.append(FixAction(
+                "started ollama serve (models are not downloaded automatically)",
+                True))
+        except OSError as exc:
+            self.fixes.append(FixAction("start ollama serve", False, str(exc)))
+
+    def _check_ollama(self) -> None:
+        if not self._deployment_strict():
+            return
+        import requests
+        binary = shutil.which("ollama")
+        root = self._ollama_root()
+        if binary:
+            self._add("Ollama installed", PASS, binary)
+        else:
+            self._add(
+                "Ollama installed", FAIL,
+                "not installed — install Ollama from https://ollama.com/download "
+                "then run: ollama serve")
+            self._add("Ollama running", FAIL, "Ollama is not installed")
+            self._add("Ollama model qwen3:8b", FAIL,
+                      "not installed — run: ollama pull qwen3:8b")
+            self._add("Ollama model qwen3-vl:8b", FAIL,
+                      "not installed — run: ollama pull qwen3-vl:8b")
+            return
         try:
             resp = requests.get(root + "/api/tags", timeout=4)
             resp.raise_for_status()
             payload = resp.json()
         except Exception as exc:  # noqa: BLE001
-            self._add("Ollama", FAIL, f"not reachable at {root} ({exc})")
-            self._add("Ollama model qwen3:8b", FAIL, "Ollama is not reachable")
-            self._add("Ollama model qwen3-vl:8b", FAIL, "Ollama is not reachable")
+            self._add(
+                "Ollama running", FAIL,
+                f"installed but not reachable at {root} ({exc}). "
+                "Start it with: ollama serve"
+                + ("  (doctor --fix will try this)" if not self.fix else ""))
+            self._add("Ollama model qwen3:8b", FAIL, "Ollama is not running")
+            self._add("Ollama model qwen3-vl:8b", FAIL, "Ollama is not running")
             return
         names = []
         for item in payload.get("models") or []:
             name = item.get("name") or item.get("model") or ""
             if name:
                 names.append(name)
-        self._add("Ollama", PASS, f"reachable at {root}")
+        self._add("Ollama running", PASS, f"reachable at {root}")
         for wanted in ("qwen3:8b", "qwen3-vl:8b"):
             found = any(n == wanted or n.startswith(wanted + "-") for n in names)
             if found:
@@ -474,7 +529,8 @@ class Doctor:
                 self._add(
                     f"Ollama model {wanted}", FAIL,
                     "not installed — run: ollama pull " + wanted +
-                    (f" (have {', '.join(names[:8])})" if names else ""))
+                    (f" (have {', '.join(names[:8])})" if names else "") +
+                    ". Doctor does not download models.")
 
     def _resume_is_placeholder(self, path: Path) -> bool:
         try:
@@ -490,15 +546,18 @@ class Doctor:
 
     def _check_production_profiles(self) -> None:
         assert self.config
-        required = (
-            "Default", "Leadership", "Digital_Workplace", "EUC", "GCC",
-            "Contact_Centre",
-        )
+        required = PRODUCTION_PROFILES
         engine = self.config.profile_engine
+        root = Path(self.config.profiles_dir)
         missing = []
         placeholders = []
+        yaml_bad = []
         ok = []
         for name in required:
+            folder = root / name
+            for fname in PROFILE_FILES:
+                if not (folder / fname).exists():
+                    yaml_bad.append(f"{name}/{fname}")
             profile = engine.profiles.get(name)
             if profile is None or profile.resume_path is None:
                 missing.append(name)
@@ -510,9 +569,19 @@ class Doctor:
                 placeholders.append(f"{name} ({path.stat().st_size} bytes)")
             else:
                 ok.append(name)
+        if yaml_bad:
+            self._add(
+                "Profile YAML files", FAIL,
+                "missing required file: " + ", ".join(yaml_bad) +
+                " — each profile needs profile.yaml, keywords.yaml, "
+                "preferred_locations.yaml, screening_answers.yaml, and resume.pdf")
+        else:
+            self._add("Profile YAML files", PASS,
+                      "required YAML and resume.pdf present for all six profiles")
         if missing:
             self._add("Production profiles", FAIL,
-                      "missing folder or resume.pdf: " + ", ".join(missing))
+                      "missing folder or resume.pdf: " + ", ".join(missing) +
+                      " — run setup so deployment_input/profiles is copied")
         else:
             self._add("Production profiles", PASS,
                       "six profiles present: " + ", ".join(required))
@@ -523,6 +592,27 @@ class Doctor:
         elif not missing:
             self._add("Real resumes", PASS,
                       f"{len(ok)} real resume.pdf file(s)")
+        dw = root / "Digital_Workplace" / "resume.pdf"
+        euc = root / "EUC" / "resume.pdf"
+        if dw.exists() and euc.exists() and not (
+                self._resume_is_placeholder(dw) or self._resume_is_placeholder(euc)):
+            try:
+                same = dw.read_bytes() == euc.read_bytes()
+            except OSError:
+                same = False
+            if same:
+                self._add("EUC resume", PASS,
+                          "matches Digital_Workplace/resume.pdf", mandatory=False)
+            else:
+                self._add(
+                    "EUC resume", WARN,
+                    "EUC/resume.pdf is its own real file and differs from "
+                    "Digital_Workplace/resume.pdf. Both were kept.",
+                    mandatory=False)
+        infra = root / "Infrastructure"
+        if infra.exists():
+            self._add("Infrastructure profile", FAIL,
+                      "profiles/Infrastructure must not be a production profile")
         self._add("Career Profiles", PASS if not missing else FAIL,
                   "loaded: " + ", ".join(engine.names()) or "(none)",
                   mandatory=True)
@@ -615,16 +705,18 @@ class Doctor:
 
     def _check_dashboard_password(self) -> None:
         import os
-        user = (os.environ.get("DASHBOARD_USER") or "Admin").strip()
-        password = (os.environ.get("DASHBOARD_PASSWORD") or "Adming").strip()
+        user = (os.environ.get("DASHBOARD_USER") or "").strip()
+        password = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
         host = (self.config.dashboard_host or "127.0.0.1") if self.config else ""
-        unsafe = password.lower() in {"adming", "admin", "password", "changeme", ""}
+        unsafe = password.lower() in {"adming", "admin", "password", "changeme"}
         lan = host in {"0.0.0.0", "::", "[::]"}
         strict = self._deployment_strict()
         if not user or not password:
-            self._add("Dashboard password", FAIL,
-                      "set DASHBOARD_USER and DASHBOARD_PASSWORD in .env",
-                      mandatory=True)
+            self._add("Dashboard password", FAIL if strict else WARN,
+                      "DASHBOARD_USER and DASHBOARD_PASSWORD in .env are blank. "
+                      "Put your own login there. Do not forward port 5000 "
+                      "to the internet.",
+                      mandatory=strict)
         elif unsafe:
             where = " The dashboard listens on the home network." if lan else ""
             self._add(

@@ -26,8 +26,9 @@ logger = get_logger(__name__)
 
 
 def _dashboard_credentials() -> tuple[str, str]:
-    user = (os.environ.get("DASHBOARD_USER") or "Admin").strip()
-    password = (os.environ.get("DASHBOARD_PASSWORD") or "Adming").strip()
+    """Login values from .env. Blank means nobody can sign in."""
+    user = (os.environ.get("DASHBOARD_USER") or "").strip()
+    password = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
     return user, password
 
 
@@ -113,8 +114,8 @@ def create_dashboard(
             user, password = _dashboard_credentials()
             got_user = (request.form.get("username") or "").strip()
             got_pass = request.form.get("password") or ""
-            if secrets.compare_digest(got_user, user) and secrets.compare_digest(
-                    got_pass, password):
+            if user and password and secrets.compare_digest(
+                    got_user, user) and secrets.compare_digest(got_pass, password):
                 session["admin"] = True
                 session.permanent = True
                 nxt = request.args.get("next") or url_for("home")

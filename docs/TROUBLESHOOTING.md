@@ -8,7 +8,7 @@ in plain language with the file and line to fix.
 - **"candidate.X is missing" / "placeholder value (… line N)"** — edit
   `candidate.yaml`; you likely copied the example without filling a field.
 - **"config.X is missing"** — a required key is absent from `config/config.yaml`;
-  compare against `config.example.yaml`.
+  compare against `examples/config.example.yaml`.
 - **"default_career_profile '…' not among loaded profiles"** — the name in
   `config.yaml` must match a folder name under `profiles/`.
 - **"no career profiles found"** — each profile folder needs a `profile.yaml`.
@@ -17,8 +17,9 @@ in plain language with the file and line to fix.
 - **"no AI provider key set"** — with local Ollama this should not appear
   (`requires_auth: false`). For a cloud provider, set `GEMINI_API_KEY_*` or
   `DEEPSEEK_API_KEY` in `.env`.
-- **Dashboard password warning** — `.env` still has the example
-  `DASHBOARD_PASSWORD`. Change it before using the dashboard on the LAN.
+- **Dashboard password FAIL** — `DASHBOARD_USER` and `DASHBOARD_PASSWORD` in
+  `.env` are blank. Fill both before using the dashboard on the home LAN.
+  Do not forward port 5000 to the internet.
 
 ## Browser
 

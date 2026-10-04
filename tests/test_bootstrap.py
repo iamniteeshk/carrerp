@@ -16,9 +16,10 @@ from careerpilot.core import bootstrap
 
 def _fake_clone(root: Path) -> None:
     """Lay down only the example files a fresh clone ships with."""
-    (root / "config.example.yaml").write_text("application: {name: CP}\n")
-    (root / ".env.example").write_text("GEMINI_API_KEY_1=\n")
-    ex = root / "profiles.example" / "Sample_Profile"
+    (root / "examples").mkdir(parents=True, exist_ok=True)
+    (root / "examples" / "config.example.yaml").write_text("application: {name: CP}\n")
+    (root / "examples" / ".env.example").write_text("GEMINI_API_KEY_1=\n")
+    ex = root / "examples" / "profiles" / "Sample_Profile"
     ex.mkdir(parents=True)
     (ex / "profile.yaml").write_text("name: Sample_Profile\nresume: resume.pdf\n")
     (ex / "resume.pdf").write_bytes(b"%PDF-1.4\n%%EOF")
@@ -65,7 +66,7 @@ def test_bootstrap_skips_infrastructure_and_keeps_real_profiles():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         _fake_clone(root)
-        infra = root / "profiles.example" / "Infrastructure"
+        infra = root / "examples" / "profiles" / "Infrastructure"
         infra.mkdir()
         (infra / "profile.yaml").write_text("name: Infrastructure\n")
         (infra / "resume.pdf").write_bytes(b"%PDF-example")

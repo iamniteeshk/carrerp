@@ -879,45 +879,22 @@ def _cmd_probe_open(pilot, argv: list[str]) -> int:
 
 
 def _bootstrap_config() -> None:
-    """On a fresh install the ZIP ships NO runtime data and NO personal config,
-    only *.example templates. Create the real config + profiles from the examples
-    on first run so the app runs directly, and tell the user to review them."""
-    import shutil
-    # 1) config/config.yaml from config.example.yaml (includes candidate section)
-    target = os.path.join("config", "config.yaml")
-    if not os.path.exists(target):
-        example = None
-        for cand in ("config.example.yaml",
-                     os.path.join("config", "config.example.yaml")):
-            if os.path.exists(cand):
-                example = cand
-                break
-        if example:
-            os.makedirs("config", exist_ok=True)
-            shutil.copyfile(example, target)
-            print(f"[first-run] Created {target} from {example}. Review your "
-                  f"search_keywords, accepted_titles, locations and AI keys.")
-    # 2) profiles/ from profiles.example/ (career-profile templates)
-    if not os.path.isdir("profiles") and os.path.isdir("profiles.example"):
-        shutil.copytree("profiles.example", "profiles")
-        print("[first-run] Created profiles/ from profiles.example/. Edit these "
-              "with your real experience before a live run.")
-    # 3) .env from .env.example (AI keys) -- optional; app runs without it
-    if not os.path.exists(".env") and os.path.exists(".env.example"):
-        shutil.copyfile(".env.example", ".env")
-        print("[first-run] Created .env from .env.example. Add your AI API key "
-              "to enable matching.")
+    """Install deployment_input or examples. Never overwrites existing files."""
+    from .core.bootstrap import ensure_scaffold
+    for action in ensure_scaffold():
+        print(f"[first-run] {action}")
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     command = argv[0] if argv else "run"
 
-    from .core.bootstrap import ensure_scaffold
+    from .core.bootstrap import ensure_scaffold, protect_local_env
 
     # 'setup' explicitly scaffolds a fresh clone, then points the user onward.
     if command == "setup":
         actions = ensure_scaffold()
+        actions.extend(protect_local_env())
         if actions:
             print("CareerPilot setup complete:")
             for a in actions:
@@ -925,11 +902,15 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("Nothing to do -- already set up.")
         print("\nNext steps:")
-        print("  1. Edit config/config.yaml -> set your real candidate details "
-              "(name, email, phone) and rules.")
-        print("  2. Put your resume.pdf in each profiles/<Name>/ folder.")
-        print("  3. Add API keys to .env")
-        print("  4. python -m careerpilot.main doctor")
+        print("  1. Edit .env and set TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID,")
+        print("     DASHBOARD_USER, and DASHBOARD_PASSWORD.")
+        print("  2. python -m careerpilot.main doctor --production")
+        print("  3. python -m careerpilot.main run")
+        print("Config and the six profiles are copied from deployment_input/")
+        print("when that folder is present. Existing files are not replaced.")
+        if any(str(a).startswith("deployment_input problem:") for a in actions):
+            print("\nFAIL: deployment_input has problems. See the lines above.")
+            return 1
         return 0
 
     # Auto-bootstrap on first run so the project is clone-and-run even without
@@ -947,7 +928,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # The doctor must run even when config is broken -- that's its job.
     if command == "doctor":
-        _bootstrap_config()   # a fresh install has only *.example templates
+        _bootstrap_config()   # install deployment_input when those files are missing
+        protect_local_env()
         fix = "--fix" in argv or "-f" in argv
         production = "--production" in argv
         return 0 if run_doctor(fix=fix, production=production) else 3
@@ -973,15 +955,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     pilot = CareerPilot(config)
-    if command == "run":
+    if command in ("run", "scan"):
         # Fail fast: a mandatory doctor failure must not reach live operation.
         if not run_doctor():
             print("Doctor reported mandatory failures. Aborting startup.",
                   file=sys.stderr)
             return 3
-        pilot.run()
-    elif command == "scan":
-        pilot.scan_once()
+        if command == "scan":
+            pilot.scan_once()
+        else:
+            pilot.run()
     elif command == "validate":
         from .core.pipeline_validator import validate_pipeline, print_report
         ok, results = validate_pipeline(pilot)

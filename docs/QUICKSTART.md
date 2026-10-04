@@ -8,9 +8,9 @@ See `INSTALL.md`, then run the one-time scaffold:
 python3 -m careerpilot.main setup
 ```
 
-This creates `config/config.yaml`, `profiles/`, `.env`, and runtime folders from
-the shipped examples (it never overwrites your edits). Then edit
-`config/config.yaml` (the `candidate:` section and rules) and add keys to `.env`.
+This copies `deployment_input/` into `config/config.yaml` and `profiles/`
+(it never overwrites your edits). Templates live in `examples/`. Then fill
+the blank `.env`.
 
 ## 2. Create your Career Profiles
 
@@ -24,7 +24,7 @@ Default  Leadership  Digital_Workplace  EUC  GCC  Contact_Centre
 
 `EUC` is meant to use the same Digital Workplace resume as `Digital_Workplace`.
 Put that same PDF in both `profiles/EUC/resume.pdf` and
-`profiles/Digital_Workplace/resume.pdf`. `profiles.example/Infrastructure/` is
+`profiles/Digital_Workplace/resume.pdf`. `examples/profiles/Infrastructure/` is
 only an extra example; setup does not copy it.
 
 Each profile folder contains:
@@ -72,8 +72,8 @@ python3 -m careerpilot.main run       # scheduler + dashboard
 
 The dashboard listens on `dashboard.host` / `dashboard.port` (example
 `0.0.0.0:5000`, so other devices on the home network can open it). Log in with
-`DASHBOARD_USER` and `DASHBOARD_PASSWORD` from `.env`. Change the example
-password before you do that. Do not forward port 5000 to the public internet.
+`DASHBOARD_USER` and `DASHBOARD_PASSWORD` from `.env`. Fill both before you
+do that. Do not forward port 5000 to the public internet.
 
 ## 5. Before `approval` or `auto`
 

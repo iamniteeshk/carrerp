@@ -13,16 +13,16 @@ clean machine).
 
 ## Fixes
 
-1. **`profiles.default` guaranteed.** The shipped `config.example.yaml` has
+1. **`profiles.default` guaranteed.** The shipped `examples/config.example.yaml` has
    `profiles.default: the example profiles`, and `setup` copies it verbatim, so the
    key always exists in a fresh `config/config.yaml`.
 2. **`profiles/` is created automatically.** New `careerpilot/core/bootstrap.py`
-   copies `profiles.example/` → `profiles/` when missing.
+   copies `examples/profiles/` → `profiles/` when missing.
 3. **First-run scaffolding.** A new `setup` command (and auto-bootstrap on every
    `doctor`/`run`/`scan`) creates `config/config.yaml`, `profiles/`, `.env`, and
    the runtime folders from the shipped examples. It never overwrites existing
    files.
-4. **Default profile is initialized with a real resume.** `profiles.example/
+4. **Default profile is initialized with a real resume.** `examples/profiles/
    the example profiles/` now ships a placeholder `resume.pdf`, so the default profile
    is structurally valid immediately after `setup`.
 5. **Doctor reaches every check, including database init.** A missing API key is

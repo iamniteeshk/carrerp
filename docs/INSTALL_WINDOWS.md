@@ -3,12 +3,18 @@
 This guide is written for a **fresh Windows 11** machine used only for
 CareerPilot (for example a **GEEKOM A7 Max**). No prior tools are assumed.
 
+The non-programmer path is `scripts\windows\Install_CareerPilot.bat`. It creates
+`.venv`, installs dependencies, and copies `deployment_input\` into `config\`
+and `profiles\`. You do not copy resumes or YAML by hand. Windows logon
+startup is **not** registered by that installer. Add it later, separately,
+if you want it.
+
 After setup, the machine should:
 
-1. Boot and auto-login (optional) or wait for you to sign in
-2. Start CareerPilot via Task Scheduler
-3. Browse LinkedIn / Naukri with a dedicated Chrome profile
-4. Score jobs with Gemini, write reports, and keep running for weeks
+1. Wait for you to sign in
+2. Start CareerPilot from `CareerPilot.bat` or `Start_CareerPilot.bat`
+3. Browse LinkedIn / Naukri with a dedicated browser profile
+4. Score jobs with local Ollama (`qwen3:8b` and `qwen3-vl:8b`)
 
 Leave `apply.mode: dry_run` until you have watched a real fill. `approval`
 submits only after Telegram Proceed. `auto` is the only mode that submits
@@ -165,44 +171,26 @@ Equivalent entry points:
 
 ### 1. `.env`
 
+The clone already has a blank `.env`. Fill only:
+
 ```env
-TELEGRAM_BOT_TOKEN=123456:ABCDEF...
-TELEGRAM_CHAT_ID=your_chat_id
-DASHBOARD_USER=choose-a-name
-DASHBOARD_PASSWORD=choose-a-long-password
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+DASHBOARD_USER=
+DASHBOARD_PASSWORD=
 ```
 
-The values shipped in `.env.example` (`Admin` / `Adming`) are **unsafe**. Change
-them. Gemini keys stay empty when you use Ollama.
+Gemini keys stay empty when you use Ollama. Do not put those secrets in Git.
 
-### 2. `config\config.yaml`
+### 2. `config\config.yaml` and resumes
 
-Created from `config.production.example.yaml` when you used `-ProductionConfig`.
+`Install_CareerPilot.bat` copies these from `deployment_input\` the first time.
+It does not replace a `config\config.yaml` or a `profiles\<Name>\` folder that
+already exists. It does not install an Infrastructure profile.
 
-Edit at least:
-
-- `candidate:` (name, email, phone, location)
-- `rules.blacklist_companies`
-- `rules.search_locations` (Chennai-first in the production template)
-- `browser.channel: chrome` (or `""` for bundled Chromium only)
-- Leave `apply.mode: dry_run` until a real fill looks right
-- `approval` and `auto` are dashboard choices after that
-
-### 3. Resumes
-
-Copy your real PDF:
-
-```text
-profiles\Default\resume.pdf
-profiles\Leadership\resume.pdf
-profiles\Digital_Workplace\resume.pdf
-profiles\EUC\resume.pdf              ← same PDF as Digital_Workplace
-profiles\GCC\resume.pdf
-profiles\Contact_Centre\resume.pdf
-```
-
-Setup does not copy `profiles.example\Infrastructure` into `profiles\`, and it
-does not replace a `profiles\` folder that already exists.
+Leave `apply.mode: dry_run` until a real fill looks right. `approval` submits
+only after a Telegram message that is exactly `Proceed`. `auto` is the only
+mode that submits without that message.
 
 ### 4. Re-check
 
@@ -242,7 +230,9 @@ If login is lost after a Windows update, delete the affected folder under
 # Ctrl+C to stop
 ```
 
-### Scheduled Task (24×7)
+### Scheduled Task (optional, not part of install)
+
+Do not run this during first setup. Use it later only if you want logon start:
 
 ```powershell
 .\scripts\Register-CareerPilotStartup.ps1

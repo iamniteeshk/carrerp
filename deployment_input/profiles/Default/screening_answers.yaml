@@ -1,4 +1,3 @@
-```yaml
 candidate:
 
   full_name: "Murahari M"
@@ -710,4 +709,3 @@ final_submission_rules:
 
   exception_action:
     "Pause application and ask Hari for confirmation"
-```

@@ -23,7 +23,7 @@ Related guides: `docs/INSTALL_WINDOWS.md`, `docs/PRODUCTION_READINESS_v4.md`.
 - [ ] `.\setup_windows.ps1 -ProductionConfig` completed successfully
 - [ ] Ollama is running and the model in `config.yaml` is installed
 - [ ] `.env` has `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
-- [ ] `.env` dashboard user/password are not the example `Admin` / `Adming`
+- [ ] `.env` has `DASHBOARD_USER` and `DASHBOARD_PASSWORD` filled in
 - [ ] `config\config.yaml` candidate details filled (no placeholders)
 - [ ] Resume PDF present in each used `profiles\<Name>\`
 - [ ] `python doctor.py` → **RESULT: PASS** (no mandatory FAILs)

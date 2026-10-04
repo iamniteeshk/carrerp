@@ -28,7 +28,8 @@ APScheduler 3.10.4, PyYAML 6.0.2, requests 2.32.3, python-dotenv 1.0.1.
 ## Configure (no source edits — ever)
 
 Scaffold a fresh clone with one command — it creates `config/config.yaml` (from
-the example), `profiles/` (from `profiles.example/`), `.env`, and the runtime
+the example), `profiles/` (from `deployment_input/profiles/` or
+`examples/profiles/`), `.env`, and the runtime
 folders. It never overwrites files you have already edited:
 
 ```bash
@@ -41,11 +42,11 @@ is no separate `candidate.yaml`; a legacy external file is still honored if
 present). Put your real `resume.pdf` in each of the six profile folders
 (`Default`, `Leadership`, `Digital_Workplace`, `EUC`, `GCC`, `Contact_Centre`).
 `EUC` uses the same Digital Workplace PDF. Setup does not copy
-`profiles.example/Infrastructure` and does not overwrite an existing `profiles/`
-tree. In `.env`, set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_USER`,
-and `DASHBOARD_PASSWORD` (the example password is unsafe). Ollama does not need
-a cloud API key. Your real `.env`, `config/config.yaml`, and `profiles/` are
-gitignored and must never be committed.
+`examples/profiles/Infrastructure` and does not overwrite an existing `profiles/`
+tree. In the blank `.env`, set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`,
+`DASHBOARD_USER`, and `DASHBOARD_PASSWORD`. Ollama does not need a cloud API
+key. `config/config.yaml` and `profiles/` stay untracked. `.env` is tracked
+only while its values are blank.
 
 Apply modes are `dry_run`, `approval`, and `auto`. Only `auto` submits without
 an explicit Proceed. The dashboard on `0.0.0.0:5000` requires that login. Do
