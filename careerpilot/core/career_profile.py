@@ -92,6 +92,103 @@ def _normalize(text: str) -> str:
     return " ".join(text.strip().lower().split())
 
 
+def _string_list(value) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    out = []
+    for item in value:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    return out
+
+
+# Keyword groups that are exclusions or score settings, not search terms.
+_KEYWORD_SKIP = {
+    "negative", "scoring", "minimum_score", "strong_match_score",
+    "excellent_match_score", "application_score",
+}
+_LOCATION_SKIP = {
+    "exclude_locations", "location_rules", "search", "relocation",
+    "priority", "priority_overrides",
+}
+
+
+def split_keywords(data) -> tuple[list[str], list[str]]:
+    """Read required/preferred, or primary plus every other keyword list."""
+    if not isinstance(data, dict):
+        return [], []
+    if isinstance(data.get("required"), list) or isinstance(data.get("preferred"), list):
+        return _string_list(data.get("required")), _string_list(data.get("preferred"))
+    required = _string_list(data.get("primary"))
+    preferred: list[str] = []
+    for key, value in data.items():
+        if key in _KEYWORD_SKIP or key == "primary":
+            continue
+        preferred.extend(_string_list(value))
+    return required, preferred
+
+
+def flatten_locations(data) -> list[str]:
+    """Read a list, a locations: list, or the grouped preferred/remote map."""
+    if isinstance(data, list):
+        return _string_list(data)
+    if not isinstance(data, dict):
+        return []
+    if isinstance(data.get("locations"), list):
+        return _string_list(data["locations"])
+    out: list[str] = []
+
+    def walk(node) -> None:
+        if isinstance(node, list):
+            out.extend(_string_list(node))
+        elif isinstance(node, dict):
+            for key, value in node.items():
+                if key in _LOCATION_SKIP:
+                    continue
+                walk(value)
+
+    walk(data)
+    seen: dict[str, None] = {}
+    for item in out:
+        seen.setdefault(item, None)
+    return list(seen)
+
+
+def collect_answers(data) -> dict[str, str]:
+    """Read answers: {question: text} or nested maps that each have answer:."""
+    if not isinstance(data, dict):
+        return {}
+    block = data.get("answers")
+    if isinstance(block, dict) and block and all(
+            not isinstance(value, (dict, list)) for value in block.values()):
+        return {_normalize(str(q)): str(a) for q, a in block.items()}
+    found: dict[str, str] = {}
+
+    def walk(node, key: str | None = None) -> None:
+        if isinstance(node, dict):
+            answer = node.get("answer")
+            if key and isinstance(answer, str) and answer.strip():
+                found[_normalize(key.replace("_", " "))] = answer.strip()
+            for child_key, child in node.items():
+                if child_key == "answer":
+                    continue
+                walk(child, str(child_key))
+        elif isinstance(node, list):
+            for item in node:
+                walk(item, key)
+
+    walk(data)
+    return found
+
+
+def _resume_filename(meta: dict) -> str:
+    resume = (meta or {}).get("resume", "resume.pdf")
+    if isinstance(resume, dict):
+        resume = resume.get("file") or "resume.pdf"
+    resume = str(resume or "resume.pdf").strip()
+    return resume or "resume.pdf"
+
+
 class CareerProfileError(Exception):
     """Raised for structural problems discovered while loading profiles."""
 
@@ -133,7 +230,7 @@ class CareerProfileEngine:
         meta = strip_line_meta(load_yaml(folder / PROFILE_FILE))
         name = meta.get("name") or folder.name
 
-        resume_path = self._resolve(folder, meta.get("resume", "resume.pdf"))
+        resume_path = self._resolve(folder, _resume_filename(meta))
         cover = meta.get("cover_letter")
         cover_path = self._resolve(folder, cover) if cover else None
 
@@ -175,28 +272,19 @@ class CareerProfileEngine:
         if not path.exists():
             return [], []
         data = strip_line_meta(load_yaml(path))
-        required = [str(k) for k in (data.get("required") or [])]
-        preferred = [str(k) for k in (data.get("preferred") or [])]
-        return required, preferred
+        return split_keywords(data)
 
     @staticmethod
     def _load_list(path: Path) -> list[str]:
         if not path.exists():
             return []
-        data = strip_line_meta(load_yaml(path))
-        if isinstance(data, list):
-            return [str(x) for x in data]
-        if isinstance(data, dict):
-            return [str(x) for x in (data.get("locations") or [])]
-        return []
+        return flatten_locations(strip_line_meta(load_yaml(path)))
 
     def _load_answers(self, folder: Path) -> dict[str, str]:
         path = folder / SCREENING_FILE
         if not path.exists():
             return {}
-        data = strip_line_meta(load_yaml(path))
-        answers = data.get("answers", data) if isinstance(data, dict) else {}
-        return {_normalize(str(q)): str(a) for q, a in answers.items()}
+        return collect_answers(strip_line_meta(load_yaml(path)))
 
     def _load_documents(self, folder: Path,
                         declared: dict[str, str]) -> dict[str, Path]:

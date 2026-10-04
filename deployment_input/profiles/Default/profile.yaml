@@ -184,7 +184,8 @@ compensation:
   salary_rule:
     fixed_salary_below_minimum: reject
     total_ctc_below_expected: do_not_automatically_reject
-    undisclosed_salary: allow_if_strong_match: true
+    undisclosed_salary:
+      allow_if_strong_match: true
 
 
 locations:

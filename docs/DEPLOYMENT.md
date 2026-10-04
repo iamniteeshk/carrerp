@@ -1,118 +1,195 @@
-# Deployment (long-running, unattended)
+# CareerPilot deployment checklist
 
-CareerPilot is designed to run continuously on one machine you control.
+This is the path for the Windows PC (GEEKOM). Setup copies
+`deployment_input/config.yaml` to `config/config.yaml` and the six profile
+folders to `profiles/`. You do not copy those files yourself.
 
-## Where to run it
+The only values you type are the secrets in `.env`.
 
-Run it on a machine on a **residential network** (e.g. a small always-on PC or
-mini-PC at home). A datacenter/VPS IP materially raises the chance LinkedIn
-flags automated access. The OS does not matter; the network does.
+Windows logon startup is not registered by the installer. Do that later,
+separately, if you want it.
 
-## Choosing the browser (no code change)
+## Prerequisites
 
-The browser is selected in `config.yaml` under `browser:`. On Windows the default
-is Microsoft Edge (`engine: chromium`, `channel: msedge`) since Edge ships with
-Windows. To use Chrome set `channel: chrome`; for the Playwright-bundled Chromium
-leave `channel: ""`; for Firefox set `engine: firefox` (channel is ignored).
-`headless` and `viewport` are configurable too. Switching browsers never requires
-editing Python.
+- Windows 10 or 11
+- Git
+- Python 3.10 or newer (`py -3` or `python` on PATH)
+- Google Chrome if `browser.channel` is `chrome` (Playwright Chromium is installed as the fallback)
+- Ollama, installed by you from https://ollama.com/download
+- Models `qwen3:8b` and `qwen3-vl:8b` (downloaded only when you confirm)
+- A Telegram bot token and chat id
+- A dashboard username and password that are not `Admin` / `Adming`
 
-## Start / stop / restart
+Ollama is not included in this repository. CareerPilot does not download the models during install.
 
-- **Windows:** `scripts\run_careerpilot.ps1` (or `.bat`), `scripts\stop_careerpilot.bat`,
-  `scripts\restart_careerpilot.bat`, `scripts\update_project.bat`,
-  `scripts\doctor.bat`, `scripts\install_requirements.bat`.
-  Logon start: `scripts\Register-CareerPilotStartup.ps1` (uses the project
-  `.venv`, the repo folder, and writes `logs\startup.err.log`).
-- **macOS / Linux:** `scripts/run.sh`, `scripts/stop.sh`, `scripts/restart.sh`,
-  `scripts/update.sh`, `scripts/doctor.sh`, `scripts/install.sh`.
+## Cloning
 
-`run` writes a `careerpilot.pid` file; `stop` reads it to terminate gracefully
-(falling back to force-kill), and `restart` chains the two. All scripts validate
-prerequisites and print meaningful errors.
+```text
+git clone -b cursor/production-ready-b4b1 https://github.com/iamniteeshk/carrerp.git C:\CareerPilot
+cd C:\CareerPilot
+```
 
-## Windows
+Use the final deployment branch. Do not copy files out of `deployment_input` by hand.
 
-- Register logon start once: `.\scripts\Register-CareerPilotStartup.ps1`.
-  It launches `scripts\run_careerpilot.ps1` with the project `.venv` and the
-  repository as the working directory. A second start is refused while
-  `careerpilot.pid` belongs to a running process. Failures are appended to
-  `logs\startup.err.log`.
-- `scripts\doctor.bat` for pre-flight; `scripts\update_project.bat` to pull
-  updates.
-- Daily operation is the dashboard (Start, Pause, Resume, Stop, Scan now).
-  Those buttons require the dashboard login.
+## Setup
 
-## macOS / Linux
+Double-click:
 
-- Run `scripts/run.sh`, or wrap it in a `systemd` user service (Linux) or a
-  `launchd` agent (macOS) with restart-on-failure.
-- Example systemd unit (Linux):
+```text
+scripts\windows\Install_CareerPilot.bat
+```
 
-  ```ini
-  [Unit]
-  Description=CareerPilot
-  [Service]
-  WorkingDirectory=/path/to/careerpilot
-  ExecStart=/usr/bin/python3 -m careerpilot.main run
-  Restart=on-failure
-  [Install]
-  WantedBy=default.target
-  ```
+That file checks it is inside the repository, creates `.venv`, installs
+`requirements.txt`, installs Playwright Chromium, copies the six production
+profiles and `config.yaml`, then runs Doctor.
 
-## Operational behavior
+The six profiles are Default, Leadership, Digital_Workplace, EUC, GCC, and
+Contact_Centre. Infrastructure is not installed.
 
-- **Scheduler:** scans every `scan_interval_hours`. A scan that overruns the
-  interval will **not** overlap the next (`max_instances=1`, `coalesce=True`).
-- **Self-healing:** a dead browser context is restarted before each scan.
-- **Daily summary + backup:** a Telegram summary and a SQLite backup run daily.
-- **Crash isolation:** one bad scan or one failing portal never stops the rest;
-  crashes are logged and notified.
-- **Graceful shutdown:** SIGINT/SIGTERM close the browser sessions and database
-  cleanly and send a shutdown notice.
+If `config\config.yaml` or `profiles\<Name>\` already exists, setup leaves it
+in place. Delete that folder first only when you intend to replace it.
 
-## Backups & logs
+## .env
 
-- Database backups: `database/backups/` (configurable).
-- Logs: categorized rotating files under `logs/`.
-- Both directories are gitignored.
+Setup copies `.env.example` to `.env` when `.env` is missing. Edit `.env`.
 
-## Account-risk reminder
+You must replace:
 
-Automating a site may violate its Terms of Service and risk your account. That
-risk exists regardless of scan volume and is your decision. Start in `dry_run`,
-go slow, and keep `max_applications_per_day` conservative.
+| Name | What to put |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | token from @BotFather |
+| `TELEGRAM_CHAT_ID` | chat that receives approval messages |
+| `DASHBOARD_USER` | a name other than `Admin` |
+| `DASHBOARD_PASSWORD` | a password other than `Adming` |
 
-## Apply modes
+Leave these empty when local Ollama is the AI provider:
 
-| Mode | Submit |
-|------|--------|
-| `dry_run` | Never. |
-| `approval` | Only after an explicit Proceed (Telegram or a saved Proceed decision). |
-| `auto` | Without asking. This is the only mode that does that. |
+- `GEMINI_API_KEY_1`
+- `GEMINI_API_KEY_2`
+- `GEMINI_API_KEY_3`
+- `DEEPSEEK_API_KEY`
+- `EMAIL_PASSWORD`
 
-If the mode is missing or not one of those three names, CareerPilot stays on
-`dry_run`. An old config that says `live` is treated as `approval`.
+Optional session keys, only if you want the dashboard login to survive a restart:
 
-## When something fails
+- `FLASK_SECRET_KEY`
+- `DASHBOARD_SECRET_KEY`
 
-CareerPilot records the job and does not mark it submitted unless the apply
-flow reports a real Submit click in `auto`, or in `approval` after Proceed.
+`.env` is gitignored. Do not commit it.
 
-- Ollama offline, model missing, timeout, or a bad model reply: the job stays
-  queued or needs review. It is not marked applied.
-- Telegram unavailable during approval: the job stays `waiting`. It is not submitted.
-- LinkedIn or Naukri logged out, 2FA, or CAPTCHA: the run pauses for you and
-  sends a notice. It does not submit.
-- Browser crash, page timeout, a changed selector, a form change, a required
-  question with no answer, or a Submit button that cannot be identified: the
-  attempt is recorded as not submitted.
-- A short network drop: that cycle fails and is retried later. A failed cycle
-  is not an application.
-- Restart (including Windows logon) while an approval is open: the saved row
-  stays `waiting` or `proceed`. The old page cannot be restored. After Proceed,
-  the same job URL is opened again, filled again, and only then submitted.
-  A restart by itself does not click Submit.
+## Doctor
 
-The dashboard on `0.0.0.0:5000` is for the home LAN. Log in is required for
-every page. Do not forward that port to the internet.
+Double-click `scripts\windows\Doctor_CareerPilot.bat`.
+
+It prints `PASS` or `FAIL` for config, the database, folder permissions,
+Playwright, the browser, browser profile directories, all six profiles, real
+resumes, the YAML files, candidate name/email/phone, Telegram, the dashboard
+password, Ollama installed, Ollama running, `qwen3:8b`, and `qwen3-vl:8b`.
+
+`run` and `scan` stop if a mandatory check fails. They do not start with a critical failure.
+
+`doctor --fix` may create folders, initialize the database, install Playwright
+Chromium, and start `ollama serve` when Ollama is already installed. It does
+not pull models and it does not invent secrets.
+
+## Ollama
+
+Double-click `scripts\windows\Setup_Ollama.bat`.
+
+- If Ollama is missing, it prints the install page and stops.
+- If Ollama is installed but not answering, it starts `ollama serve`.
+- If a model is missing, it prints `ollama pull qwen3:8b` and `ollama pull qwen3-vl:8b`.
+- It downloads those models only after you type `Y`.
+
+## Browser login
+
+The first start creates `profiles_browser\linkedin` and `profiles_browser\naukri`.
+CareerPilot opens the browser configured in `config.yaml` (`channel: chrome`
+in the shipped file, headed, not headless).
+
+Log in to LinkedIn and Naukri in that window. The sessions stay in those
+folders for later runs.
+
+CareerPilot does not store the website password, does not bypass CAPTCHA, and
+does not complete 2FA. If a login, code, or CAPTCHA appears, it waits.
+
+## Dry Run validation
+
+Shipped `apply.mode` is `dry_run`. In this mode CareerPilot may fill a form
+and record the answers. It does not click Submit.
+
+Confirm on the machine with one job you are willing to open, and check that
+no application was sent.
+
+## Approval validation
+
+Set `apply.mode` to `approval` only after dry run looks right.
+
+A submission happens only when the Telegram message is exactly `Proceed`
+(capitalization does not matter). These do not authorize a submit:
+
+```text
+yes
+ok
+go
+submit
+approve
+Proceed now
+```
+
+`Reject` does not submit.
+
+The dashboard Apply button only keeps the Telegram approval request. It does
+not authorize the submit.
+
+## Auto validation
+
+`auto` is the only mode that submits without a Telegram `Proceed`. Leave it
+off until you have decided you want unattended submit. A blank or unknown
+mode stays `dry_run`. The old name `live` means `approval`, not `auto`.
+
+## Dashboard
+
+`Open_Dashboard.bat` reads `dashboard.port` from `config\config.yaml`
+(5000 in the shipped file) and opens `http://127.0.0.1:<port>/`.
+
+The shipped config listens on `127.0.0.1`, so the page is on this PC.
+Every page, including status, asks for `DASHBOARD_USER` and
+`DASHBOARD_PASSWORD`. Do not publish port 5000 on the internet.
+
+## Troubleshooting
+
+| What you see | What to do |
+|---|---|
+| Doctor says FAIL for Telegram | Fill both Telegram lines in `.env` |
+| Doctor says FAIL for the dashboard password | Replace `Admin` / `Adming` |
+| Doctor says Ollama is not running | Run `ollama serve`, or `Setup_Ollama.bat` |
+| Doctor says a model is missing | Run the `ollama pull` command it prints |
+| Doctor says a resume is a placeholder | The file in `deployment_input\profiles\<Name>\resume.pdf` is not a real PDF. Replace that file in the repository source, then delete `profiles\<Name>\` and run setup again |
+| "already running" | Use Stop, or read the PID in `careerpilot.pid` |
+| Browser did not open | Doctor, system browser check. `channel: chrome` needs Chrome installed |
+
+## Backup and recovery
+
+Copy these folders while CareerPilot is stopped:
+
+- `database\` (includes `database\backups\`)
+- `profiles\` (resumes and answers)
+- `config\config.yaml`
+- `.env`
+- `profiles_browser\` (LinkedIn and Naukri sessions)
+
+`scripts\backup.ps1` can copy the database tree. Restoring is copying those
+folders back into a clone and running Doctor. Do not commit `.env`,
+`config\config.yaml`, or `profiles\`.
+
+## Safe shutdown
+
+Double-click `scripts\windows\Stop_CareerPilot.bat`, or choose Stop in
+`CareerPilot.bat`.
+
+That stops only the process id stored in `careerpilot.pid`. It asks Windows
+to close that process, waits, and only then force-stops that same PID.
+It does not kill every Python process and it does not stop Ollama.
+
+Closing the Start window with Ctrl+C also shuts CareerPilot down.

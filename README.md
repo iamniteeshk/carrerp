@@ -28,18 +28,47 @@ your behalf, pausing for you whenever a security checkpoint needs a human.
   OTPs, or solve CAPTCHAs. (The Human Interaction framework itself is a planned
   phase — see Roadmap.)
 
-## Quick start (Windows dedicated PC)
+## First installation (Windows, GEEKOM)
 
-```powershell
-git clone <repo-url> C:\CareerPilot
-cd C:\CareerPilot
-.\setup_windows.ps1 -ProductionConfig
-# edit .env + config\config.yaml + profiles\*\resume.pdf
-python doctor.py
-.\scripts\run_careerpilot.ps1
-```
+You do not copy resumes, profile folders, or `config.yaml`. Those are
+installed from `deployment_input/` by setup.
 
-Full guide: [`docs/INSTALL_WINDOWS.md`](docs/INSTALL_WINDOWS.md).
+1. Clone this branch.
+2. Double-click `scripts\windows\Install_CareerPilot.bat`.
+3. Copy `.env.example` to `.env` if setup has not already created `.env`.
+4. Put your real values in `.env`:
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_USER`,
+   `DASHBOARD_PASSWORD`.
+5. Double-click `scripts\windows\Doctor_CareerPilot.bat` and read every line.
+   A missing item says `FAIL` and how to fix it.
+6. Double-click `scripts\windows\Start_CareerPilot.bat`.
+7. When the browser opens, log in to LinkedIn and Naukri yourself.
+   Login, 2FA, and CAPTCHA wait for you. Passwords are not stored by the app.
+8. Double-click `scripts\windows\Open_Dashboard.bat`.
+
+Ollama is not bundled. `scripts\windows\Setup_Ollama.bat` checks it and will
+not download `qwen3:8b` or `qwen3-vl:8b` unless you type `Y`.
+
+Windows logon startup is not part of this install. Set that up later if you
+want it.
+
+Full checklist: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
+
+## Normal daily operation
+
+Double-click `CareerPilot.bat` in the repository folder:
+
+1. Start CareerPilot
+2. Stop CareerPilot
+3. Restart CareerPilot
+4. Run Doctor
+5. Open Dashboard
+6. Setup / Repair
+7. Exit
+
+Stop uses only the process id in `careerpilot.pid`. It does not stop other
+Python or Ollama programs. Start refuses a second copy while that process
+is still running.
 
 ## Quick start (any platform)
 

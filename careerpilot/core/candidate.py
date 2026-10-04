@@ -75,25 +75,52 @@ _KNOWN_KEYS = {
 }
 
 
+def _form_text(value: Any) -> str:
+    """Form fields are strings. Structured maps keep a readable value."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("formatted", "answer"):
+            text = value.get(key)
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+        if "days" in value:
+            text = f"{value['days']} days"
+            if value.get("negotiable"):
+                text += ", negotiable"
+            return text
+        if value.get("india") is True:
+            return "India"
+        return ""
+    return str(value)
+
+
 def candidate_from_dict(clean: dict[str, Any]) -> Candidate:
     """Build a Candidate from an already-parsed dict (line-meta stripped)."""
     extra = {k: v for k, v in clean.items() if k not in _KNOWN_KEYS}
+    # Keep the original structured compensation/notice maps. Forms use the text.
+    for key in ("current_ctc", "expected_ctc", "notice_period", "work_authorization"):
+        raw = clean.get(key)
+        if isinstance(raw, dict):
+            extra[f"{key}_detail"] = raw
     return Candidate(
-        full_name=clean.get("full_name", ""),
-        email=clean.get("email", ""),
-        phone=clean.get("phone", ""),
-        current_location=clean.get("current_location", ""),
-        total_experience=clean.get("total_experience", ""),
-        current_company=clean.get("current_company", ""),
-        current_designation=clean.get("current_designation", ""),
-        current_ctc=clean.get("current_ctc", ""),
-        expected_ctc=clean.get("expected_ctc", ""),
-        notice_period=clean.get("notice_period", ""),
-        work_authorization=clean.get("work_authorization", ""),
-        linkedin_url=clean.get("linkedin_url", ""),
+        full_name=str(clean.get("full_name") or ""),
+        email=str(clean.get("email") or ""),
+        phone=str(clean.get("phone") or ""),
+        current_location=str(clean.get("current_location") or ""),
+        total_experience=str(clean.get("total_experience") or ""),
+        current_company=str(clean.get("current_company") or ""),
+        current_designation=str(clean.get("current_designation") or ""),
+        current_ctc=_form_text(clean.get("current_ctc", "")),
+        expected_ctc=_form_text(clean.get("expected_ctc", "")),
+        notice_period=_form_text(clean.get("notice_period", "")),
+        work_authorization=_form_text(clean.get("work_authorization", "")),
+        linkedin_url=str(clean.get("linkedin_url") or ""),
         willing_to_relocate=bool(clean.get("willing_to_relocate", True)),
-        remote_preference=clean.get("remote_preference", "Any"),
-        preferred_shift=clean.get("preferred_shift", "Any"),
+        remote_preference=str(clean.get("remote_preference") or "Any"),
+        preferred_shift=str(clean.get("preferred_shift") or "Any"),
         extra=extra,
     )
 

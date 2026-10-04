@@ -1,13 +1,15 @@
 # Secrets and personal data -- NEVER commit these.
+# Anchored to the repo root so deployment_input/ stays trackable.
 .env
-candidate.yaml
-config/config.yaml
-config.yaml
+/candidate.yaml
+/config/config.yaml
+/config.yaml
 
-# Per-user career profiles (real resumes, answers, documents).
-profiles/
-documents/
-resumes/
+# Installed career profiles (real resumes). The source copies live in
+# deployment_input/profiles/ and are committed on purpose.
+/profiles/
+/documents/
+/resumes/
 
 # Runtime artifacts.
 careerpilot.pid
