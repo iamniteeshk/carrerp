@@ -49,7 +49,7 @@ validated clean before release.
    `core/config.py` (added `source_path`).
 5. **Fresh ZIP starts clean and runs directly (Issues 5, 6).** The ZIP ships NO
    database/CSV/logs/cache/profiles/pyc. A first-run bootstrap creates
-   `config/config.yaml` from `config.example.yaml` automatically so the app runs
+   `config/config.yaml` from `examples/config.example.yaml` automatically so the app runs
    without manual setup. *Files:* `main.py` (`_bootstrap_config`).
 6. **Packaging validator (Issues 6, 18).** `scripts/validate_clean.py` fails
    packaging if any runtime artifact (db, csv, logs, debug, screenshots, cache,

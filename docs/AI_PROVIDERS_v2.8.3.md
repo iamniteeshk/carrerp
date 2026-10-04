@@ -96,7 +96,7 @@ on your side.
 - **Local OpenAI-compatible servers (Ollama, LM Studio, vLLM) are first-class.**
   A provider block with a `base_url` but no `api_key_env` is treated as keyless:
   it is usable without a key and the `Authorization` header is omitted. Example
-  blocks are in `config.example.yaml`. For servers that pin a single served
+  blocks are in `examples/config.example.yaml`. For servers that pin a single served
   model and don't list models, set `discover_models: false` + `preferred_model`.
 - No AI Engine code changes are needed to add either a new cloud provider or a
   local server — configuration only.

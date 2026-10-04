@@ -1,6 +1,8 @@
 # Secrets and personal data -- NEVER commit these.
+# Root .env is tracked on purpose while every value is blank. Install and
+# setup mark it skip-worktree and register a clean filter that drops values
+# if it is staged. Do not put real secrets in any other file.
 # Anchored to the repo root so deployment_input/ stays trackable.
-.env
 /candidate.yaml
 /config/config.yaml
 /config.yaml

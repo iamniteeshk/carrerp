@@ -18,7 +18,7 @@ separately, if you want it.
 - Ollama, installed by you from https://ollama.com/download
 - Models `qwen3:8b` and `qwen3-vl:8b` (downloaded only when you confirm)
 - A Telegram bot token and chat id
-- A dashboard username and password that are not `Admin` / `Adming`
+- A dashboard username and password, which you type into the blank `.env`
 
 Ollama is not included in this repository. CareerPilot does not download the models during install.
 
@@ -51,7 +51,7 @@ in place. Delete that folder first only when you intend to replace it.
 
 ## .env
 
-Setup copies `.env.example` to `.env` when `.env` is missing. Edit `.env`.
+The clone already contains a blank `.env`. Edit that file. Do not create a second one.
 
 You must replace:
 
@@ -59,8 +59,8 @@ You must replace:
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | token from @BotFather |
 | `TELEGRAM_CHAT_ID` | chat that receives approval messages |
-| `DASHBOARD_USER` | a name other than `Admin` |
-| `DASHBOARD_PASSWORD` | a password other than `Adming` |
+| `DASHBOARD_USER` | a username you choose |
+| `DASHBOARD_PASSWORD` | a password you choose |
 
 Leave these empty when local Ollama is the AI provider:
 
@@ -151,18 +151,19 @@ mode stays `dry_run`. The old name `live` means `approval`, not `auto`.
 ## Dashboard
 
 `Open_Dashboard.bat` reads `dashboard.port` from `config\config.yaml`
-(5000 in the shipped file) and opens `http://127.0.0.1:<port>/`.
+(5000 in the shipped file) and opens `http://127.0.0.1:<port>/` on this PC.
 
-The shipped config listens on `127.0.0.1`, so the page is on this PC.
-Every page, including status, asks for `DASHBOARD_USER` and
-`DASHBOARD_PASSWORD`. Do not publish port 5000 on the internet.
+The shipped config listens on `0.0.0.0` port 5000, so other devices on your
+home LAN can open `http://<this-pc-ip>:5000/`. Every page, including status,
+asks for `DASHBOARD_USER` and `DASHBOARD_PASSWORD`. This is for the home
+network only. Do not forward port 5000 to the public internet.
 
 ## Troubleshooting
 
 | What you see | What to do |
 |---|---|
 | Doctor says FAIL for Telegram | Fill both Telegram lines in `.env` |
-| Doctor says FAIL for the dashboard password | Replace `Admin` / `Adming` |
+| Doctor says FAIL for the dashboard password | Fill `DASHBOARD_USER` and `DASHBOARD_PASSWORD` in `.env` |
 | Doctor says Ollama is not running | Run `ollama serve`, or `Setup_Ollama.bat` |
 | Doctor says a model is missing | Run the `ollama pull` command it prints |
 | Doctor says a resume is a placeholder | The file in `deployment_input\profiles\<Name>\resume.pdf` is not a real PDF. Replace that file in the repository source, then delete `profiles\<Name>\` and run setup again |

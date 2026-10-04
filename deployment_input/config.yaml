@@ -234,7 +234,7 @@ browser:
   render_settle_ms: 1200
   scroll_passes: 3
 dashboard:
-  host: 127.0.0.1
+  host: 0.0.0.0
   port: 5000
   refresh_seconds: 30
 database:

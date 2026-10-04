@@ -96,7 +96,7 @@ def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
         report.error(
             f"config.yaml could not be parsed (invalid YAML): {exc} — "
             f"Fix: open {path} in an editor and correct the syntax "
-            f"(indentation/colons); compare with config.example.yaml")
+            f"(indentation/colons); compare with examples/config.example.yaml")
         return None
 
     fname = path.name
@@ -109,7 +109,7 @@ def _validate_config(path: str | Path, report: ValidationReport) -> dict | None:
                      f"Fix: add dashboard: with host/port")
     if "ai" not in cfg:
         report.error(f"config.ai is missing ({fname}) — "
-                     f"Fix: copy ai: block from config.example.yaml")
+                     f"Fix: copy ai: block from examples/config.example.yaml")
     if "apply" not in cfg:
         report.error(f"config.apply is missing ({fname}) — "
                      f"Fix: add apply: with mode: dry_run and min_apply_score:")
@@ -271,8 +271,8 @@ def _validate_folders(cfg: dict, report: ValidationReport) -> None:
 def _validate_env(cfg: dict, env_path: str | Path, report: ValidationReport) -> None:
     if not Path(env_path).exists():
         report.warn(
-            f".env not found at {env_path} — Fix: copy .env.example to .env "
-            f"and set GEMINI_API_KEY_1=...")
+            f".env not found at {env_path} — the clone ships a blank .env. "
+            f"Run setup if it is missing.")
         return
     ai = cfg.get("ai", {}) or {}
     gemini_vars = ai.get("gemini_key_env_vars", []) or []

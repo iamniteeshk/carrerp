@@ -182,7 +182,7 @@ telegram:
 # ---- Career Profiles: six folders under 'dir' --------------------------------
 # Default, Leadership, Digital_Workplace, EUC, GCC, Contact_Centre.
 # EUC uses the same Digital Workplace resume PDF as Digital_Workplace.
-# profiles.example/Infrastructure is an extra example and is not copied by setup.
+# examples/profiles/Infrastructure is an extra example and is not copied by setup.
 profiles:
   dir: profiles
   default: Default        # used when AI confidence is below threshold

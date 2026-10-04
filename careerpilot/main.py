@@ -889,11 +889,12 @@ def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     command = argv[0] if argv else "run"
 
-    from .core.bootstrap import ensure_scaffold
+    from .core.bootstrap import ensure_scaffold, protect_local_env
 
     # 'setup' explicitly scaffolds a fresh clone, then points the user onward.
     if command == "setup":
         actions = ensure_scaffold()
+        actions.extend(protect_local_env())
         if actions:
             print("CareerPilot setup complete:")
             for a in actions:
@@ -927,7 +928,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # The doctor must run even when config is broken -- that's its job.
     if command == "doctor":
-        _bootstrap_config()   # a fresh install has only *.example templates
+        _bootstrap_config()   # install deployment_input when those files are missing
+        protect_local_env()
         fix = "--fix" in argv or "-f" in argv
         production = "--production" in argv
         return 0 if run_doctor(fix=fix, production=production) else 3

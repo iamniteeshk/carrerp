@@ -57,8 +57,8 @@ Key behaviors, all implemented:
 - Secrets live only in `.env`. Career data lives only in `profiles/`. Structure
   and thresholds live in `config.yaml`.
 - The repository is GitHub-safe: it ships **examples only** —
-  `.env.example`, `config.example.yaml`, `the candidate section`, and
-  `profiles.example/the example profiles/`. Real files are gitignored.
+  `examples/.env.example`, `examples/config.example.yaml`, `the candidate section`, and
+  `examples/profiles/the example profiles/`. Real files are gitignored.
 - `.gitignore` excludes: `.env`, `candidate.yaml`, `config/config.yaml`,
   `profiles/`, `documents/`, `resumes/`, and all runtime dirs (database, logs,
   screenshots, reports, browser profiles).

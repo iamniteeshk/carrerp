@@ -45,7 +45,7 @@ skipped before opening.
    "does this fit" check can't be one list. Fix: new **`search_keywords`** config
    (focused, point-6 list) for searching; `accepted_titles` stays the broad
    match allowlist. Backward compatible (falls back to `accepted_titles`).
-   *Files:* `core/config.py`, `main.py`, `config.example.yaml`, `config/config.yaml`.
+   *Files:* `core/config.py`, `main.py`, `examples/config.example.yaml`, `config/config.yaml`.
 6. **Robotic browsing (#4).** Root: reading/scrolling too fast. Fix: realistic
    timings — 220 wpm, 0.9–12s reading, 120–380px scroll notches, 0.6–1.8s pauses.
    *Files:* `browser/humanize.py`.
@@ -69,7 +69,7 @@ full per-job stage trace. *Files:* `core/pipeline.py` (`_write_run_log_md`).
 
 `rules/rule_engine.py`, `browser/job_detail.py`, `browser/base_portal.py`,
 `browser/humanize.py`, `core/pipeline.py`, `core/config.py`, `main.py`,
-`config.example.yaml`, `config/config.yaml`, and tests
+`examples/config.example.yaml`, `config/config.yaml`, and tests
 (`tests/test_prefilter.py`, `tests/test_read_gate.py`, `tests/test_navigation.py`).
 
 ## Tests executed
@@ -130,7 +130,7 @@ identical results (matched=2, partial=0, failed=0), proving the cache-hit fix.
 
 ### How to run and confirm
 1. Ensure `config/config.yaml` has your focused `search_keywords` and broad
-   `accepted_titles` (templates updated in `config.example.yaml`).
+   `accepted_titles` (templates updated in `examples/config.example.yaml`).
 2. Set `browser.open_jobs: true`, `debug.visual_mode: true`, `apply.mode: dry_run`.
 3. Run a scan. Confirm the EFFECTIVE CONFIG banner shows `job-open path = READY`
    and the right config file; watch jobs open one at a time and read.

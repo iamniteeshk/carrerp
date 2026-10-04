@@ -1,12 +1,13 @@
 """First-run bootstrap / scaffolding.
 
-A fresh clone ships only example files (`config.example.yaml`, `profiles.example/`,
-`.env.example`) because the real ones are gitignored. This module turns a fresh
-clone into a runnable layout automatically, so the project is clone-and-run:
+A fresh clone ships `deployment_input/` (the real production files), a blank
+`.env`, and templates under `examples/`. This module turns that into a
+runnable layout:
 
-* create `config/config.yaml` from `config.example.yaml` if missing
-* create `profiles/` from `profiles.example/` if missing
-* create `.env` from `.env.example` if missing
+* copy `deployment_input/config.yaml` to `config/config.yaml` if missing
+* copy the six `deployment_input/profiles/` folders if missing
+* otherwise create config and profiles from `examples/` if those are missing
+* leave an existing `.env` alone (the clone already contains a blank one)
 * create the runtime directories (logs, database, screenshots, reports)
 
 It never overwrites an existing file, so it is safe to call on every startup.
@@ -23,11 +24,12 @@ from .logging_setup import get_logger
 logger = get_logger(__name__)
 
 DEFAULT_CONFIG = Path("config/config.yaml")
-EXAMPLE_CONFIG = Path("config.example.yaml")
+EXAMPLE_CONFIG = Path("examples/config.example.yaml")
 PROFILES_DIR = Path("profiles")
-EXAMPLE_PROFILES = Path("profiles.example")
+EXAMPLE_PROFILES = Path("examples/profiles")
+PRODUCTION_EXAMPLE_CONFIG = Path("examples/config.production.example.yaml")
 ENV_FILE = Path(".env")
-EXAMPLE_ENV = Path(".env.example")
+EXAMPLE_ENV = Path("examples/.env.example")
 DEPLOYMENT_INPUT = Path("deployment_input")
 DEPLOYMENT_CONFIG = DEPLOYMENT_INPUT / "config.yaml"
 DEPLOYMENT_PROFILES = DEPLOYMENT_INPUT / "profiles"
@@ -45,7 +47,7 @@ RUNTIME_DIRS = (
 )
 
 # Example-only folder. Production uses the six career profiles; this one is
-# kept under profiles.example/ as a template and is not copied into profiles/.
+# kept under examples/profiles/ as a template and is not copied into profiles/.
 SKIP_EXAMPLE_PROFILES = frozenset({"Infrastructure"})
 
 
@@ -304,7 +306,7 @@ def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
     # with example placeholders.
     if not config_path.exists() and not has_deploy:
         example = None
-        prod = Path("config.production.example.yaml")
+        prod = PRODUCTION_EXAMPLE_CONFIG
         if prefer_production and prod.exists():
             example = prod
         elif EXAMPLE_CONFIG.exists():
@@ -317,7 +319,7 @@ def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
             logger.warning("No %s and no example config to copy from",
                            config_path)
 
-    # 2. profiles/  <-  profiles.example/ only when deployment_input is absent.
+    # 2. profiles/  <-  examples/profiles/ only when deployment_input is absent.
     # Existing profiles/ is left completely alone, including real resumes.
     if not PROFILES_DIR.exists() and not has_deploy:
         if EXAMPLE_PROFILES.exists():
@@ -329,11 +331,11 @@ def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
             logger.warning("No %s/ and no %s/ to copy from",
                            PROFILES_DIR, EXAMPLE_PROFILES)
 
-    # 3. .env  <-  .env.example
+    # 3. .env is shipped blank. Recreate it only if a checkout deleted it.
     if not ENV_FILE.exists() and EXAMPLE_ENV.exists():
         shutil.copyfile(EXAMPLE_ENV, ENV_FILE)
         actions.append(f"created {ENV_FILE} from {EXAMPLE_ENV} "
-                       "(add your real keys)")
+                       "(fill in your real secrets)")
 
     # 4. runtime directories
     for name in RUNTIME_DIRS:
@@ -345,4 +347,38 @@ def ensure_scaffold(config_path: str | Path = DEFAULT_CONFIG,
     if actions:
         for a in actions:
             logger.info("bootstrap: %s", a)
+    return actions
+
+
+def protect_local_env() -> list[str]:
+    """Keep a filled .env from being committed.
+
+    Registers the clean filter named in .gitattributes and marks .env
+    skip-worktree. Local edits stay on disk. Staging the file stores blanks.
+    No-op outside a git checkout.
+    """
+    import subprocess
+    import sys
+
+    actions: list[str] = []
+    if not Path(".git").exists() or not ENV_FILE.exists():
+        return actions
+    script = Path("scripts/git/blank_env_filter.py")
+    if not script.exists():
+        return actions
+    clean = f"{sys.executable} {script.resolve()}"
+    commands = [
+        ["git", "config", "filter.careerpilot-blank-env.clean", clean],
+        ["git", "config", "filter.careerpilot-blank-env.smudge", "cat"],
+        ["git", "config", "filter.careerpilot-blank-env.required", "true"],
+        ["git", "update-index", "--skip-worktree", ".env"],
+    ]
+    for cmd in commands:
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            logger.warning("env protection: %s (%s)", " ".join(cmd), exc)
+            actions.append(f"env protection failed: {' '.join(cmd)}")
+            return actions
+    actions.append("protected .env (local secrets are not committed)")
     return actions

@@ -193,16 +193,16 @@ class Doctor:
             print()
 
     def _maybe_copy_production_config(self) -> None:
-        """Copy config.production.example.yaml when no real config exists yet."""
+        """Copy examples/config.production.example.yaml when no real config exists yet."""
         target = Path(self.config_path)
-        prod = Path("config.production.example.yaml")
+        prod = Path("examples/config.production.example.yaml")
         if target.exists() or not prod.exists():
             return
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(prod, target)
             self.fixes.append(FixAction(
-                f"created {target} from config.production.example.yaml", True))
+                f"created {target} from examples/config.production.example.yaml", True))
         except OSError as exc:
             self.fixes.append(FixAction("copy production config", False, str(exc)))
 
@@ -274,8 +274,8 @@ class Doctor:
             self._add(".env file", PASS, self.env_path)
         else:
             self._add(".env file", FAIL,
-                      f"{self.env_path} not found (copy .env.example to .env "
-                      f"or run: python -m careerpilot.main doctor --fix)")
+                      f"{self.env_path} not found — the clone ships a blank .env. "
+                      f"Run: python -m careerpilot.main setup")
 
     def _check_env_file_raw(self) -> None:
         if Path(self.env_path).exists():
@@ -705,16 +705,18 @@ class Doctor:
 
     def _check_dashboard_password(self) -> None:
         import os
-        user = (os.environ.get("DASHBOARD_USER") or "Admin").strip()
-        password = (os.environ.get("DASHBOARD_PASSWORD") or "Adming").strip()
+        user = (os.environ.get("DASHBOARD_USER") or "").strip()
+        password = (os.environ.get("DASHBOARD_PASSWORD") or "").strip()
         host = (self.config.dashboard_host or "127.0.0.1") if self.config else ""
-        unsafe = password.lower() in {"adming", "admin", "password", "changeme", ""}
+        unsafe = password.lower() in {"adming", "admin", "password", "changeme"}
         lan = host in {"0.0.0.0", "::", "[::]"}
         strict = self._deployment_strict()
         if not user or not password:
-            self._add("Dashboard password", FAIL,
-                      "set DASHBOARD_USER and DASHBOARD_PASSWORD in .env",
-                      mandatory=True)
+            self._add("Dashboard password", FAIL if strict else WARN,
+                      "DASHBOARD_USER and DASHBOARD_PASSWORD in .env are blank. "
+                      "Put your own login there. Do not forward port 5000 "
+                      "to the internet.",
+                      mandatory=strict)
         elif unsafe:
             where = " The dashboard listens on the home network." if lan else ""
             self._add(

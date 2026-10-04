@@ -12,7 +12,7 @@
   Does NOT invent API keys or portal logins — those always require you.
 
 .PARAMETER ProductionConfig
-  Prefer config.production.example.yaml when creating config\config.yaml.
+  Prefer examples/config.production.example.yaml when creating config\config.yaml.
 
 .PARAMETER SkipBrowserInstall
   Skip ``playwright install chromium`` (use if already installed).
@@ -199,7 +199,7 @@ Write-Host "============================================================" -Foreg
 Write-Host "Next steps (only you can fill these in — nothing here is a real secret):"
 Write-Host "  1. Edit .env"
 Write-Host "       TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID"
-Write-Host "       DASHBOARD_USER and DASHBOARD_PASSWORD  (example password is UNSAFE)"
+Write-Host "       DASHBOARD_USER and DASHBOARD_PASSWORD  (both start blank)"
 Write-Host "  2. Edit config\config.yaml"
 Write-Host "       candidate information, rules, and ai.providers.ollama model name"
 Write-Host "       apply.mode stays dry_run until you change it on the dashboard"

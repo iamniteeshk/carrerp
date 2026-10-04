@@ -33,10 +33,9 @@ your behalf, pausing for you whenever a security checkpoint needs a human.
 You do not copy resumes, profile folders, or `config.yaml`. Those are
 installed from `deployment_input/` by setup.
 
-1. Clone this branch.
+1. Clone this branch. A blank `.env` is already in the folder.
 2. Double-click `scripts\windows\Install_CareerPilot.bat`.
-3. Copy `.env.example` to `.env` if setup has not already created `.env`.
-4. Put your real values in `.env`:
+3. Put your real values in `.env`:
    `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `DASHBOARD_USER`,
    `DASHBOARD_PASSWORD`.
 5. Double-click `scripts\windows\Doctor_CareerPilot.bat` and read every line.

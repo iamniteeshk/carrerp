@@ -171,15 +171,16 @@ Equivalent entry points:
 
 ### 1. `.env`
 
+The clone already has a blank `.env`. Fill only:
+
 ```env
-TELEGRAM_BOT_TOKEN=123456:ABCDEF...
-TELEGRAM_CHAT_ID=your_chat_id
-DASHBOARD_USER=choose-a-name
-DASHBOARD_PASSWORD=choose-a-long-password
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=
+DASHBOARD_USER=
+DASHBOARD_PASSWORD=
 ```
 
-The values shipped in `.env.example` (`Admin` / `Adming`) are **unsafe**. Change
-them. Gemini keys stay empty when you use Ollama.
+Gemini keys stay empty when you use Ollama. Do not put those secrets in Git.
 
 ### 2. `config\config.yaml` and resumes
 

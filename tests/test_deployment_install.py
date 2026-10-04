@@ -31,12 +31,15 @@ def test_setup_copies_six_profiles_and_config_without_infrastructure():
         infra = root / "deployment_input" / "profiles" / "Infrastructure"
         infra.mkdir()
         (infra / "profile.yaml").write_text("name: Infrastructure\n", encoding="utf-8")
-        example = root / "profiles.example" / "Sample_Profile"
+        example = root / "examples" / "profiles" / "Sample_Profile"
         example.mkdir(parents=True)
         (example / "profile.yaml").write_text("name: Sample_Profile\n", encoding="utf-8")
         (example / "resume.pdf").write_bytes(b"%PDF-1.4\n%%EOF")
-        (root / "config.example.yaml").write_text("application: {name: Example}\n", encoding="utf-8")
-        (root / ".env.example").write_text("TELEGRAM_BOT_TOKEN=\n", encoding="utf-8")
+        (root / "examples").mkdir(exist_ok=True)
+        (root / "examples" / "config.example.yaml").write_text(
+            "application: {name: Example}\n", encoding="utf-8")
+        (root / "examples" / ".env.example").write_text(
+            "TELEGRAM_BOT_TOKEN=\n", encoding="utf-8")
         old = os.getcwd()
         os.chdir(root)
         try:
@@ -63,19 +66,37 @@ def test_setup_copies_six_profiles_and_config_without_infrastructure():
         assert any("did not install profiles/Infrastructure" in a for a in actions)
 
 
-def test_env_example_lists_required_names_and_env_is_ignored():
-    text = (ROOT / ".env.example").read_text(encoding="utf-8")
+def test_env_template_is_blank_and_tracked():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "blank_env_filter", ROOT / "scripts" / "git" / "blank_env_filter.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    blank_env = mod.blank_env
+    text = (ROOT / ".env").read_text(encoding="utf-8")
+    example = (ROOT / "examples" / ".env.example").read_text(encoding="utf-8")
     for name in (
         "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "DASHBOARD_USER",
         "DASHBOARD_PASSWORD", "GEMINI_API_KEY_1", "GEMINI_API_KEY_2",
         "GEMINI_API_KEY_3", "DEEPSEEK_API_KEY", "EMAIL_PASSWORD",
         "FLASK_SECRET_KEY", "DASHBOARD_SECRET_KEY",
     ):
-        assert name in text, name
-    assert "MUST REPLACE" in text
-    proc = subprocess.run(
-        ["git", "check-ignore", "-q", ".env"], cwd=ROOT)
-    assert proc.returncode == 0
+        assert f"{name}=" in text, name
+        assert f"{name}=" in example, name
+    for line in text.splitlines():
+        if not line.strip() or line.strip().startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        assert value.strip() == "", key
+    filled = "TELEGRAM_BOT_TOKEN=123456:SECRET\nDASHBOARD_PASSWORD=hunter2\n"
+    blanked = blank_env(filled)
+    assert "SECRET" not in blanked
+    assert "hunter2" not in blanked
+    assert "TELEGRAM_BOT_TOKEN=\n" in blanked
+    proc = subprocess.run(["git", "check-ignore", "-q", ".env"], cwd=ROOT)
+    assert proc.returncode != 0
+    assert "host: 0.0.0.0" in (ROOT / "deployment_input" / "config.yaml").read_text(
+        encoding="utf-8")
 
 
 def test_candidate_structured_compensation_becomes_form_text():
@@ -109,6 +130,37 @@ def test_duplicate_pid_is_refused():
             assert Path("careerpilot.pid").read_text(encoding="utf-8") == str(os.getpid())
         finally:
             os.chdir(old)
+
+
+def test_git_clean_filter_drops_env_secrets():
+    script = ROOT / "scripts" / "git" / "blank_env_filter.py"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        subprocess.run(["git", "init"], cwd=tmp, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "t@example.com"], cwd=tmp, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp, check=True)
+        (tmp / ".gitattributes").write_text(".env filter=careerpilot-blank-env\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "config", "filter.careerpilot-blank-env.clean",
+             f"{sys.executable} {script}"],
+            cwd=tmp, check=True)
+        subprocess.run(
+            ["git", "config", "filter.careerpilot-blank-env.smudge", "cat"],
+            cwd=tmp, check=True)
+        subprocess.run(
+            ["git", "config", "filter.careerpilot-blank-env.required", "true"],
+            cwd=tmp, check=True)
+        (tmp / ".env").write_text(
+            "TELEGRAM_BOT_TOKEN=123456:SHOULD_NOT_COMMIT\nDASHBOARD_PASSWORD=s3cret\n",
+            encoding="utf-8")
+        subprocess.run(["git", "add", ".env"], cwd=tmp, check=True)
+        staged = subprocess.run(
+            ["git", "show", ":.env"], cwd=tmp, check=True, capture_output=True, text=True)
+        assert "SHOULD_NOT_COMMIT" not in staged.stdout
+        assert "s3cret" not in staged.stdout
+        assert "TELEGRAM_BOT_TOKEN=" in staged.stdout
+        # Working copy stays filled.
+        assert "SHOULD_NOT_COMMIT" in (tmp / ".env").read_text(encoding="utf-8")
 
 
 def test_windows_bats_are_safe():
