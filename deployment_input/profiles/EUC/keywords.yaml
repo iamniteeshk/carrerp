@@ -1,0 +1,411 @@
+primary:
+
+  # EUC / End User Computing Leadership
+  - EUC Director
+  - Director EUC
+  - Head EUC
+  - End User Computing Director
+  - Head End User Computing
+  - Director End User Computing
+  - End User Computing Head
+  - EUC Head
+  - Global EUC Director
+  - Global EUC Head
+  - EUC Services Director
+  - EUC Services Head
+
+  # Endpoint / Modern Endpoint Leadership
+  - Endpoint Director
+  - Head Endpoint
+  - Endpoint Services Director
+  - Head Endpoint Services
+  - Endpoint Management Director
+  - Head Endpoint Management
+  - Modern Endpoint Director
+  - Head Modern Endpoint
+  - Modern Workplace Director
+  - Head Modern Workplace
+  - Digital Workplace Director
+  - Head Digital Workplace
+  - Workplace Technology Director
+  - Head Workplace Technology
+  - Workplace Services Director
+  - Head Workplace Services
+
+  # Infrastructure leadership with strong EUC relevance
+  - IT Infrastructure Director
+  - Director IT Infrastructure
+  - Head IT Infrastructure
+  - Infrastructure Services Director
+  - IT Operations Director
+  - Head IT Operations
+  - IT Service Delivery Director
+  - Director Service Delivery
+  - Head IT Service Delivery
+
+
+secondary:
+
+  # Endpoint Operations
+  - Endpoint Operations Director
+  - Endpoint Operations Head
+  - EUC Operations Director
+  - EUC Operations Head
+  - Workplace Operations Director
+  - Workplace Operations Head
+  - Digital Workplace Operations Director
+  - Digital Workplace Operations Head
+  - Client Computing Director
+  - Client Computing Head
+  - Desktop Engineering Director
+  - Desktop Engineering Head
+  - Desktop Services Director
+  - Desktop Services Head
+
+  # Supporting technology leadership
+  - Technology Operations Director
+  - Head Technology Operations
+  - Infrastructure Operations Director
+  - Head Infrastructure Operations
+  - Service Management Head
+  - Service Delivery Head
+  - Managed Services Director
+  - Head Managed Services
+  - Technology Services Director
+
+  # Transformation
+  - Workplace Transformation Director
+  - Digital Transformation Director
+  - IT Transformation Director
+  - EUC Transformation Director
+  - Endpoint Transformation Director
+
+
+domain:
+
+  # Core EUC domains
+  - End User Computing
+  - EUC
+  - User Computing
+  - Client Computing
+  - Endpoint Management
+  - Endpoint Services
+  - Endpoint Operations
+  - Unified Endpoint Management
+  - UEM
+  - Modern Endpoint
+  - Modern Workplace
+  - Digital Workplace
+  - Workplace Technology
+  - Workplace Services
+  - Digital Employee Experience
+  - DEX
+
+  # Device / desktop technologies
+  - Desktop Engineering
+  - Desktop Services
+  - Client Engineering
+  - Device Management
+  - Device Lifecycle Management
+  - Endpoint Lifecycle Management
+  - Windows Management
+  - Windows 10
+  - Windows 11
+  - Mac Management
+  - Mobile Device Management
+  - MDM
+
+  # Virtual workplace
+  - Virtual Desktop Infrastructure
+  - VDI
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - Windows 365
+  - Desktop as a Service
+  - DaaS
+
+  # Enterprise workplace
+  - Microsoft 365
+  - Microsoft 365 Management
+  - Workplace Productivity
+  - Collaboration Technology
+  - Employee Experience
+  - Digital Employee Experience
+
+
+endpoint_management:
+
+  - Microsoft Intune
+  - Intune
+  - Microsoft Endpoint Manager
+  - Microsoft Endpoint Configuration Manager
+  - MECM
+  - SCCM
+  - System Center Configuration Manager
+  - Configuration Manager
+  - Jamf
+  - Jamf Pro
+  - VMware Workspace ONE
+  - Workspace ONE
+  - Mobile Device Management
+  - MDM
+  - Unified Endpoint Management
+  - UEM
+  - Endpoint Management
+  - Endpoint Compliance
+  - Endpoint Configuration
+  - Endpoint Provisioning
+  - Autopilot
+  - Windows Autopilot
+  - Windows Update for Business
+  - Application Packaging
+  - Software Distribution
+  - Patch Management
+
+
+technology:
+
+  # Microsoft ecosystem
+  - Microsoft Intune
+  - Intune
+  - Microsoft Endpoint Configuration Manager
+  - MECM
+  - SCCM
+  - Microsoft 365
+  - Microsoft 365 Apps
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Windows 365
+  - Cloud PC
+  - Microsoft Entra ID
+  - Azure AD
+  - Active Directory
+  - Group Policy
+  - PowerShell
+
+  # Apple / cross-platform
+  - Jamf
+  - Jamf Pro
+  - macOS
+  - Apple Business Manager
+  - Workspace ONE
+
+  # EUC analytics / DEX
+  - Nexthink
+  - SysTrack
+  - Lakeside SysTrack
+  - Workblaze
+  - PredictX
+  - Digital Employee Experience
+  - DEX
+  - Employee Experience Analytics
+
+  # Service management
+  - ServiceNow
+  - BMC Remedy
+  - ITIL
+
+  # Automation / AI
+  - Power Automate
+  - Power Platform
+  - RPA
+  - Automation
+  - AIOps
+  - AI
+  - Gen AI
+  - Generative AI
+  - AI Force
+
+
+security:
+
+  - Endpoint Security
+  - Endpoint Protection
+  - Endpoint Compliance
+  - Endpoint Detection and Response
+  - EDR
+  - Microsoft Defender
+  - Microsoft Defender for Endpoint
+  - Defender for Endpoint
+  - BitLocker
+  - Vulnerability Management
+  - Patch Management
+  - Security Baseline
+  - Zero Trust
+  - Conditional Access
+  - Device Compliance
+  - Identity and Access Management
+  - IAM
+
+
+transformation:
+
+  - EUC Transformation
+  - Endpoint Transformation
+  - Workplace Transformation
+  - Digital Workplace Transformation
+  - Modern Workplace Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Service Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Agentic AI
+  - AIOps
+  - Modernisation
+  - Modernization
+  - Cloud Transformation
+  - Workplace Modernisation
+  - Workplace Modernization
+  - Operational Excellence
+  - Continuous Improvement
+  - Transition
+  - Transition and Transformation
+  - T&T
+
+
+scale_indicators:
+
+  - 25+ years
+  - 20+ years
+  - 15+ years
+  - 175K users
+  - 175,000 users
+  - 188K devices
+  - 188,000 devices
+  - 1000+ employees
+  - 1000+ professionals
+  - 500+ employees
+  - Global
+  - Enterprise
+  - Large Enterprise
+  - Multi-region
+  - Multi-country
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+  - Global Endpoint
+  - Global EUC
+  - Global Workplace
+
+
+leadership:
+
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+
+  - Executive Leadership
+  - Senior Leadership
+  - Technology Leadership
+  - Operations Leadership
+  - Service Delivery
+  - Global Delivery
+  - P&L
+  - Profit and Loss
+  - P&L Ownership
+  - Budget Ownership
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - Executive Stakeholder
+  - Executive Stakeholder Management
+  - CIO
+  - C-Suite
+  - CXO
+  - QBR
+  - SLA
+  - KPI
+  - SOW
+  - RFP
+  - MSA
+
+
+positive_terms:
+
+  - Global
+  - Enterprise
+  - Strategic
+  - Executive
+  - Leadership
+  - Transformation
+  - Modern Workplace
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - Endpoint
+  - UEM
+  - Device Management
+  - Employee Experience
+  - Digital Employee Experience
+  - Operations
+  - Delivery
+  - Managed Services
+  - Consulting
+  - Advisory
+  - Governance
+  - Automation
+  - AI
+  - AIOps
+  - Operational Excellence
+  - Continuous Improvement
+  - Global Delivery
+  - Service Excellence
+  - Customer Experience
+  - Business Transformation
+
+
+negative:
+
+  - Intern
+  - Internship
+  - Trainee
+  - Junior
+  - Engineer
+  - Analyst
+  - Specialist
+  - Technician
+  - Desktop Support
+  - Technical Support
+  - Service Desk Analyst
+  - Desktop Engineer
+  - Desktop Support Engineer
+  - System Administrator
+  - Network Engineer
+  - Cloud Engineer
+  - Support Analyst
+  - Helpdesk
+  - Help Desk
+  - L1
+  - L2
+  - L3
+  - Contract
+  - Temporary
+  - Freelance
+  - Part Time
+  - Part-Time
+
+
+scoring:
+
+  title_weight: 40
+  domain_weight: 30
+  leadership_weight: 15
+  experience_weight: 8
+  location_weight: 4
+  compensation_weight: 3
+
+  minimum_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+  application_score: 90

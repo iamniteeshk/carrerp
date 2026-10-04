@@ -1,0 +1,425 @@
+primary:
+
+  # Executive / General Management
+  - IT Director
+  - Director IT
+  - Director Technology
+  - Technology Director
+  - Head IT
+  - Head Technology
+  - Head of IT
+  - Head of Technology
+  - Senior Director IT
+  - Senior Director Technology
+  - Associate Director IT
+  - Associate Director Technology
+  - AVP IT
+  - AVP Technology
+  - VP IT
+  - VP Technology
+  - General Manager IT
+  - General Manager Technology
+
+  # Infrastructure / Technology Services Leadership
+  - IT Infrastructure Director
+  - Director IT Infrastructure
+  - Head IT Infrastructure
+  - Infrastructure Services Director
+  - Head Infrastructure Services
+  - IT Operations Director
+  - Head IT Operations
+  - Technology Operations Director
+  - Head Technology Operations
+  - IT Service Delivery Director
+  - Director Service Delivery
+  - Head IT Service Delivery
+  - Service Delivery Director
+  - Global Delivery Director
+  - Head Global Delivery
+
+  # Managed Services / Transformation
+  - Managed Services Director
+  - Head Managed Services
+  - Global Managed Services Director
+  - Transformation Director
+  - IT Transformation Director
+  - Digital Transformation Director
+  - Business Transformation Director
+  - Service Transformation Director
+
+  # GCC / Global Leadership
+  - GCC Head
+  - GCC Director
+  - Global Capability Centre Head
+  - Global Capability Center Head
+  - Global Capability Centre Director
+  - Global Capability Center Director
+  - Global Operations Director
+  - Global Technology Director
+
+
+secondary:
+
+  # Senior Operations Leadership
+  - Operations Director
+  - Head Operations
+  - Regional Operations Director
+  - Site Director
+  - Centre Director
+  - Center Director
+  - Site Head
+  - Centre Head
+  - Center Head
+  - Delivery Head
+  - Delivery Director
+  - Service Management Head
+  - Technology Services Director
+  - Enterprise Technology Director
+  - Enterprise IT Director
+  - Infrastructure Operations Director
+
+  # Commercial / Client Leadership
+  - Client Services Director
+  - Client Delivery Director
+  - Customer Operations Director
+  - Customer Experience Director
+  - Strategic Account Director
+  - Account Director
+  - Client Partner
+  - Delivery Partner
+  - Executive Client Partner
+
+  # Workplace / EUC opportunities
+  - Digital Workplace Director
+  - Head Digital Workplace
+  - EUC Director
+  - Head EUC
+  - Workplace Services Director
+
+
+domain:
+
+  # Core executive technology domains
+  - IT Infrastructure
+  - Infrastructure Services
+  - Enterprise IT
+  - Enterprise Technology
+  - Technology Operations
+  - IT Operations
+  - IT Service Delivery
+  - Service Delivery
+  - Global Delivery
+  - Global Operations
+  - Technology Services
+  - Managed Services
+  - Service Management
+
+  # Transformation
+  - Business Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Technology Transformation
+  - Service Transformation
+  - Operating Model
+  - Operational Excellence
+  - Continuous Improvement
+  - Transformation and Change
+  - Transition and Transformation
+  - T&T
+
+  # GCC / Global capability
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Captive Centre
+  - Captive Center
+  - Global Delivery Centre
+  - Global Delivery Center
+
+  # Workplace / supporting domains
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - Unified Endpoint Management
+  - UEM
+  - Cloud Operations
+  - Contact Centre
+  - Customer Operations
+
+
+leadership:
+
+  # Seniority
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+
+  # Executive leadership
+  - Executive Leadership
+  - Senior Leadership
+  - Executive Management
+  - General Management
+  - Business Leadership
+  - Technology Leadership
+  - Strategic Leadership
+
+  # Financial / commercial
+  - P&L
+  - Profit and Loss
+  - P&L Ownership
+  - Budget Ownership
+  - Commercial Governance
+  - Commercial Management
+  - Revenue Growth
+  - Revenue Management
+  - Margin Management
+  - Cost Optimization
+  - Cost Reduction
+  - Financial Management
+
+  # Client / stakeholder
+  - Executive Stakeholder
+  - Executive Stakeholder Management
+  - C-Suite
+  - CIO
+  - CXO
+  - Board
+  - Client Advisory
+  - Customer Advisory
+  - Strategic Account Management
+  - Customer Success
+  - QBR
+  - Executive Governance
+
+  # Contract / deal governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - SLA
+  - KPI
+  - Contract Governance
+  - Commercial Governance
+  - Service Governance
+
+
+global_delivery:
+
+  - Global Delivery
+  - Global Operations
+  - Global Service Delivery
+  - Global Technology Operations
+  - Global Infrastructure
+  - Global Managed Services
+  - Multi-region
+  - Multi-country
+  - Multi-tower
+  - Global Delivery Model
+  - Global Operating Model
+  - Follow-the-Sun
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+
+
+gcc:
+
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Captive Centre
+  - Captive Center
+  - GCC Setup
+  - GCC Build
+  - GCC Build-Out
+  - GCC Operations
+  - GCC Operating Model
+  - Centre Setup
+  - Center Setup
+  - Operating Model
+  - Build Operate Transform Transfer
+  - BOTT
+  - Transition Readiness
+  - Talent Ramp-Up
+  - Multi-Tower
+  - Global Capability
+
+
+transformation:
+
+  - Transformation
+  - Business Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Technology Transformation
+  - Service Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Generative AI
+  - Gen AI
+  - Agentic AI
+  - Automation
+  - AIOps
+  - RPA
+  - Modernisation
+  - Modernization
+  - Transition
+  - Transition and Transformation
+  - T&T
+  - Service Modernisation
+  - Service Modernization
+  - Operational Excellence
+  - Continuous Improvement
+  - Business Process Transformation
+
+
+technology:
+
+  - IT Infrastructure
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - Unified Endpoint Management
+  - UEM
+  - Microsoft Intune
+  - SCCM
+  - Microsoft Endpoint Configuration Manager
+  - Jamf
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - AWS
+  - Google Cloud
+  - GCP
+  - Microsoft 365
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - AI Force
+  - Yellow.ai
+  - Krisp.AI
+  - PowerShell
+  - Power Platform
+  - RPA
+  - Gen AI
+  - ITIL
+
+
+scale_indicators:
+
+  - 25+ years
+  - 20+ years
+  - 15+ years
+  - 1000+ employees
+  - 1000+ professionals
+  - 500+ employees
+  - 175K users
+  - 175,000 users
+  - 188K devices
+  - 188,000 devices
+  - USD 50M
+  - $50M
+  - 50M USD
+  - Global
+  - Enterprise
+  - Multi-region
+  - Multi-country
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+  - P&L ownership
+  - Revenue Growth
+  - Margin Management
+
+
+positive_terms:
+
+  - Global
+  - Enterprise
+  - Strategic
+  - Executive
+  - Leadership
+  - General Management
+  - Transformation
+  - Operations
+  - Delivery
+  - Managed Services
+  - Consulting
+  - Advisory
+  - Governance
+  - Commercial
+  - Customer Success
+  - Business Transformation
+  - Operating Model
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - Operational Excellence
+  - Continuous Improvement
+  - Global Delivery
+  - Executive Stakeholder
+  - Client Advisory
+  - Strategic Account
+  - Service Excellence
+  - Business Growth
+  - Cost Optimization
+  - Automation
+  - AI
+
+
+negative:
+
+  - Intern
+  - Internship
+  - Trainee
+  - Junior
+  - Engineer
+  - Analyst
+  - Specialist
+  - Technician
+  - Desktop Support
+  - Technical Support
+  - Service Desk Analyst
+  - Desktop Engineer
+  - System Administrator
+  - Network Engineer
+  - Cloud Engineer
+  - Support Analyst
+  - L1
+  - L2
+  - L3
+  - Helpdesk
+  - Contract
+  - Temporary
+  - Freelance
+  - Part Time
+  - Part-Time
+
+
+scoring:
+
+  title_weight: 40
+  domain_weight: 20
+  leadership_weight: 25
+  experience_weight: 8
+  location_weight: 4
+  compensation_weight: 3
+
+  minimum_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+  application_score: 90

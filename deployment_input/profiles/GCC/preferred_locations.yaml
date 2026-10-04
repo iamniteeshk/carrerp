@@ -1,0 +1,62 @@
+preferred:
+  primary:
+    - Chennai
+
+  secondary:
+    - Bengaluru
+    - Hyderabad
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+remote:
+  accepted:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+relocation:
+  willing: true
+
+search:
+  nationwide: true
+  radius_km: 100
+
+priority:
+  Chennai: 100
+  Bengaluru: 95
+  Hyderabad: 95
+  Pune: 85
+  Mumbai: 80
+  "Delhi NCR": 80
+  Gurgaon: 80
+  Noida: 80
+  Remote: 90
+
+priority_overrides:
+  gcc_hub_locations:
+    - Bengaluru
+    - Hyderabad
+    - Chennai
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  gcc_hub_bonus: 10
+
+location_rules:
+  preferred_location_required: false
+  reject_if_outside_preferred_locations: false
+  accept_remote_roles: true
+  accept_hybrid_roles: true
+  accept_onsite_roles: true
+  accept_relocation_roles: true
+
+exclude_locations:
+  - International
+  - Outside India

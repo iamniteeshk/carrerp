@@ -1,0 +1,892 @@
+candidate:
+  full_name: "Murahari M"
+  preferred_name: "Hari Madhav"
+
+  email: "harim@live.in"
+  phone: "+91 94455 05850"
+
+  linkedin: "linkedin.com/in/hari-madhav-8283237"
+  website: "harimadhav.com"
+
+  nationality: "Indian"
+  current_location: "Chennai, India"
+
+
+current_employment:
+  company: "HCLTech"
+  designation: "Director – End-to-End IT Infrastructure & Digital Workplace Services"
+  currently_employed: true
+  serving_notice: false
+
+
+experience:
+  total_it_experience_years: 25
+  total_it_experience: "25+ years"
+
+  leadership_experience_years: 15
+  leadership_experience: "15+ years"
+
+  infrastructure_experience_years: 25
+  infrastructure_experience: "25+ years"
+
+  digital_workplace:
+    experience: true
+    experience_level: "Strong"
+    current_core_domain: true
+
+  euc:
+    experience: true
+    experience_level: "Strong"
+
+  gcc:
+    experience: true
+
+  contact_centre:
+    experience: true
+    experience_years: 12
+    experience_level: "Site Director level"
+
+
+compensation:
+  current:
+    total_ctc:
+      amount: 7700000
+      formatted: "₹77 Lakhs"
+      currency: "INR"
+
+    fixed:
+      amount: 5000000
+      formatted: "₹50 Lakhs"
+      currency: "INR"
+
+    variable:
+      amount: 1050000
+      formatted: "₹10.5 Lakhs"
+      currency: "INR"
+
+    psu_rsu:
+      amount: 1650000
+      formatted: "₹16.5 Lakhs"
+      currency: "INR"
+      description: "PSU / RSU - stocks & cash bonus"
+
+  expected:
+    total_ctc:
+      amount: 9000000
+      formatted: "₹90 Lakhs"
+      currency: "INR"
+      negotiable: true
+
+  minimum:
+    fixed:
+      amount: 7000000
+      formatted: "₹70 Lakhs"
+      currency: "INR"
+
+
+screening:
+  current_ctc_answer: "₹77 Lakhs"
+  current_fixed_ctc_answer: "₹50 Lakhs"
+  expected_ctc_answer: "₹90 Lakhs, negotiable"
+  minimum_fixed_ctc_answer: "₹70 Lakhs"
+
+
+compensation_rules:
+  evaluate_fixed_and_total_separately: true
+  minimum_fixed_is_hard_floor: true
+  expected_total_ctc_is_negotiable: true
+
+  reject_if_fixed_below_minimum: true
+  reject_if_total_ctc_below_expected: false
+  reject_salary_undisclosed: false
+
+  salary_not_disclosed:
+    action: "Keep if role is otherwise strongly matched"
+    do_not_assume_salary: true
+
+
+notice_period:
+  days: 90
+  answer: "90 days"
+  negotiable: true
+  serving_notice: false
+
+
+location:
+  primary:
+    - Chennai
+
+  secondary:
+    - Bengaluru
+    - Hyderabad
+
+  other_metros:
+    - Mumbai
+    - Pune
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  flexible_for_right_role: true
+  willing_to_relocate: true
+
+
+work_modes:
+  remote: true
+  hybrid: true
+  onsite: true
+
+maximum_travel_percent: 50
+travel_flexibility: "Flexible"
+
+
+role_priority:
+  1:
+    category: "IT Infrastructure / End-to-End Infrastructure Services"
+    priority: 1
+
+  2:
+    category: "Digital Workplace / Modern Endpoint / EUC"
+    priority: 2
+
+  3:
+    category: "Senior Leadership / Transformation / General Management"
+    priority: 3
+
+  4:
+    category: "GCC / Global Capability Centre Head or Setup"
+    priority: 4
+
+  5:
+    category: "Contact Centre / BPO / CX Operations"
+    priority: 5
+
+  6:
+    category: "Other opportunity fit"
+    priority: 6
+    note: "Open based on opportunity fit"
+
+
+profile_priority:
+  category: "Digital Workplace / Modern Endpoint / EUC"
+  priority: 2
+  profile_relevance: "Primary specialized profile"
+
+  preferred_role_focus:
+    - End User Computing
+    - EUC
+    - Digital Workplace
+    - Modern Endpoint
+    - Unified Endpoint Management
+    - Endpoint Services
+    - Workplace Technology
+    - Workplace Services
+    - Digital Employee Experience
+    - Global Endpoint Services
+    - EUC Transformation
+
+
+executive_titles:
+  Director: true
+  Senior_Director: true
+  Associate_Director: true
+  AVP: true
+  VP: true
+  SVP: false
+  Head: true
+  GM: true
+  CIO: false
+  CTO: false
+
+
+employment:
+  permanent: true
+  full_time: true
+  contract: false
+  consulting: false
+  interim: false
+
+
+international:
+  open_to_jobs_outside_india: true
+
+preferred_countries:
+  - USA
+  - "Other relevant markets"
+
+visa:
+  usa:
+    current_status: "B1 visa"
+    work_authorization: false
+    h1b: false
+    sponsorship_required_for_employment: true
+
+    screening_rule:
+      - "Never claim US work authorization."
+      - "B1 visa must not be treated as employment authorization."
+      - "Ask user before answering US work authorization questions."
+
+
+education:
+  bachelor:
+    degree: "B.Sc."
+    year: 2000
+
+  masters:
+    degree: "M.A."
+    field: "Public Administration"
+    university: "Annamalai University"
+    year: 2004
+
+  postgraduate:
+    degree: "PGDBA"
+    field: "International Business"
+    university: "Annamalai University"
+    year: 2005
+
+
+travel:
+  international_travel: true
+  business_travel: true
+  maximum_percent: 50
+  flexibility: true
+
+
+euc_experience:
+  end_user_computing:
+    experience: true
+    level: "Strong"
+
+  digital_workplace:
+    experience: true
+    level: "Strong"
+    current_core_domain: true
+
+  modern_endpoint:
+    experience: true
+    level: "Strong"
+
+  endpoint_management:
+    experience: true
+    level: "Strong"
+
+  unified_endpoint_management:
+    experience: true
+    level: "Strong"
+
+  workplace_services:
+    experience: true
+    level: "Strong"
+
+  endpoint_operations:
+    experience: true
+    level: "Strong"
+
+  digital_employee_experience:
+    experience: true
+    level: "Strong"
+
+
+euc_scale:
+  users_supported:
+    amount: 175000
+    formatted: "175,000 users"
+
+  devices_supported:
+    amount: 188000
+    formatted: "188,000 devices"
+
+  maximum_team_size:
+    amount: 1000
+    formatted: "1,000+ professionals"
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+
+euc_leadership:
+  global_euc:
+    answer: "Yes"
+
+  global_endpoint_services:
+    answer: "Yes"
+
+  digital_workplace_leadership:
+    answer: "Yes"
+
+  endpoint_management_leadership:
+    answer: "Yes"
+
+  workplace_services:
+    answer: "Yes"
+
+  euс_transformation:
+    answer: "Yes"
+
+  modern_endpoint_transformation:
+    answer: "Yes"
+
+  service_delivery:
+    answer: "Yes"
+
+  managed_services:
+    answer: "Yes"
+
+  global_delivery:
+    answer: "Yes"
+
+  people_management:
+    answer: "Yes"
+
+  executive_stakeholder_management:
+    answer: "Yes"
+
+  operational_excellence:
+    answer: "Yes"
+
+  automation:
+    answer: "Yes"
+
+  ai_transformation:
+    answer: "Yes"
+
+
+technology_experience:
+  microsoft_intune:
+    verified: true
+    answer: "Yes"
+
+  microsoft_endpoint_configuration_manager:
+    verified: true
+    answer: "Yes"
+
+  sccm:
+    verified: true
+    answer: "Yes"
+
+  jamf:
+    verified: true
+    answer: "Yes"
+
+  azure:
+    verified: true
+    answer: "Yes"
+
+  azure_virtual_desktop:
+    verified: true
+    answer: "Yes"
+
+  avd:
+    verified: true
+    answer: "Yes"
+
+  cloud_pc:
+    verified: true
+    answer: "Yes"
+
+  aws:
+    verified: true
+    answer: "Yes"
+
+  google_cloud:
+    verified: true
+    answer: "Yes"
+
+  microsoft_365:
+    verified: true
+    answer: "Yes"
+
+  servicenow:
+    verified: true
+    answer: "Yes"
+
+  bmc_remedy:
+    verified: true
+    answer: "Yes"
+
+  workblaze:
+    verified: true
+    answer: "Yes"
+
+  systrack:
+    verified: true
+    answer: "Yes"
+
+  nexthink:
+    verified: true
+    answer: "Yes"
+
+  predictx:
+    verified: true
+    answer: "Yes"
+
+  ai_force:
+    verified: true
+    answer: "Yes"
+
+  yellow_ai:
+    verified: true
+    answer: "Yes"
+
+  krisp_ai:
+    verified: true
+    answer: "Yes"
+
+  powershell:
+    verified: true
+    answer: "Yes"
+
+  power_platform:
+    verified: true
+    answer: "Yes"
+
+  rpa:
+    verified: true
+    answer: "Yes"
+
+  gen_ai:
+    verified: true
+    answer: "Yes"
+
+  itil:
+    verified: true
+    answer: "Yes"
+
+
+transformation:
+  transformation_experience:
+    answer: "Yes"
+
+  digital_transformation:
+    answer: "Yes"
+
+  it_transformation:
+    answer: "Yes"
+
+  service_transformation:
+    answer: "Yes"
+
+  ai_transformation:
+    answer: "Yes"
+
+  ai_led_transformation:
+    answer: "Yes"
+
+  automation:
+    answer: "Yes"
+
+  aiops:
+    answer: "Yes"
+
+  modernisation:
+    answer: "Yes"
+
+  transition:
+    answer: "Yes"
+
+  transition_and_transformation:
+    answer: "Yes"
+
+  operational_excellence:
+    answer: "Yes"
+
+  continuous_improvement:
+    answer: "Yes"
+
+
+leadership:
+  director_experience:
+    answer: "Yes"
+
+  senior_director_experience:
+    answer: "Yes"
+
+  associate_director_experience:
+    answer: "Yes"
+
+  avp_experience:
+    answer: "Yes"
+
+  vp_experience:
+    answer: "Yes"
+
+  head_of_function_experience:
+    answer: "Yes"
+
+  general_management_experience:
+    answer: "Yes"
+
+  p_and_l:
+    answer: "Yes"
+
+  portfolio_value:
+    answer: "Up to USD 50M"
+
+  revenue_growth:
+    answer: "Yes"
+
+  margin_management:
+    answer: "Yes"
+
+  commercial_governance:
+    answer: "Yes"
+
+  executive_stakeholder_management:
+    answer: "Yes"
+
+  qbr:
+    answer: "Yes"
+
+  sla_management:
+    answer: "Yes"
+
+  kpi_management:
+    answer: "Yes"
+
+  sow:
+    answer: "Yes"
+
+  rfp:
+    answer: "Yes"
+
+  msa:
+    answer: "Yes"
+
+
+gcc:
+  experience:
+    answer: "Yes"
+
+  gcc_setup:
+    answer: "Yes"
+
+  gcc_build:
+    answer: "Yes"
+
+  build_operate_transform_transfer:
+    answer: "Yes"
+
+  operating_model:
+    answer: "Yes"
+
+  talent_ramp_up:
+    answer: "Yes"
+
+  transition_readiness:
+    answer: "Yes"
+
+  multi_tower_delivery:
+    answer: "Yes"
+
+
+standard_answers:
+
+  current_company:
+    answer: "HCLTech"
+
+  current_designation:
+    answer: "Director – End-to-End IT Infrastructure & Digital Workplace Services"
+
+  total_experience:
+    answer: "25+ years"
+
+  leadership_experience:
+    answer: "15+ years"
+
+  infrastructure_experience:
+    answer: "25+ years"
+
+  digital_workplace_experience:
+    answer: "Strong experience, with Digital Workplace as a current core domain"
+
+  euc_experience:
+    answer: "Strong experience"
+
+  endpoint_management_experience:
+    answer: "Strong experience"
+
+  unified_endpoint_management_experience:
+    answer: "Strong experience"
+
+  modern_endpoint_experience:
+    answer: "Strong experience"
+
+  workplace_services_experience:
+    answer: "Strong experience"
+
+  digital_employee_experience:
+    answer: "Strong experience"
+
+  global_endpoint_experience:
+    answer: "Yes"
+
+  global_delivery:
+    answer: "Yes"
+
+  people_management:
+    answer: "Yes"
+
+  maximum_team_size:
+    answer: "1,000+ professionals"
+
+  users_supported:
+    answer: "175,000"
+
+  devices_supported:
+    answer: "188,000"
+
+  p_and_l:
+    answer: "Yes"
+
+  director_experience:
+    answer: "Yes"
+
+  head_of_function_experience:
+    answer: "Yes"
+
+  transformation_experience:
+    answer: "Yes"
+
+  ai_transformation:
+    answer: "Yes"
+
+  automation:
+    answer: "Yes"
+
+  managed_services:
+    answer: "Yes"
+
+  service_delivery:
+    answer: "Yes"
+
+  operational_excellence:
+    answer: "Yes"
+
+  permanent_employment:
+    answer: "Yes"
+
+  full_time_employment:
+    answer: "Yes"
+
+  contract_employment:
+    answer: "No"
+
+  consulting:
+    answer: "No"
+
+  interim:
+    answer: "No"
+
+  willing_to_relocate:
+    answer: "Yes"
+
+  remote:
+    answer: "Yes"
+
+  hybrid:
+    answer: "Yes"
+
+  onsite:
+    answer: "Yes"
+
+  business_travel:
+    answer: "Yes"
+
+  maximum_business_travel:
+    answer: "Up to 50%, flexible"
+
+  current_ctc:
+    answer: "₹77 Lakhs"
+
+  current_fixed_ctc:
+    answer: "₹50 Lakhs"
+
+  expected_ctc:
+    answer: "₹90 Lakhs, negotiable"
+
+  minimum_fixed_ctc:
+    answer: "₹70 Lakhs"
+
+  notice_period:
+    answer: "90 days, negotiable"
+
+  currently_serving_notice:
+    answer: "No"
+
+  india_work_authorization:
+    answer: "Yes"
+
+  usa_work_authorization:
+    answer: "UNKNOWN - REVIEW REQUIRED"
+
+  usa_visa:
+    answer: "B1 visa"
+
+  h1b:
+    answer: "No"
+
+  usa_sponsorship:
+    answer: "Required for employment unless otherwise legally authorized"
+
+
+education_answers:
+
+  bachelor:
+    answer: "B.Sc., 2000"
+
+  masters:
+    answer: "M.A. in Public Administration, Annamalai University, 2004"
+
+  postgraduate:
+    answer: "PGDBA in International Business, Annamalai University, 2005"
+
+
+location_answers:
+
+  current_location:
+    answer: "Chennai, India"
+
+  primary_location:
+    answer: "Chennai"
+
+  preferred_locations:
+    answer:
+      - Chennai
+      - Bengaluru
+      - Hyderabad
+
+  other_metros:
+    answer:
+      - Mumbai
+      - Pune
+      - Delhi NCR
+      - Gurgaon
+      - Noida
+
+  relocation:
+    answer: "Yes"
+
+  flexible_for_right_role:
+    answer: "Yes"
+
+
+application:
+  automation_level: "conditional_auto_submit"
+
+conditional_auto_submit:
+  enabled: true
+
+  conditions:
+    minimum_match_score: 90
+    easy_apply_only: true
+
+    verified_profile_match_required: true
+
+    no_unknown_required_answers: true
+    no_sensitive_answer_without_confirmation: true
+
+    no_work_authorization_assumptions: true
+    no_qualification_assumptions: true
+    no_salary_assumptions: true
+    no_notice_period_assumptions: true
+
+    minimum_fixed_ctc:
+      amount: 7000000
+      currency: "INR"
+
+    expected_ctc:
+      amount: 9000000
+      currency: "INR"
+      negotiable: true
+
+    salary_undisclosed:
+      allowed: true
+
+    preferred_location:
+      required: false
+
+    relocation:
+      allowed: true
+
+    remote:
+      allowed: true
+
+    hybrid:
+      allowed: true
+
+    onsite:
+      allowed: true
+
+    maximum_travel_percent: 50
+
+    final_confirmation_required_for_exceptions: true
+
+
+screening_rules:
+  known_verified_answers:
+    auto_answer: true
+
+  sensitive_answers:
+    ask_first: true
+
+  unknown_answers:
+    ask_first: true
+
+  ambiguous_answers:
+    ask_first: true
+
+  conflicting_answers:
+    ask_first: true
+
+  never_guess: true
+
+
+never_invent:
+  qualifications: true
+  certifications: true
+  employment_history: true
+  salary: true
+  notice_period: true
+  visa_status: true
+  work_authorization: true
+  demographic_information: true
+  experience: true
+  technology_experience: true
+
+
+verification_rules:
+
+  source_priority:
+    1: "Verified candidate data"
+    2: "Current approved profile"
+    3: "Approved resume"
+    4: "User confirmation"
+
+  prohibited_inference:
+    - "Do not infer work authorization from visa possession."
+    - "Do not infer salary from job title."
+    - "Do not infer notice period from employment status."
+    - "Do not infer qualifications from experience."
+    - "Do not infer certification status from technology experience."
+    - "Do not infer willingness to relocate from job location."
+    - "Do not infer technology experience unless verified."
+    - "Do not infer demographic information."
+
+  action_on_missing_data: "Ask user"
+
+  action_on_sensitive_data: "Ask user before submission"
+
+  action_on_legal_or_work_authorization_question:
+    "Ask user before submission"
+
+  action_on_conflict:
+    "Stop application and ask user"
+
+  action_on_salary_question:
+    "Use verified compensation data"
+
+  action_on_undisclosed_salary:
+    "Do not reject solely because salary is undisclosed"

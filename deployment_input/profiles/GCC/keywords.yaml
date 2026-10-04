@@ -1,0 +1,383 @@
+primary:
+  - GCC Head
+  - GCC Director
+  - Global Capability Centre Head
+  - Global Capability Center Head
+  - Head of GCC
+  - Director GCC
+  - GCC Leader
+  - GCC Leadership
+  - Global Capability Centre Director
+  - Global Capability Center Director
+  - Head Global Capability Centre
+  - Head Global Capability Center
+  - Global Capability Centre Leader
+  - Global Capability Center Leader
+  - GIC Head
+  - GIC Director
+  - Global In-House Centre Head
+  - Global In-House Center Head
+  - Captive Centre Head
+  - Captive Center Head
+  - GCC Setup Head
+  - GCC Build Head
+  - GCC Transformation Head
+  - GCC Operations Head
+  - GCC Delivery Head
+  - GCC Technology Head
+  - GCC IT Head
+  - GCC Infrastructure Head
+  - GCC Digital Workplace Head
+  - GCC Service Delivery Head
+  - GCC Transformation Director
+  - GCC Operations Director
+  - GCC Technology Director
+  - GCC IT Director
+  - GCC Infrastructure Director
+  - GCC Digital Workplace Director
+  - GCC Service Delivery Director
+
+secondary:
+  - Global Delivery Director
+  - Head Global Delivery
+  - Global Delivery Head
+  - Global Operations Head
+  - Global Technology Head
+  - Enterprise Technology Director
+  - Technology Director
+  - IT Director
+  - IT Infrastructure Director
+  - Director IT Infrastructure
+  - Director IT Operations
+  - Head IT Operations
+  - IT Operations Director
+  - Director Service Delivery
+  - Head IT Service Delivery
+  - IT Service Delivery Director
+  - Head Digital Workplace
+  - Director Digital Workplace
+  - Head EUC
+  - Director EUC
+  - Transformation Director
+  - IT Transformation Director
+  - Digital Transformation Director
+  - Managed Services Director
+  - Infrastructure Services Director
+  - Workplace Services Director
+
+domain:
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Global In-House Centre
+  - Global In-House Center
+  - Captive Centre
+  - Captive Center
+  - Shared Services
+  - Global Delivery
+  - Global Operations
+  - Global Technology
+  - Global IT
+  - IT Infrastructure
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - IT Operations
+  - IT Service Delivery
+  - Service Delivery
+  - Managed Services
+  - Enterprise Technology
+  - Technology Operations
+  - Infrastructure Services
+  - Workplace Services
+  - Multi-Tower Operations
+
+gcc:
+  - GCC
+  - GIC
+  - Global Capability Centre
+  - Global Capability Center
+  - Global Capability
+  - Global In-House Centre
+  - Global In-House Center
+  - Captive Centre
+  - Captive Center
+  - Captive Operations
+  - GCC Setup
+  - GCC Set-Up
+  - GCC Build
+  - GCC Build-Out
+  - GCC Buildout
+  - GCC Establishment
+  - GCC Launch
+  - GCC Expansion
+  - GCC Scale-Up
+  - GCC Operations
+  - GCC Operating Model
+  - GCC Strategy
+  - GCC Transformation
+  - GCC Transition
+  - GCC Delivery
+  - GCC Governance
+  - GCC Leadership
+  - GCC Technology
+  - GCC Infrastructure
+  - GCC Digital Workplace
+  - GCC Service Delivery
+  - GCC Multi-Tower
+  - Global Capability Strategy
+  - Global Capability Operating Model
+  - Centre Setup
+  - Center Setup
+  - Centre Build
+  - Center Build
+  - Centre Build-Out
+  - Center Build-Out
+  - Operating Model
+  - Target Operating Model
+  - TOM
+  - Multi-Tower
+  - Multi-Function
+  - Multi-Region
+  - Global Delivery Model
+
+transformation:
+  - Transformation
+  - GCC Transformation
+  - Digital Transformation
+  - IT Transformation
+  - Service Transformation
+  - Business Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Agentic AI
+  - AIOps
+  - Modernisation
+  - Modernization
+  - Transition
+  - Transition and Transformation
+  - T&T
+  - Service Modernisation
+  - Service Modernization
+  - Operational Excellence
+  - Continuous Improvement
+  - Transformation Roadmap
+  - Transformation Office
+  - Transformation Governance
+
+leadership:
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+  - Executive Leadership
+  - Senior Leadership
+  - Global Leadership
+  - P&L
+  - Profit and Loss
+  - P&L Ownership
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - Executive Stakeholder
+  - Executive Stakeholder Management
+  - C-Suite
+  - CIO
+  - QBR
+  - SLA
+  - KPI
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Governance
+  - Operating Model
+  - Strategic Leadership
+
+build_operate_transform_transfer:
+  - BOTT
+  - Build Operate Transform Transfer
+  - Build-Operate-Transform-Transfer
+  - Build Operate Transfer
+  - BOT
+  - Build Operate Transfer
+  - Build
+  - Operate
+  - Transform
+  - Transfer
+  - Transition
+  - Transition Readiness
+  - Transition Management
+  - Knowledge Transfer
+  - Knowledge Transition
+  - Service Transition
+  - Operational Readiness
+  - Go-Live Readiness
+  - Business Readiness
+
+operating_model:
+  - Operating Model
+  - Target Operating Model
+  - TOM
+  - Global Operating Model
+  - GCC Operating Model
+  - Service Operating Model
+  - Delivery Model
+  - Global Delivery Model
+  - Governance Model
+  - Service Management Model
+  - Organisation Design
+  - Organizational Design
+  - Organisation Structure
+  - Organizational Structure
+  - Capability Build
+  - Capability Development
+  - Capability Maturity
+  - Centre of Excellence
+  - Center of Excellence
+  - CoE
+
+talent_and_scale:
+  - Talent Ramp-Up
+  - Talent Ramp Up
+  - Workforce Planning
+  - Workforce Strategy
+  - Talent Strategy
+  - Talent Acquisition
+  - Hiring Strategy
+  - Recruitment
+  - Resource Ramp-Up
+  - Resource Ramp Up
+  - Team Build
+  - Team Building
+  - Capability Build
+  - Capacity Planning
+  - Workforce Transformation
+  - 1000+ Employees
+  - 1000+ Professionals
+  - 500+ Employees
+  - Large Team
+  - Global Workforce
+
+scale_indicators:
+  - 25+ years
+  - 20+ years
+  - 15+ years
+  - 1000+ employees
+  - 1000+ professionals
+  - 500+ employees
+  - 175K users
+  - 175,000 users
+  - 188K devices
+  - 188,000 devices
+  - USD 50M
+  - $50M
+  - Global
+  - Enterprise
+  - Multi-Region
+  - Multi-region
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+  - Global Operations
+  - Global Delivery
+
+technology:
+  - Microsoft Intune
+  - SCCM
+  - Microsoft Endpoint Configuration Manager
+  - Jamf
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Cloud PC
+  - AWS
+  - Google Cloud
+  - GCP
+  - Microsoft 365
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - AI Force
+  - Yellow.ai
+  - Krisp.AI
+  - PowerShell
+  - Power Platform
+  - RPA
+  - Gen AI
+  - ITIL
+  - AIOps
+  - Automation
+  - Agentic AI
+
+positive_terms:
+  - Global
+  - Enterprise
+  - Strategic
+  - Executive
+  - Leadership
+  - Transformation
+  - Operations
+  - Delivery
+  - Managed Services
+  - Consulting
+  - Advisory
+  - Governance
+  - Commercial
+  - Customer Success
+  - Business Transformation
+  - Operating Model
+  - Capability Build
+  - Scale
+  - Growth
+  - Global Delivery
+  - Multi-Tower
+  - Multi-Region
+
+negative:
+  - Intern
+  - Internship
+  - Trainee
+  - Junior
+  - Associate
+  - Engineer
+  - Analyst
+  - Specialist
+  - Technician
+  - Desktop Support
+  - Technical Support
+  - Service Desk Analyst
+  - Desktop Engineer
+  - System Administrator
+  - Network Engineer
+  - Cloud Engineer
+  - Support Analyst
+  - L1
+  - L2
+  - Contract
+  - Temporary
+  - Freelance
+
+scoring:
+  title_weight: 35
+  domain_weight: 25
+  leadership_weight: 20
+  experience_weight: 10
+  location_weight: 5
+  compensation_weight: 5
+
+minimum_score: 60
+strong_match_score: 75
+excellent_match_score: 85
+application_score: 90

@@ -1,0 +1,84 @@
+preferred:
+
+  primary:
+    - Chennai
+
+  secondary:
+    - Bengaluru
+    - Hyderabad
+
+  other_metros:
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  flexible:
+    - India
+    - Other Major Metros
+    - Remote
+
+
+remote:
+
+  accepted:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+
+relocation:
+
+  willing: true
+
+
+search:
+
+  nationwide: true
+  radius_km: 100
+
+
+priority:
+
+  Chennai: 100
+
+  Bengaluru: 95
+  Hyderabad: 90
+
+  Pune: 85
+  Mumbai: 80
+
+  "Delhi NCR": 75
+  Gurgaon: 75
+  Noida: 75
+
+  Remote: 90
+
+  Other Major Metros: 70
+
+  Other India Locations: 60
+
+
+location_rules:
+
+  preferred_location_required: false
+
+  reject_if_outside_preferred_locations: false
+
+  accept_remote_roles: true
+
+  accept_hybrid_roles: true
+
+  accept_onsite_roles: true
+
+  flexible_for_right_role: true
+
+  relocation_allowed: true
+
+
+exclude_locations:
+
+  - International
+  - Outside India

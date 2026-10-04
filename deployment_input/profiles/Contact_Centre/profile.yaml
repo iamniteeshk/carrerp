@@ -1,0 +1,486 @@
+name: Contact_Centre
+
+display_name: "Contact Centre / BPO / CX Operations Leadership"
+
+description: >
+  Executive job-search profile for Murahari M targeting Director, Head, AVP,
+  VP and General Management roles across Contact Centre, BPO, Customer
+  Experience, Customer Operations, Business Process Services, Global Delivery,
+  Managed Services and Operations Transformation.
+
+candidate:
+  name: "Murahari M"
+  preferred_name: "Hari Madhav"
+  location: "Chennai, India"
+  experience_years: 25
+
+target:
+  seniority:
+    - Director
+    - Senior Director
+    - Associate Director
+    - AVP
+    - VP
+    - Head
+    - General Manager
+
+  primary_roles:
+    - Contact Centre Director
+    - Contact Center Director
+    - Contact Centre Head
+    - Contact Center Head
+    - Head Contact Centre
+    - Head Contact Center
+    - Director Contact Centre Operations
+    - Director Contact Center Operations
+    - Contact Centre Operations Director
+    - Contact Center Operations Director
+    - Head Contact Centre Operations
+    - Head Contact Center Operations
+    - Customer Operations Director
+    - Customer Operations Head
+    - Customer Experience Director
+    - Customer Experience Head
+    - CX Operations Director
+    - CX Operations Head
+    - BPO Director
+    - BPO Head
+    - BPO Operations Director
+    - BPO Operations Head
+    - Business Process Services Director
+    - Business Process Services Head
+    - Operations Director
+    - Operations Head
+    - Site Director
+    - Site Head
+    - Centre Director
+    - Center Director
+    - Centre Head
+    - Center Head
+    - Global Operations Director
+    - Head Global Operations
+    - Global Delivery Director
+    - Head Global Delivery
+    - Service Delivery Director
+    - Head Service Delivery
+
+  secondary_roles:
+    - Customer Service Director
+    - Customer Service Head
+    - Customer Support Director
+    - Customer Support Head
+    - Customer Success Director
+    - Customer Success Head
+    - Shared Services Director
+    - Shared Services Head
+    - Service Operations Director
+    - Service Operations Head
+    - Delivery Director
+    - Delivery Head
+    - Managed Services Director
+    - Managed Services Head
+    - Transformation Director
+    - Operations Transformation Director
+    - Digital Transformation Director
+    - Process Excellence Director
+    - Operational Excellence Director
+    - Continuous Improvement Director
+    - Business Operations Director
+
+experience:
+  minimum_years: 12
+  preferred_years: 15
+  candidate_years: 25
+
+  contact_centre:
+    minimum_years: 10
+    candidate_years: 12
+
+compensation:
+  minimum_fixed_ctc: 7000000
+  expected_ctc: 9000000
+  currency: INR
+  negotiable: true
+
+  rules:
+    minimum_fixed_is_hard_floor: true
+    expected_total_ctc_is_negotiable: true
+    reject_if_fixed_below_minimum: true
+    reject_if_total_ctc_below_expected: false
+    reject_salary_undisclosed: false
+
+locations:
+  preferred:
+    - Chennai
+    - Bengaluru
+    - Hyderabad
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+  relocation:
+    willing: true
+
+  nationwide_search: false
+
+work_preferences:
+  employment_type:
+    - Full Time
+    - Permanent
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+  maximum_travel_percent: 50
+
+domain_focus:
+  primary:
+    - Contact Centre
+    - Contact Centre Operations
+    - Customer Operations
+    - Customer Experience
+    - BPO
+    - Business Process Services
+    - Global Delivery
+    - Service Delivery
+    - Managed Services
+    - Operations Management
+    - Business Operations
+
+  secondary:
+    - Shared Services
+    - Global Business Services
+    - Customer Service
+    - Customer Support
+    - Service Operations
+    - Process Management
+    - Process Excellence
+    - Operational Excellence
+    - Continuous Improvement
+    - Operations Transformation
+    - Digital Transformation
+    - AI Transformation
+    - Automation
+
+leadership_scope:
+  p_and_l: true
+  maximum_portfolio_usd: 50000000
+  maximum_team_size: 1000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+  leadership_scope:
+    - Site Leadership
+    - Multi-Site Leadership
+    - Global Delivery
+    - Operations Leadership
+    - Client Governance
+    - Executive Stakeholder Management
+    - Commercial Governance
+
+enterprise_scale:
+  users: 175000
+  devices: 188000
+
+contact_centre_scale:
+  experience_years: 12
+  site_director_level: true
+  large_scale_operations: true
+  multi_site_operations: true
+  global_delivery: true
+
+genuine_strengths:
+
+  - "25+ years of overall professional experience"
+  - "15+ years of leadership experience"
+  - "12 years of Contact Centre experience"
+  - "Site Director-level Contact Centre leadership"
+  - "Large-scale customer operations"
+  - "BPO and business process services"
+  - "Global delivery"
+  - "Multi-site operations"
+  - "P&L ownership"
+  - "USD 50M portfolio ownership"
+  - "1,000+ professionals led"
+  - "Executive stakeholder management"
+  - "Client governance"
+  - "Commercial and SOW governance"
+  - "Service delivery"
+  - "Managed services"
+  - "Operational excellence"
+  - "Continuous improvement"
+  - "Business transformation"
+  - "AI-led transformation"
+  - "Automation"
+  - "Customer experience transformation"
+
+contact_centre_keywords:
+
+  - Contact Centre
+  - Contact Center
+  - Contact Centre Operations
+  - Contact Center Operations
+  - Customer Operations
+  - Customer Experience
+  - Customer Service
+  - Customer Support
+  - BPO
+  - Business Process Outsourcing
+  - Business Process Services
+  - Shared Services
+  - Global Business Services
+  - Global Delivery
+  - Service Delivery
+  - Managed Services
+  - Multi-Site Operations
+  - Site Leadership
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - SLA
+  - KPI
+  - CSAT
+  - NPS
+  - AHT
+  - FCR
+  - Workforce Management
+  - WFM
+  - Quality Management
+  - Process Excellence
+  - COPC
+  - Six Sigma
+  - Operational Excellence
+
+technology_keywords:
+
+  - CRM
+  - Salesforce
+  - ServiceNow
+  - Microsoft Dynamics
+  - Genesys
+  - Avaya
+  - NICE
+  - NICE CXone
+  - Verint
+  - Five9
+  - Amazon Connect
+  - Cisco Contact Center
+  - Workforce Management
+  - WFM
+  - Speech Analytics
+  - Customer Analytics
+  - Power BI
+  - Power Platform
+  - RPA
+  - Automation
+  - Gen AI
+  - Conversational AI
+  - AI
+  - ITIL
+  - COPC
+  - Six Sigma
+  - Lean
+
+leadership_keywords:
+
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Contract Management
+  - Client Governance
+  - Account Management
+  - Executive Stakeholder Management
+  - CIO
+  - C-Suite
+  - QBR
+  - SLA
+  - KPI
+  - Operational Excellence
+  - Crisis Management
+  - Business Continuity
+  - Transformation
+  - Transition
+  - Global Delivery
+  - Multi-Site Operations
+
+transformation_keywords:
+
+  - Transformation
+  - Business Transformation
+  - Operations Transformation
+  - Digital Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Intelligent Automation
+  - RPA
+  - Gen AI
+  - Agentic AI
+  - Process Automation
+  - Workflow Automation
+  - Service Transformation
+  - Operating Model
+  - Target Operating Model
+  - Operational Excellence
+  - Continuous Improvement
+  - Process Re-engineering
+  - Modernisation
+  - Modernization
+
+rejection_rules:
+  rejected_title_terms:
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Associate
+    - Agent
+    - Customer Service Representative
+    - Customer Service Executive
+    - Customer Support Executive
+    - Process Associate
+    - Process Executive
+    - Team Leader
+    - Team Lead
+    - Supervisor
+    - SME
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - L1
+    - L2
+
+  rejected_roles:
+    - Customer Service Representative
+    - Customer Service Executive
+    - Customer Support Executive
+    - Process Associate
+    - Process Executive
+    - Team Leader
+    - Team Lead
+    - Operations Supervisor
+    - Contact Centre Supervisor
+    - Service Desk Analyst
+    - Desktop Support Engineer
+    - Technical Support Engineer
+
+  rejected_employment_types:
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+
+  rejected_experience:
+    maximum_years_required: 12
+
+  reject_if_salary_below_minimum: true
+
+matching:
+  minimum_match_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+
+mandatory:
+  - seniority
+  - relevant_leadership_experience
+  - relevant_contact_centre_experience
+  - employment_type
+
+preferred:
+  - P&L
+  - global_delivery
+  - contact_centre
+  - customer_operations
+  - customer_experience
+  - BPO
+  - managed_services
+  - transformation
+  - operational_excellence
+  - AI
+  - automation
+  - commercial_governance
+
+resume:
+  file: "resume.pdf"
+
+source_resume: "Contact Centre / BPO / CX Leadership resume"
+
+positioning:
+  - "Contact Centre Leadership"
+  - "BPO Operations Leadership"
+  - "Customer Operations"
+  - "Customer Experience Transformation"
+  - "Site / Centre Leadership"
+  - "Global Delivery"
+  - "P&L Leadership"
+  - "Operations Transformation"
+  - "Executive Client Advisory"
+
+search:
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+  include_recommended: true
+  include_all_feed: true
+
+  keywords:
+    - Contact Centre Director
+    - Contact Center Director
+    - Contact Centre Head
+    - Contact Center Head
+    - Director Contact Centre Operations
+    - Head Contact Centre Operations
+    - Customer Operations Director
+    - Customer Operations Head
+    - Customer Experience Director
+    - Customer Experience Head
+    - BPO Director
+    - BPO Head
+    - BPO Operations Director
+    - Business Process Services Director
+    - Operations Director
+    - Operations Head
+    - Site Director
+    - Site Head
+    - Global Operations Director
+    - Head Global Operations
+    - Global Delivery Director
+    - Head Global Delivery
+    - Service Delivery Director
+    - Head Service Delivery
+    - Managed Services Director
+    - Operations Transformation Director
+
+application:
+  eligible: true
+  minimum_score: 90
+  easy_apply_only: true
+  require_preferred_location: false
+  require_final_confirmation: true

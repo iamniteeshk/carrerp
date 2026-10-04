@@ -1,0 +1,568 @@
+name: EUC
+
+display_name: "End User Computing & Endpoint Leadership"
+
+description: >
+  Specialized executive job-search profile for Murahari M targeting
+  End User Computing, EUC, Modern Endpoint, Unified Endpoint Management,
+  Digital Workplace, Workplace Technology, Endpoint Services and
+  large-scale employee technology leadership roles.
+
+
+candidate:
+  name: "Murahari M"
+  preferred_name: "Hari Madhav"
+  location: "Chennai, India"
+  experience_years: 25
+
+
+target:
+  seniority:
+    - Director
+    - Senior Director
+    - Associate Director
+    - AVP
+    - VP
+    - Head
+    - General Manager
+
+  primary_roles:
+    - EUC Director
+    - Director EUC
+    - Head EUC
+    - Global EUC Director
+    - Global EUC Head
+    - EUC Services Director
+    - EUC Services Head
+    - End User Computing Director
+    - Head End User Computing
+    - Director End User Computing
+    - Endpoint Director
+    - Head Endpoint
+    - Endpoint Services Director
+    - Head Endpoint Services
+    - Endpoint Management Director
+    - Head Endpoint Management
+    - Modern Endpoint Director
+    - Head Modern Endpoint
+    - Digital Workplace Director
+    - Head Digital Workplace
+    - Modern Workplace Director
+    - Head Modern Workplace
+    - Workplace Technology Director
+    - Head Workplace Technology
+    - Workplace Services Director
+    - Head Workplace Services
+
+  secondary_roles:
+    - Endpoint Operations Director
+    - Endpoint Operations Head
+    - EUC Operations Director
+    - EUC Operations Head
+    - Workplace Operations Director
+    - Workplace Operations Head
+    - Digital Workplace Operations Director
+    - Digital Workplace Operations Head
+    - Client Computing Director
+    - Client Computing Head
+    - Desktop Engineering Director
+    - Desktop Engineering Head
+    - Infrastructure Services Director
+    - IT Infrastructure Director
+    - Director IT Infrastructure
+    - Head IT Infrastructure
+    - IT Operations Director
+    - Head IT Operations
+    - IT Service Delivery Director
+    - Director Service Delivery
+    - Head IT Service Delivery
+    - Managed Services Director
+    - Head Managed Services
+    - EUC Transformation Director
+    - Endpoint Transformation Director
+    - Workplace Transformation Director
+
+
+experience:
+  minimum_years: 15
+  preferred_years: 20
+  candidate_years: 25
+
+  required_domains:
+    - End User Computing
+    - EUC
+    - Digital Workplace
+    - Endpoint Management
+
+  preferred_domains:
+    - Unified Endpoint Management
+    - UEM
+    - Modern Endpoint
+    - Workplace Technology
+    - Workplace Services
+    - Digital Employee Experience
+    - Endpoint Operations
+    - Device Management
+
+
+compensation:
+  minimum_ctc: 7000000
+  minimum_fixed_ctc: 7000000
+  expected_ctc: 9000000
+  currency: INR
+  negotiable: true
+
+  rules:
+    minimum_fixed_is_hard_floor: true
+    expected_total_ctc_is_negotiable: true
+    reject_if_fixed_below_minimum: true
+    reject_if_salary_undisclosed: false
+
+
+locations:
+  preferred:
+    - Chennai
+    - Bengaluru
+    - Hyderabad
+    - Pune
+    - Mumbai
+    - Delhi NCR
+    - Gurgaon
+    - Noida
+
+  remote:
+    - India
+    - Remote
+    - Remote - India
+    - Work From Home
+
+  relocation:
+    willing: true
+
+  flexible_for_right_role: true
+
+  nationwide_search: false
+
+
+work_preferences:
+  employment_type:
+    - Full Time
+    - Permanent
+
+  work_mode:
+    - Hybrid
+    - Remote
+    - Onsite
+
+  shift:
+    - Any
+
+  preferred_shift: "Any"
+
+  maximum_travel_percent: 50
+
+
+domain_focus:
+  primary:
+    - End User Computing
+    - EUC
+    - Endpoint Management
+    - Unified Endpoint Management
+    - UEM
+    - Digital Workplace
+    - Modern Workplace
+    - Modern Endpoint
+    - Workplace Technology
+    - Workplace Services
+    - Endpoint Services
+    - Endpoint Operations
+    - Device Management
+    - Digital Employee Experience
+
+  secondary:
+    - IT Infrastructure
+    - IT Operations
+    - IT Service Delivery
+    - Managed Services
+    - Global Delivery
+    - Service Management
+    - Cloud Operations
+    - Microsoft 365
+    - Virtual Desktop Infrastructure
+    - Azure Virtual Desktop
+    - Cloud PC
+    - Automation
+    - AI Transformation
+    - Contact Centre
+    - Customer Operations
+
+
+endpoint_management:
+  core:
+    - Microsoft Intune
+    - Microsoft Endpoint Configuration Manager
+    - MECM
+    - SCCM
+    - Microsoft Endpoint Manager
+    - Jamf
+    - Jamf Pro
+    - VMware Workspace ONE
+    - Workspace ONE
+    - UEM
+    - MDM
+    - Endpoint Management
+
+  preferred:
+    - Windows Autopilot
+    - Windows Update for Business
+    - Application Packaging
+    - Software Distribution
+    - Patch Management
+    - Endpoint Compliance
+    - Endpoint Provisioning
+    - Device Lifecycle Management
+
+
+virtual_workplace:
+  preferred:
+    - Azure Virtual Desktop
+    - AVD
+    - Windows 365
+    - Cloud PC
+    - VDI
+    - Virtual Desktop Infrastructure
+    - Desktop as a Service
+    - DaaS
+
+
+digital_employee_experience:
+  preferred:
+    - Nexthink
+    - SysTrack
+    - Lakeside SysTrack
+    - Workblaze
+    - PredictX
+    - Digital Employee Experience
+    - DEX
+    - Employee Experience Analytics
+
+
+technology_keywords:
+  - Microsoft Intune
+  - Microsoft Endpoint Configuration Manager
+  - SCCM
+  - MECM
+  - Jamf
+  - Workspace ONE
+  - Azure
+  - Microsoft Azure
+  - Azure Virtual Desktop
+  - AVD
+  - Windows 365
+  - Cloud PC
+  - Microsoft 365
+  - Microsoft Entra ID
+  - Azure AD
+  - Active Directory
+  - Group Policy
+  - PowerShell
+  - ServiceNow
+  - BMC Remedy
+  - Workblaze
+  - SysTrack
+  - Nexthink
+  - PredictX
+  - PowerShell
+  - Power Platform
+  - Power Automate
+  - RPA
+  - AIOps
+  - AI Force
+  - Gen AI
+  - ITIL
+
+
+leadership_scope:
+  people_management: true
+  maximum_team_size: 1000
+
+  enterprise_scale:
+    users: 175000
+    devices: 188000
+
+  global_regions:
+    - North America
+    - LATAM
+    - EMEA
+    - APAC
+
+  global_delivery: true
+  managed_services: true
+  service_delivery: true
+  executive_stakeholder_management: true
+  transformation: true
+  automation: true
+  ai_transformation: true
+
+
+genuine_strengths:
+
+  - "25+ years of IT experience"
+  - "15+ years of leadership experience"
+  - "Director-level technology leadership"
+  - "Digital Workplace leadership"
+  - "End User Computing leadership"
+  - "Large-scale endpoint and workplace environments"
+  - "175,000 users supported"
+  - "188,000 devices supported"
+  - "1,000+ professionals led"
+  - "Global delivery across North America, LATAM, EMEA and APAC"
+  - "IT Infrastructure leadership"
+  - "Unified Endpoint Management"
+  - "Modern Endpoint transformation"
+  - "EUC transformation"
+  - "Digital Employee Experience"
+  - "Managed services"
+  - "Service delivery"
+  - "Executive stakeholder management"
+  - "Commercial governance"
+  - "AI-led transformation"
+  - "Automation"
+  - "Operational excellence"
+
+
+transformation_focus:
+  - EUC Transformation
+  - Endpoint Transformation
+  - Digital Workplace Transformation
+  - Modern Workplace Transformation
+  - IT Transformation
+  - Digital Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - AIOps
+  - Cloud Transformation
+  - Service Transformation
+  - Operational Excellence
+  - Continuous Improvement
+
+
+leadership_keywords:
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+  - Executive Leadership
+  - Senior Leadership
+  - Technology Leadership
+  - Global Delivery
+  - P&L
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - SOW
+  - RFP
+  - MSA
+  - Executive Stakeholder Management
+  - CIO
+  - C-Suite
+  - QBR
+  - SLA
+  - KPI
+  - Operational Excellence
+
+
+gcc_relevance:
+  preferred: true
+
+  keywords:
+    - GCC
+    - GIC
+    - Global Capability Centre
+    - Global Capability Center
+    - Captive Centre
+    - Captive Center
+    - BOTT
+    - Build Operate Transform Transfer
+    - Operating Model
+    - Centre Setup
+    - Center Setup
+    - Talent Ramp-Up
+    - Transition Readiness
+    - Multi-Tower Delivery
+
+
+rejection_rules:
+
+  rejected_title_terms:
+    - Intern
+    - Internship
+    - Trainee
+    - Junior
+    - Engineer
+    - Analyst
+    - Specialist
+    - Technician
+    - Desktop Support
+    - Technical Support
+    - Service Desk Analyst
+    - Desktop Engineer
+    - Desktop Support Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+    - Helpdesk
+    - Help Desk
+    - L1
+    - L2
+    - L3
+
+  rejected_roles:
+    - Desktop Support Engineer
+    - Technical Support Engineer
+    - Service Desk Analyst
+    - Desktop Engineer
+    - System Administrator
+    - Network Engineer
+    - Cloud Engineer
+    - Support Analyst
+
+  rejected_employment_types:
+    - Internship
+    - Contract
+    - Temporary
+    - Freelance
+    - Part Time
+    - Part-Time
+
+  rejected_experience:
+    maximum_years_required: 15
+
+  reject_if_salary_below_minimum: true
+
+
+matching:
+  minimum_match_score: 60
+  strong_match_score: 75
+  excellent_match_score: 85
+
+  scoring:
+    title_weight: 40
+    domain_weight: 30
+    leadership_weight: 15
+    experience_weight: 8
+    location_weight: 4
+    compensation_weight: 3
+
+
+mandatory:
+  - seniority
+  - relevant_leadership_experience
+  - relevant_euc_or_endpoint_experience
+  - employment_type
+
+preferred:
+  - Digital Workplace
+  - End User Computing
+  - EUC
+  - Endpoint Management
+  - UEM
+  - Microsoft Intune
+  - SCCM
+  - MECM
+  - Jamf
+  - Azure Virtual Desktop
+  - Microsoft 365
+  - Digital Employee Experience
+  - Global Delivery
+  - Managed Services
+  - Transformation
+  - AI
+  - Automation
+  - P&L
+
+
+resume:
+  file: "resume.pdf"
+
+  source_resume: "Digital Workplace / EUC resume"
+
+
+positioning:
+  - "EUC Leadership"
+  - "End User Computing"
+  - "Modern Endpoint Leadership"
+  - "Digital Workplace Leadership"
+  - "Workplace Technology"
+  - "Unified Endpoint Management"
+  - "Global Endpoint Services"
+  - "Digital Employee Experience"
+  - "Technology Transformation"
+  - "Executive Technology Leadership"
+
+
+search:
+  portals:
+    - LinkedIn
+    - Naukri
+
+  include_easy_apply: true
+  include_recommended: true
+  include_all_feed: true
+
+
+keywords:
+  - EUC Director
+  - Director EUC
+  - Head EUC
+  - End User Computing Director
+  - Head End User Computing
+  - Global EUC Director
+  - Endpoint Director
+  - Head Endpoint
+  - Endpoint Management Director
+  - Head Endpoint Management
+  - Modern Endpoint Director
+  - Head Modern Endpoint
+  - Digital Workplace Director
+  - Head Digital Workplace
+  - Modern Workplace Director
+  - Head Modern Workplace
+  - Workplace Technology Director
+  - Head Workplace Technology
+  - Workplace Services Director
+  - Head Workplace Services
+  - EUC Services Director
+  - EUC Operations Director
+  - Endpoint Operations Director
+  - Workplace Operations Director
+  - EUC Transformation Director
+  - Endpoint Transformation Director
+
+
+application:
+  eligible: true
+  minimum_score: 90
+  easy_apply_only: true
+  require_preferred_location: false
+  require_final_confirmation: true
+
+  conditional_auto_submit: true
+
+  conditions:
+    verified_profile_match_required: true
+    no_unknown_required_answers: true
+    no_sensitive_answer_without_confirmation: true
+    no_work_authorization_assumptions: true
+    no_qualification_assumptions: true
+    no_salary_assumptions: true
+    no_notice_period_assumptions: true
+    minimum_fixed_ctc: 7000000
+    expected_ctc: 9000000
+    salary_undisclosed_allowed: true

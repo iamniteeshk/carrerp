@@ -1,0 +1,380 @@
+primary:
+
+  - Contact Centre Director
+  - Contact Center Director
+  - Contact Centre Head
+  - Contact Center Head
+  - Head Contact Centre
+  - Head Contact Center
+  - Director Contact Centre
+  - Director Contact Center
+  - Contact Centre Operations Director
+  - Contact Center Operations Director
+  - Head Contact Centre Operations
+  - Head Contact Center Operations
+  - Contact Centre Operations Head
+  - Contact Center Operations Head
+  - Customer Operations Director
+  - Customer Operations Head
+  - Customer Experience Director
+  - Customer Experience Head
+  - CX Operations Director
+  - CX Operations Head
+  - BPO Director
+  - BPO Head
+  - BPO Operations Director
+  - BPO Operations Head
+  - Business Process Services Director
+  - Business Process Services Head
+  - Operations Director
+  - Operations Head
+  - Site Director
+  - Site Head
+  - Centre Director
+  - Center Director
+  - Centre Head
+  - Center Head
+  - Country Operations Director
+  - Global Operations Director
+  - Global Delivery Director
+  - Head Global Operations
+  - Head Global Delivery
+  - Service Delivery Director
+  - Head Service Delivery
+
+
+secondary:
+
+  - Customer Service Director
+  - Customer Service Head
+  - Customer Support Director
+  - Customer Support Head
+  - Customer Success Director
+  - Customer Success Head
+  - Shared Services Director
+  - Shared Services Head
+  - Service Operations Director
+  - Service Operations Head
+  - Delivery Director
+  - Delivery Head
+  - Managed Services Director
+  - Managed Services Head
+  - Transformation Director
+  - Operations Transformation Director
+  - Digital Transformation Director
+  - Process Excellence Director
+  - Operational Excellence Director
+  - Continuous Improvement Director
+  - Workforce Management Head
+  - Quality Head
+  - Training Head
+  - Process Management Head
+  - Business Operations Director
+
+
+domain:
+
+  - Contact Centre
+  - Contact Center
+  - Contact Centre Operations
+  - Contact Center Operations
+  - Customer Operations
+  - Customer Experience
+  - Customer Service
+  - Customer Support
+  - CX
+  - BPO
+  - Business Process Outsourcing
+  - Business Process Services
+  - BPM
+  - Shared Services
+  - Global Operations
+  - Global Delivery
+  - Service Delivery
+  - Managed Services
+  - Service Operations
+  - Operations Management
+  - Business Operations
+  - Process Management
+  - Process Excellence
+  - Operational Excellence
+  - Continuous Improvement
+  - Transformation
+  - Digital Transformation
+  - Operations Transformation
+
+
+leadership:
+
+  - Director
+  - Senior Director
+  - Associate Director
+  - AVP
+  - Vice President
+  - VP
+  - Head
+  - General Manager
+  - Site Director
+  - Site Head
+  - Country Head
+  - Country Operations
+  - Regional Head
+  - Global Head
+  - Executive Leadership
+  - Senior Leadership
+  - P&L
+  - Profit and Loss
+  - Revenue Growth
+  - Margin Management
+  - Commercial Governance
+  - Executive Stakeholder
+  - Executive Stakeholder Management
+  - Client Governance
+  - QBR
+  - SLA
+  - KPI
+  - SOW
+  - RFI
+  - RFP
+  - MSA
+  - Contract Management
+  - Account Management
+
+
+contact_centre:
+
+  - Contact Centre
+  - Contact Center
+  - Contact Centre Operations
+  - Contact Center Operations
+  - Voice
+  - Non-Voice
+  - Blended
+  - Inbound
+  - Outbound
+  - Omnichannel
+  - Customer Service
+  - Customer Experience
+  - Customer Support
+  - Customer Care
+  - Sales
+  - Collections
+  - Back Office
+  - Chat
+  - Email Support
+  - Workforce Management
+  - WFM
+  - Quality Assurance
+  - Quality Management
+  - Training
+  - Learning and Development
+  - Process Excellence
+  - Lean
+  - Six Sigma
+  - COPC
+  - ISO
+  - SLA Management
+  - KPI Management
+  - CSAT
+  - NPS
+  - AHT
+  - FCR
+  - Attrition
+  - Productivity
+  - Capacity Planning
+  - Forecasting
+  - Resource Planning
+
+
+bpo:
+
+  - BPO
+  - Business Process Outsourcing
+  - Business Process Services
+  - BPM
+  - Shared Services
+  - Global Business Services
+  - GBS
+  - Offshore Delivery
+  - Nearshore Delivery
+  - Global Delivery
+  - Delivery Centre
+  - Delivery Center
+  - Operations Centre
+  - Operations Center
+  - Multi-Site Operations
+  - Multi-Location Operations
+  - Client Operations
+  - Account Operations
+  - Transition
+  - Transition Management
+  - Transition and Transformation
+  - T&T
+  - Service Transition
+
+
+transformation:
+
+  - Transformation
+  - Operations Transformation
+  - Business Transformation
+  - Digital Transformation
+  - AI Transformation
+  - AI-led Transformation
+  - Automation
+  - Intelligent Automation
+  - RPA
+  - Agentic AI
+  - Gen AI
+  - AIOps
+  - Process Automation
+  - Workflow Automation
+  - Service Transformation
+  - Operating Model
+  - Target Operating Model
+  - TOM
+  - Operational Excellence
+  - Continuous Improvement
+  - Process Re-engineering
+  - Process Optimisation
+  - Process Optimization
+  - Modernisation
+  - Modernization
+
+
+technology:
+
+  - CRM
+  - Salesforce
+  - ServiceNow
+  - Microsoft Dynamics
+  - Genesys
+  - Avaya
+  - NICE
+  - NICE CXone
+  - Verint
+  - Five9
+  - Amazon Connect
+  - Cisco Contact Center
+  - Cisco Contact Centre
+  - Workforce Management
+  - WFM
+  - Quality Management
+  - Speech Analytics
+  - Customer Analytics
+  - Power BI
+  - Power Platform
+  - RPA
+  - Automation
+  - Gen AI
+  - AI
+  - Chatbots
+  - Conversational AI
+  - ITIL
+  - COPC
+  - Six Sigma
+  - Lean
+
+
+scale_indicators:
+
+  - 25+ years
+  - 20+ years
+  - 15+ years
+  - 12+ years
+  - 1000+ employees
+  - 1000+ professionals
+  - 500+ employees
+  - Large-Scale Operations
+  - Enterprise
+  - Global
+  - Multi-Site
+  - Multi-Location
+  - Multi-Region
+  - North America
+  - LATAM
+  - EMEA
+  - APAC
+  - P&L Ownership
+  - USD 50M
+  - $50M
+  - 175K users
+  - 188K devices
+
+
+positive_terms:
+
+  - Global
+  - Enterprise
+  - Strategic
+  - Executive
+  - Leadership
+  - Transformation
+  - Operations
+  - Delivery
+  - Customer Experience
+  - Customer Success
+  - Managed Services
+  - Consulting
+  - Advisory
+  - Governance
+  - Commercial
+  - Client Management
+  - Account Management
+  - Business Transformation
+  - Operating Model
+  - Operational Excellence
+  - Continuous Improvement
+  - Revenue Growth
+  - Margin Improvement
+  - P&L
+  - Large-Scale
+  - Multi-Site
+
+
+negative:
+
+  - Intern
+  - Internship
+  - Trainee
+  - Junior
+  - Associate
+  - Executive
+  - Agent
+  - Customer Service Representative
+  - Customer Service Executive
+  - Customer Support Executive
+  - Process Associate
+  - Process Executive
+  - Team Leader
+  - Team Lead
+  - Supervisor
+  - SME
+  - Subject Matter Expert
+  - Engineer
+  - Analyst
+  - Specialist
+  - Technician
+  - Desktop Support
+  - Technical Support
+  - Service Desk Analyst
+  - L1
+  - L2
+  - Contract
+  - Temporary
+  - Freelance
+
+
+scoring:
+
+  title_weight: 35
+  domain_weight: 25
+  leadership_weight: 20
+  experience_weight: 10
+  location_weight: 5
+  compensation_weight: 5
+
+minimum_score: 60
+strong_match_score: 75
+excellent_match_score: 85
+application_score: 90
